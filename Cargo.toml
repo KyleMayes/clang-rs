@@ -11,3 +11,8 @@ license = "MIT"
 description = "Rust bindings and idiomatic wrapper for libclang."
 
 repository = "https://github.com/KyleMayes/clang-rs"
+
+[dependencies.clippy]
+
+version = "^0.0.23"
+optional = true
