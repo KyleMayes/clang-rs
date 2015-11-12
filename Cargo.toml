@@ -1,0 +1,13 @@
+[package]
+
+name = "clang"
+authors = ["Kyle Mayes <kyle@mayeses.com>"]
+
+version = "0.0.1"
+
+readme = "README.md"
+license = "MIT"
+
+description = "Rust bindings and idiomatic wrapper for libclang."
+
+repository = "https://github.com/KyleMayes/clang-rs"
