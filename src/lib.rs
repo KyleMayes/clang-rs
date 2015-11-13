@@ -10,9 +10,10 @@ extern crate lazy_static;
 extern crate libc;
 
 use std::marker::{PhantomData};
+use std::path::{Path};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use libc::{c_int};
+use libc::{c_int, c_ulong};
 
 pub mod ffi;
 
@@ -111,4 +112,44 @@ impl<'c> Drop for Index<'c> {
     fn drop(&mut self) {
         unsafe { ffi::clang_disposeIndex(self.handle); }
     }
+}
+
+// Unsaved _______________________________________
+
+/// The path to and unsaved contents of a previously existing file.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Unsaved {
+    path: std::ffi::CString,
+    contents: std::ffi::CString,
+}
+
+impl Unsaved {
+    //- Constructors -----------------------------
+
+    /// Constructs a new `Unsaved`.
+    pub fn new<P: AsRef<Path>>(path: P, contents: &str) -> Unsaved {
+        Unsaved { path: from_path(path), contents: from_string(contents) }
+    }
+
+    //- Accessors --------------------------------
+
+    fn as_raw(&self) -> ffi::CXUnsavedFile {
+        ffi::CXUnsavedFile {
+            Filename: self.path.as_ptr(),
+            Contents: self.contents.as_ptr(),
+            Length: self.contents.as_bytes().len() as c_ulong,
+        }
+    }
+}
+
+//================================================
+// Functions
+//================================================
+
+fn from_path<P>(path: P) -> std::ffi::CString where P: AsRef<Path> {
+    from_string(path.as_ref().as_os_str().to_str().expect("invalid C string"))
+}
+
+fn from_string(string: &str) -> std::ffi::CString {
+    std::ffi::CString::new(string).expect("invalid C string")
 }
