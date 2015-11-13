@@ -12,6 +12,11 @@ description = "Rust bindings and idiomatic wrapper for libclang."
 
 repository = "https://github.com/KyleMayes/clang-rs"
 
+[dependencies]
+
+bitflags = "^0.3.2"
+libc = "^0.2.2"
+
 [dependencies.clippy]
 
 version = "^0.0.23"
