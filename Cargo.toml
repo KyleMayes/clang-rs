@@ -16,6 +16,7 @@ repository = "https://github.com/KyleMayes/clang-rs"
 [dependencies]
 
 bitflags = "^0.3.2"
+lazy_static = "^0.1.15"
 libc = "^0.2.2"
 
 [dependencies.clippy]
