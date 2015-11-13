@@ -9,7 +9,10 @@ extern crate lazy_static;
 
 extern crate libc;
 
+use std::marker::{PhantomData};
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use libc::{c_int};
 
 pub mod ffi;
 
@@ -46,5 +49,66 @@ impl Clang {
 impl Drop for Clang {
     fn drop(&mut self) {
         AVAILABLE.store(true, Ordering::Relaxed);
+    }
+}
+
+// Index _________________________________________
+
+/// Indicates which types of threads have background priority.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct BackgroundPriority {
+    pub editing: bool,
+    pub indexing: bool,
+}
+
+/// A collection of translation units.
+pub struct Index<'c> {
+    handle: ffi::CXIndex,
+    _marker: PhantomData<&'c Clang>,
+}
+
+impl<'c> Index<'c> {
+    //- Constructors -----------------------------
+
+    /// Constructs a new `Index`.
+    ///
+    /// `exclude` determines whether declarations from precompiled headers are excluded and
+    /// `diagnostics` determines whether diagnostics are printed while parsing source files.
+    pub fn new(_: &'c Clang, exclude: bool, diagnostics: bool) -> Index<'c> {
+        let handle = unsafe { ffi::clang_createIndex(exclude as c_int, diagnostics as c_int) };
+        Index { handle: handle, _marker: PhantomData }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns which types of threads have background priority.
+    pub fn get_background_priority(&self) -> BackgroundPriority {
+        let flags = unsafe { ffi::clang_CXIndex_getGlobalOptions(self.handle) };
+        let editing = flags.contains(ffi::CXGlobalOpt_ThreadBackgroundPriorityForEditing);
+        let indexing = flags.contains(ffi::CXGlobalOpt_ThreadBackgroundPriorityForIndexing);
+        BackgroundPriority { editing: editing, indexing: indexing }
+    }
+
+    //- Mutators ---------------------------------
+
+    /// Sets which types of threads have background priority.
+    pub fn set_background_priority(&mut self, priority: BackgroundPriority) {
+        let mut flags = ffi::CXGlobalOptFlags::empty();
+
+        if priority.editing {
+            flags.insert(ffi::CXGlobalOpt_ThreadBackgroundPriorityForEditing);
+        }
+
+        if priority.indexing {
+            flags.insert(ffi::CXGlobalOpt_ThreadBackgroundPriorityForIndexing);
+        }
+
+        unsafe { ffi::clang_CXIndex_setGlobalOptions(self.handle, flags); }
+    }
+}
+
+impl<'c> Drop for Index<'c> {
+    fn drop(&mut self) {
+        unsafe { ffi::clang_disposeIndex(self.handle); }
     }
 }
