@@ -140,6 +140,34 @@ impl<'c> Drop for Index<'c> {
     }
 }
 
+// ParseOptions __________________________________
+
+options! {
+    /// A set of options that determines how a source file is parsed into a translation unit.
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    options ParseOptions: CXTranslationUnit_Flags {
+        /// Indicates whether certain code completion results will be cached when the translation
+        /// unit is reparsed.
+        ///
+        /// This option increases the time it takes to reparse the translation unit but improves
+        /// code completion performance.
+        pub cache_completion_results: CXTranslationUnit_CacheCompletionResults,
+        /// Indicates whether a detailed preprocessing record will be constructed which includes all
+        /// macro definitions and instantiations.
+        pub detailed_preprocessing_record: CXTranslationUnit_DetailedPreprocessingRecord,
+        /// Indicates whether brief documentation comments will be included in code completion
+        /// results.
+        pub include_brief_comments_in_code_completion: CXTranslationUnit_IncludeBriefCommentsInCodeCompletion,
+        /// Indicates whether the translation unit will be considered incomplete.
+        ///
+        /// This option suppresses certain semantic analyses and is typically used when parsing
+        /// headers with the intent of creating a precompiled header.
+        pub incomplete: CXTranslationUnit_Incomplete,
+        /// Indicates whether function and method bodies will be skipped.
+        pub skip_function_bodies: CXTranslationUnit_SkipFunctionBodies,
+    }
+}
+
 // Unsaved _______________________________________
 
 /// The path to and unsaved contents of a previously existing file.
