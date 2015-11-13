@@ -18,6 +18,32 @@ use libc::{c_int, c_ulong};
 pub mod ffi;
 
 //================================================
+// Macros
+//================================================
+
+// options! ______________________________________
+
+macro_rules! options {
+    ($(#[$attribute:meta])* options $name:ident: $underlying:ident {
+        $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
+    }) => (
+        $(#[$attribute])*
+        #[derive(Default)]
+        pub struct $name {
+            $($(#[$fattribute])* pub $option: bool), +,
+        }
+
+        impl Into<ffi::$underlying> for $name {
+            fn into(self) -> ffi::$underlying {
+                let mut flags = ffi::$underlying::empty();
+                $(if self.$option { flags.insert(ffi::$flag); })+
+                flags
+            }
+        }
+    );
+}
+
+//================================================
 // Structs
 //================================================
 
