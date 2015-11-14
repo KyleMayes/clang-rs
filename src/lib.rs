@@ -10,6 +10,8 @@ extern crate lazy_static;
 extern crate libc;
 
 use std::mem;
+use std::slice;
+use std::collections::{HashMap};
 use std::marker::{PhantomData};
 use std::path::{Path};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -47,6 +49,42 @@ macro_rules! options {
 //================================================
 // Enums
 //================================================
+
+// MemoryUsage ___________________________________
+
+/// Indicates the usage category of a quantity of memory.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum MemoryUsage {
+    /// Expressions, declarations and types.
+    Ast = 1,
+    /// Various tables used by the AST.
+    AstSideTables = 6,
+    /// Memory allocated with `malloc` for external AST sources.
+    ExternalAstSourceMalloc = 9,
+    /// Memory allocated with `mmap` for external AST sources.
+    ExternalAstSourceMMap = 10,
+    /// Cached global code completion results.
+    GlobalCodeCompletionResults = 4,
+    /// Identifiers.
+    Identifiers = 2,
+    /// The preprocessing record.
+    PreprocessingRecord = 12,
+    /// Memory allocated with `malloc` for the preprocessor.
+    Preprocessor = 11,
+    /// Header search tables.
+    PreprocessorHeaderSearch = 14,
+    /// Selectors.
+    Selectors = 3,
+    /// The content cache used by the source manager.
+    SourceManagerContentCache = 5,
+    /// Data structures used by the source manager.
+    SourceManagerDataStructures = 13,
+    /// Memory allocated with `malloc` for the source manager.
+    SourceManagerMalloc = 7,
+    /// Memory allocated with `mmap` for the source manager.
+    SourceManagerMMap = 8,
+}
 
 // SaveError _____________________________________
 
@@ -282,6 +320,20 @@ impl<'i> TranslationUnit<'i> {
     }
 
     //- Accessors --------------------------------
+
+    /// Returns the memory usage of this translation unit.
+    pub fn get_memory_usage(&self) -> HashMap<MemoryUsage, usize> {
+        unsafe {
+            let raw = ffi::clang_getCXTUResourceUsage(self.handle);
+
+            let usage = slice::from_raw_parts(raw.entries, raw.numEntries as usize).iter().map(|u| {
+                (mem::transmute(u.kind), u.amount as usize)
+            }).collect();
+
+            ffi::clang_disposeCXTUResourceUsage(raw);
+            usage
+        }
+    }
 
     /// Saves this translation unit to an AST file.
     ///

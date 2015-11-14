@@ -72,6 +72,13 @@ fn test() {
         let _ = TranslationUnit::from_source(&mut index, f, &[], unsaved, options).unwrap();
     });
 
+    //- get_memory_usage -------------------------
+
+    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |_, _, tu| {
+        let usage = tu.get_memory_usage();
+        assert_eq!(usage.get(&MemoryUsage::Selectors), Some(&0));
+    });
+
     //- reparse ----------------------------------
 
     with_translation_unit(&clang, "test.c", "int a = 322;", &[], |_, f, tu| {
