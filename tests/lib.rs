@@ -77,6 +77,10 @@ fn test() {
 
     // TranslationUnit ___________________________
 
+    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |_, f, tu| {
+        assert_eq!(format!("{:?}", tu), format!("TranslationUnit {{ spelling: {:?} }}", f));
+    });
+
     //- from_ast ---------------------------------
     //- save -------------------------------------
 

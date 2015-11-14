@@ -34,7 +34,7 @@ macro_rules! options {
         $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
     }) => (
         $(#[$attribute])*
-        #[derive(Default)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
         pub struct $name {
             $($(#[$fattribute])* pub $option: bool), +,
         }
@@ -152,6 +152,7 @@ impl Drop for Clang {
 // File __________________________________________
 
 /// A source file.
+#[derive(Copy, Clone)]
 pub struct File<'tu> {
     handle: ffi::CXFile,
     tu: &'tu TranslationUnit<'tu>,
@@ -277,7 +278,6 @@ impl<'c> Drop for Index<'c> {
 
 options! {
     /// A set of options that determines how a source file is parsed into a translation unit.
-    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     options ParseOptions: CXTranslationUnit_Flags {
         /// Indicates whether certain code completion results will be cached when the translation
         /// unit is reparsed.
@@ -468,6 +468,13 @@ impl<'i> TranslationUnit<'i> {
 impl<'i> Drop for TranslationUnit<'i> {
     fn drop(&mut self) {
         unsafe { ffi::clang_disposeTranslationUnit(self.handle); }
+    }
+}
+
+impl<'i> fmt::Debug for TranslationUnit<'i> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let spelling = unsafe { ffi::clang_getTranslationUnitSpelling(self.handle) };
+        formatter.debug_struct("TranslationUnit").field("spelling", &to_string(spelling)).finish()
     }
 }
 
