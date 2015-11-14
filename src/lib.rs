@@ -9,11 +9,12 @@ extern crate lazy_static;
 
 extern crate libc;
 
+use std::mem;
 use std::marker::{PhantomData};
 use std::path::{Path};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use libc::{c_int, c_ulong};
+use libc::{c_int, c_uint, c_ulong};
 
 pub mod ffi;
 
@@ -41,6 +42,34 @@ macro_rules! options {
             }
         }
     );
+}
+
+//================================================
+// Enums
+//================================================
+
+// SaveError _____________________________________
+
+/// Indicates the type of error that prevented the saving of a translation unit to an AST file.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SaveError {
+    /// Errors in the translation unit prevented saving.
+    Errors,
+    /// An unknown error occurred.
+    Unknown,
+}
+
+// SourceError ___________________________________
+
+/// Indicates the type of error that prevented the loading of a translation unit from a source file.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SourceError {
+    /// An error occurred while deserializing an AST file.
+    AstDeserialization,
+    /// `libclang` crashed.
+    Crash,
+    /// An unknown error occurred.
+    Unknown,
 }
 
 //================================================
@@ -165,6 +194,151 @@ options! {
         pub incomplete: CXTranslationUnit_Incomplete,
         /// Indicates whether function and method bodies will be skipped.
         pub skip_function_bodies: CXTranslationUnit_SkipFunctionBodies,
+    }
+}
+
+// TranslationUnit _______________________________
+
+/// A preprocessed and parsed source file.
+pub struct TranslationUnit<'i> {
+    handle: ffi::CXTranslationUnit,
+    _marker: PhantomData<&'i Index<'i>>,
+}
+
+impl<'i> TranslationUnit<'i> {
+    //- Constructors -----------------------------
+
+    fn from_ptr(handle: ffi::CXTranslationUnit) -> TranslationUnit<'i> {
+        TranslationUnit{ handle: handle, _marker: PhantomData }
+    }
+
+    /// Constructs a new `TranslationUnit` from an AST file.
+    ///
+    /// # Failures
+    ///
+    /// * an unknown error occurs
+    pub fn from_ast<F: AsRef<Path>>(
+        index: &'i mut Index, file: F
+    ) -> Result<TranslationUnit<'i>, ()> {
+        let handle = unsafe {
+            ffi::clang_createTranslationUnit(index.handle, from_path(file).as_ptr())
+        };
+
+        if !handle.0.is_null() {
+            Ok(TranslationUnit::from_ptr(handle))
+        } else {
+            Err(())
+        }
+    }
+
+    /// Constructs a new `TranslationUnit` from a source file.
+    ///
+    /// Any compiler argument that may be supplied to `clang` may be supplied to this function.
+    /// However, the following arguments are ignored:
+    ///
+    /// * `-c`
+    /// * `-emit-ast`
+    /// * `-fsyntax-only`
+    /// * `-o` and the following `<output>`
+    ///
+    /// # Failures
+    ///
+    /// * an error occurs while deserializing an AST file
+    /// * `libclang` crashes
+    /// * an unknown error occurs
+    pub fn from_source<F: AsRef<Path>>(
+        index: &'i mut Index,
+        file: F,
+        arguments: &[&str],
+        unsaved: &[Unsaved],
+        options: ParseOptions,
+    ) -> Result<TranslationUnit<'i>, SourceError> {
+        let arguments = arguments.iter().map(|a| from_string(a)).collect::<Vec<_>>();
+        let arguments = arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
+        let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
+
+        unsafe {
+            let mut handle = mem::uninitialized();
+
+            let code = ffi::clang_parseTranslationUnit2(
+                index.handle,
+                from_path(file).as_ptr(),
+                arguments.as_ptr(),
+                arguments.len() as c_int,
+                mem::transmute(unsaved.as_ptr()),
+                unsaved.len() as c_uint,
+                options.into(),
+                &mut handle,
+            );
+
+            match code {
+                ffi::CXErrorCode::Success => Ok(TranslationUnit::from_ptr(handle)),
+                ffi::CXErrorCode::ASTReadError => Err(SourceError::AstDeserialization),
+                ffi::CXErrorCode::Crashed => Err(SourceError::Crash),
+                ffi::CXErrorCode::Failure => Err(SourceError::Unknown),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Saves this translation unit to an AST file.
+    ///
+    /// # Failures
+    ///
+    /// * errors in the translation unit prevent saving
+    /// * an unknown error occurs
+    pub fn save<F: AsRef<Path>>(&self, file: F) -> Result<(), SaveError> {
+        let code = unsafe {
+            ffi::clang_saveTranslationUnit(
+                self.handle, from_path(file).as_ptr(), ffi::CXSaveTranslationUnit_None
+            )
+        };
+
+        match code {
+            ffi::CXSaveError::None => Ok(()),
+            ffi::CXSaveError::InvalidTU => Err(SaveError::Errors),
+            ffi::CXSaveError::Unknown => Err(SaveError::Unknown),
+            _ => unreachable!(),
+        }
+    }
+
+    //- Consumers --------------------------------
+
+    /// Consumes this translation unit and reparses the source file it was created from with the
+    /// same compiler arguments that were used originally.
+    ///
+    /// # Failures
+    ///
+    /// * an error occurs while deserializing an AST file
+    /// * `libclang` crashes
+    /// * an unknown error occurs
+    pub fn reparse(self, unsaved: &[Unsaved]) -> Result<TranslationUnit<'i>, SourceError> {
+        let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
+
+        unsafe {
+            let code = ffi::clang_reparseTranslationUnit(
+                self.handle,
+                unsaved.len() as c_uint,
+                mem::transmute(unsaved.as_ptr()),
+                ffi::CXReparse_None,
+            );
+
+            match code {
+                ffi::CXErrorCode::Success => Ok(self),
+                ffi::CXErrorCode::ASTReadError => Err(SourceError::AstDeserialization),
+                ffi::CXErrorCode::Crashed => Err(SourceError::Crash),
+                ffi::CXErrorCode::Failure => Err(SourceError::Unknown),
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+impl<'i> Drop for TranslationUnit<'i> {
+    fn drop(&mut self) {
+        unsafe { ffi::clang_disposeTranslationUnit(self.handle); }
     }
 }
 
