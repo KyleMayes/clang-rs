@@ -40,6 +40,30 @@ fn with_translation_unit<'c, F>(
 fn test() {
     let clang = Clang::new().unwrap();
 
+    // File ______________________________________
+
+    with_translation_unit(&clang, "test.h", "int a = 322;", &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+        assert!(file.get_id() != (0, 0, 0));
+        assert_eq!(file.get_path(), f.to_path_buf());
+        assert!(file.get_time() != 0);
+        assert!(!file.is_include_guarded());
+
+        assert_eq!(file, file);
+        assert_eq!(format!("{:?}", file), format!("File {{ path: {:?} }}", f));
+    });
+
+    let source = "
+        #ifndef _TEST_H_
+        #define _TEST_H_
+        int a = 322;
+        #endif
+    ";
+
+    with_translation_unit(&clang, "test.h", source, &[], |_, f, tu| {
+        assert!(tu.get_file(f).unwrap().is_include_guarded());
+    });
+
     // Index _____________________________________
 
     let mut index = Index::new(&clang, false, false);
@@ -70,6 +94,13 @@ fn test() {
         let unsaved = &[Unsaved::new(f, "int a = 644;")];
         let options = ParseOptions::default();
         let _ = TranslationUnit::from_source(&mut index, f, &[], unsaved, options).unwrap();
+    });
+
+    //- get_file ---------------------------------
+
+    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |d, f, tu| {
+        assert!(tu.get_file(f).is_some());
+        assert!(tu.get_file(d.join("test.cpp")).is_none());
     });
 
     //- get_memory_usage -------------------------

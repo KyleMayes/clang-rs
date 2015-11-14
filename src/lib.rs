@@ -9,14 +9,17 @@ extern crate lazy_static;
 
 extern crate libc;
 
+use std::cmp;
+use std::fmt;
+use std::hash;
 use std::mem;
 use std::slice;
 use std::collections::{HashMap};
 use std::marker::{PhantomData};
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use libc::{c_int, c_uint, c_ulong};
+use libc::{c_int, c_uint, c_ulong, time_t};
 
 pub mod ffi;
 
@@ -143,6 +146,69 @@ impl Clang {
 impl Drop for Clang {
     fn drop(&mut self) {
         AVAILABLE.store(true, Ordering::Relaxed);
+    }
+}
+
+// File __________________________________________
+
+/// A source file.
+pub struct File<'tu> {
+    handle: ffi::CXFile,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> File<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_ptr(handle: ffi::CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
+        File { handle: handle, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns a unique identifier for this file.
+    pub fn get_id(&self) -> (u64, u64, u64) {
+        unsafe {
+            let mut id = mem::uninitialized();
+            ffi::clang_getFileUniqueID(self.handle, &mut id);
+            (id.data[0] as u64, id.data[1] as u64, id.data[2] as u64)
+        }
+    }
+
+    /// Returns the absolute path to this file.
+    pub fn get_path(&self) -> PathBuf {
+        let path = unsafe { ffi::clang_getFileName(self.handle) };
+        Path::new(&to_string(path)).into()
+    }
+
+    /// Returns the last modification time for this file.
+    pub fn get_time(&self) -> time_t {
+        unsafe { ffi::clang_getFileTime(self.handle) }
+    }
+
+    /// Returns whether this file is guarded against multiple inclusions.
+    pub fn is_include_guarded(&self) -> bool {
+        unsafe { ffi::clang_isFileMultipleIncludeGuarded(self.tu.handle, self.handle) != 0 }
+    }
+}
+
+impl<'tu> cmp::Eq for File<'tu> { }
+
+impl<'tu> cmp::PartialEq for File<'tu> {
+    fn eq(&self, other: &File<'tu>) -> bool {
+        unsafe { ffi::clang_File_isEqual(self.handle, other.handle) != 0 }
+    }
+}
+
+impl<'tu> fmt::Debug for File<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("File").field("path", &self.get_path()).finish()
+    }
+}
+
+impl<'tu> hash::Hash for File<'tu> {
+    fn hash<H>(&self, hasher: &mut H) where H: hash::Hasher {
+        self.get_id().hash(hasher);
     }
 }
 
@@ -321,6 +387,17 @@ impl<'i> TranslationUnit<'i> {
 
     //- Accessors --------------------------------
 
+    /// Returns the file at the supplied path in this translation unit, if any.
+    pub fn get_file<F: AsRef<Path>>(&'i self, file: F) -> Option<File<'i>> {
+        let file = unsafe { ffi::clang_getFile(self.handle, from_path(file).as_ptr()) };
+
+        if !file.0.is_null() {
+            Some(File::from_ptr(file, self))
+        } else {
+            None
+        }
+    }
+
     /// Returns the memory usage of this translation unit.
     pub fn get_memory_usage(&self) -> HashMap<MemoryUsage, usize> {
         unsafe {
@@ -432,4 +509,13 @@ fn from_path<P>(path: P) -> std::ffi::CString where P: AsRef<Path> {
 
 fn from_string(string: &str) -> std::ffi::CString {
     std::ffi::CString::new(string).expect("invalid C string")
+}
+
+fn to_string(handle: ffi::CXString) -> String {
+    unsafe {
+        let string = ::std::ffi::CStr::from_ptr(ffi::clang_getCString(handle));
+        let string = string.to_str().expect("invalid Rust string").into();
+        ffi::clang_disposeString(handle);
+        string
+    }
 }
