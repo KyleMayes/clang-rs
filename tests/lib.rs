@@ -10,6 +10,13 @@ use clang::*;
 
 use uuid::{Uuid};
 
+macro_rules! assert_location_eq {
+    ($location:expr, $file:expr, $line:expr, $column:expr, $offset:expr) => ({
+        let location = Location { file: $file, line: $line, column: $column, offset: $offset };
+        assert_eq!($location, location);
+    })
+}
+
 fn with_temporary_directory<F>(mut f: F) where F: FnMut(&Path) {
     let directory = env::temp_dir().join(Uuid::new_v4().to_simple_string());
     fs::create_dir(&directory).unwrap();
@@ -45,6 +52,7 @@ fn test() {
     with_translation_unit(&clang, "test.h", "int a = 322;", &[], |_, f, tu| {
         let file = tu.get_file(f).unwrap();
         assert!(file.get_id() != (0, 0, 0));
+        assert_eq!(file.get_location(1, 5), file.get_offset_location(4));
         assert_eq!(file.get_path(), f.to_path_buf());
         assert!(file.get_time() != 0);
         assert!(!file.is_include_guarded());
@@ -74,6 +82,48 @@ fn test() {
     priority.editing = true;
     index.set_background_priority(priority);
     assert_eq!(index.get_background_priority(), priority);
+
+    // SourceLocation ____________________________
+
+    let source = r#"
+        #define ADD(LEFT, RIGHT) (LEFT + RIGHT)
+        #line 322 "presumed.h"
+        int add(int left, int right) { return ADD(left, right); }
+    "#;
+
+    with_translation_unit(&clang, "test.h", source, &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+        let location = file.get_location(3, 51);
+        assert_location_eq!(location.get_expansion_location(), file, 3, 31, 79);
+        assert_location_eq!(location.get_file_location(), file, 3, 31, 79);
+        assert_location_eq!(location.get_spelling_location(), file, 3, 31, 79);
+        assert_eq!(location.get_presumed_location(), ("presumed.h".into(), 321, 31));
+        assert!(location.is_in_main_file());
+        assert!(!location.is_in_system_header());
+
+        assert_eq!(location, location);
+
+        let expected = format!(
+            "SourceLocation {{ file: {:?}, line: {}, column: {}, offset: {} }}", file, 3, 31, 79
+        );
+
+        assert_eq!(format!("{:?}", location), expected);
+    });
+
+    // SourceRange _______________________________
+
+    with_translation_unit(&clang, "test.h", "int a = 322;", &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+        let start = file.get_location(1, 5);
+        let end = file.get_location(1, 6);
+        let range = SourceRange::new(start, end);
+        assert_eq!(range.get_end(), end);
+        assert_eq!(range.get_start(), start);
+
+        assert_eq!(range, range);
+        let expected = format!("SourceRange {{ start: {:?}, end: {:?} }}", start, end);
+        assert_eq!(format!("{:?}", range), expected);
+    });
 
     // TranslationUnit ___________________________
 

@@ -176,6 +176,32 @@ impl<'tu> File<'tu> {
         }
     }
 
+    /// Returns the source location at the supplied line and column.
+    ///
+    /// # Panics
+    ///
+    /// * `line` or `column` is `0`
+    pub fn get_location(&'tu self, line: u32, column: u32) -> SourceLocation<'tu> {
+        if line == 0 || column == 0 {
+            panic!("`line` or `column` is `0`");
+        }
+
+        let raw = unsafe {
+            ffi::clang_getLocation(self.tu.handle, self.handle, line as c_uint, column as c_uint)
+        };
+
+        SourceLocation::from_raw(raw, self.tu)
+    }
+
+    /// Returns the source location at the supplied character offset.
+    pub fn get_offset_location(&'tu self, offset: u32) -> SourceLocation<'tu> {
+        let raw = unsafe {
+            ffi::clang_getLocationForOffset(self.tu.handle, self.handle, offset as c_uint)
+        };
+
+        SourceLocation::from_raw(raw, self.tu)
+    }
+
     /// Returns the absolute path to this file.
     pub fn get_path(&self) -> PathBuf {
         let path = unsafe { ffi::clang_getFileName(self.handle) };
@@ -298,6 +324,177 @@ options! {
         pub incomplete: CXTranslationUnit_Incomplete,
         /// Indicates whether function and method bodies will be skipped.
         pub skip_function_bodies: CXTranslationUnit_SkipFunctionBodies,
+    }
+}
+
+// SourceLocation ________________________________
+
+macro_rules! location {
+    ($function:ident, $location:expr, $tu:expr) => ({
+        let (mut file, mut line, mut column, mut offset) = mem::uninitialized();
+        ffi::$function($location, &mut file, &mut line, &mut column, &mut offset);
+
+        Location {
+            file: File::from_ptr(file, $tu),
+            line: line as u32,
+            column: column as u32,
+            offset: offset as u32,
+        }
+    });
+}
+
+/// The file, line, column, and character offset of a source location.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Location<'tu> {
+    pub file: File<'tu>,
+    pub line: u32,
+    pub column: u32,
+    pub offset: u32,
+}
+
+/// A location in a source file.
+#[derive(Copy, Clone)]
+pub struct SourceLocation<'tu> {
+    raw: ffi::CXSourceLocation,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> SourceLocation<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXSourceLocation, tu: &'tu TranslationUnit<'tu>) -> SourceLocation<'tu> {
+        SourceLocation { raw: raw, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the file, line, column and character offset of this source location.
+    ///
+    /// If this source location is inside a macro expansion, the location of the macro expansion is
+    /// returned instead.
+    pub fn get_expansion_location(&'tu self) -> Location<'tu> {
+        unsafe { location!(clang_getExpansionLocation, self.raw, self.tu) }
+    }
+
+    /// Returns the file, line, column and character offset of this source location.
+    ///
+    /// If this source location is inside a macro expansion, the location of the macro expansion is
+    /// returned instead unless this source location is inside a macro argument. In that case, the
+    /// location of the macro argument is returned.
+    pub fn get_file_location(&'tu self) -> Location<'tu> {
+        unsafe { location!(clang_getFileLocation, self.raw, self.tu) }
+    }
+
+    /// Returns the file path, line, and column of this source location taking line directives into
+    /// account.
+    pub fn get_presumed_location(&self) -> (String, u32, u32) {
+        unsafe {
+            let (mut file, mut line, mut column) = mem::uninitialized();
+            ffi::clang_getPresumedLocation(self.raw, &mut file, &mut line, &mut column);
+            (to_string(file), line as u32, column as u32)
+        }
+    }
+
+    /// Returns the file, line, column and character offset of this source location.
+    pub fn get_spelling_location(&'tu self) -> Location<'tu> {
+        unsafe { location!(clang_getSpellingLocation, self.raw, self.tu) }
+    }
+
+    /// Returns whether this source location is in the main file of its translation unit.
+    pub fn is_in_main_file(&self) -> bool {
+        unsafe { ffi::clang_Location_isFromMainFile(self.raw) != 0 }
+    }
+
+    /// Returns whether this source location is in a system header.
+    pub fn is_in_system_header(&self) -> bool {
+        unsafe { ffi::clang_Location_isInSystemHeader(self.raw) != 0 }
+    }
+}
+
+impl<'tu> cmp::Eq for SourceLocation<'tu> { }
+
+impl<'tu> cmp::PartialEq for SourceLocation<'tu> {
+    fn eq(&self, other: &SourceLocation<'tu>) -> bool {
+        unsafe { ffi::clang_equalLocations(self.raw, other.raw) != 0 }
+    }
+}
+
+impl<'tu> fmt::Debug for SourceLocation<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let location = self.get_spelling_location();
+        formatter.debug_struct("SourceLocation")
+            .field("file", &location.file)
+            .field("line", &location.line)
+            .field("column", &location.column)
+            .field("offset", &location.offset)
+            .finish()
+    }
+}
+
+impl<'tu> hash::Hash for SourceLocation<'tu> {
+    fn hash<H>(&self, hasher: &mut H) where H: hash::Hasher {
+        self.get_spelling_location().hash(hasher)
+    }
+}
+
+// SourceRange ___________________________________
+
+/// A half-open range in a source file.
+#[derive(Copy, Clone)]
+pub struct SourceRange<'tu> {
+    raw: ffi::CXSourceRange,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> SourceRange<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXSourceRange, tu: &'tu TranslationUnit<'tu>) -> SourceRange<'tu> {
+        SourceRange { raw: raw, tu: tu }
+    }
+
+    /// Constructs a new `SourceRange` that spans [`start`, `end`).
+    pub fn new(start: SourceLocation<'tu>, end: SourceLocation<'tu>) -> SourceRange<'tu> {
+        let raw = unsafe { ffi::clang_getRange(start.raw, end.raw) };
+        SourceRange::from_raw(raw, start.tu)
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the exclusive end of this source range.
+    pub fn get_end(&'tu self) -> SourceLocation<'tu> {
+        let raw = unsafe { ffi::clang_getRangeEnd(self.raw) };
+        SourceLocation::from_raw(raw, self.tu)
+    }
+
+    /// Returns the inclusive start of this source range.
+    pub fn get_start(&'tu self) -> SourceLocation<'tu> {
+        let raw = unsafe { ffi::clang_getRangeStart(self.raw) };
+        SourceLocation::from_raw(raw, self.tu)
+    }
+}
+
+impl<'tu> cmp::Eq for SourceRange<'tu> { }
+
+impl<'tu> cmp::PartialEq for SourceRange<'tu> {
+    fn eq(&self, other: &SourceRange<'tu>) -> bool {
+        unsafe { ffi::clang_equalRanges(self.raw, other.raw) != 0 }
+    }
+}
+
+impl<'tu> fmt::Debug for SourceRange<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("SourceRange")
+            .field("start", &self.get_start())
+            .field("end", &self.get_end())
+            .finish()
+    }
+}
+
+impl<'tu> hash::Hash for SourceRange<'tu> {
+    fn hash<H>(&self, hasher: &mut H) where H: hash::Hasher {
+        self.get_start().hash(hasher);
+        self.get_end().hash(hasher);
     }
 }
 
