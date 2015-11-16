@@ -27,6 +27,15 @@ pub mod ffi;
 // Macros
 //================================================
 
+// iter! _________________________________________
+
+macro_rules! iter {
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
+        let count = unsafe { ffi::$num($($num_argument), *) };
+        (0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i) })
+    });
+}
+
 // options! ______________________________________
 
 macro_rules! options {
@@ -193,6 +202,17 @@ impl<'tu> File<'tu> {
         SourceLocation::from_raw(raw, self.tu)
     }
 
+    /// Returns the module containing this file, if any.
+    pub fn get_module(&self) -> Option<Module<'tu>> {
+        let handle = unsafe { ffi::clang_getModuleForFile(self.tu.handle, self.handle) };
+
+        if !handle.0.is_null() {
+            Some(Module::from_ptr(handle, self.tu))
+        } else {
+            None
+        }
+    }
+
     /// Returns the source location at the supplied character offset in this file.
     pub fn get_offset_location(&self, offset: u32) -> SourceLocation<'tu> {
         let raw = unsafe {
@@ -297,6 +317,76 @@ impl<'c> Index<'c> {
 impl<'c> Drop for Index<'c> {
     fn drop(&mut self) {
         unsafe { ffi::clang_disposeIndex(self.handle); }
+    }
+}
+
+// Module ________________________________________
+
+/// A collection of headers.
+#[derive(Copy, Clone)]
+pub struct Module<'tu> {
+    handle: ffi::CXModule,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> Module<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_ptr(handle: ffi::CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
+        Module { handle: handle, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the AST file this module came from.
+    pub fn get_file(&self) -> File<'tu> {
+        let handle = unsafe { ffi::clang_Module_getASTFile(self.handle) };
+        File::from_ptr(handle, self.tu)
+    }
+
+    /// Returns the full name of this module (e.g., `std.vector` for the `std.vector` module).
+    pub fn get_full_name(&self) -> String {
+        let name = unsafe { ffi::clang_Module_getFullName(self.handle) };
+        to_string(name)
+    }
+
+    /// Returns the name of this module (e.g., `vector` for the `std.vector` module).
+    pub fn get_name(&self) -> String {
+        let name = unsafe { ffi::clang_Module_getName(self.handle) };
+        to_string(name)
+    }
+
+    /// Returns the parent of this module, if any.
+    pub fn get_parent(&self) -> Option<Module<'tu>> {
+        let handle = unsafe { ffi::clang_Module_getParent(self.handle) };
+
+        if !handle.0.is_null() {
+            Some(Module::from_ptr(handle, self.tu))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the top-level headers in this module.
+    pub fn get_top_level_headers(&self) -> Vec<File<'tu>> {
+        iter!(
+            clang_Module_getNumTopLevelHeaders(self.tu.handle, self.handle),
+            clang_Module_getTopLevelHeader(self.tu.handle, self.handle),
+        ).map(|h| File::from_ptr(h, self.tu)).collect()
+    }
+
+    /// Returns whether this module is a system module.
+    pub fn is_system(&self) -> bool {
+        unsafe { ffi::clang_Module_isSystem(self.handle) != 0 }
+    }
+}
+
+impl<'tu> fmt::Debug for Module<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Module")
+            .field("full_name", &self.get_full_name())
+            .field("file", &self.get_file())
+            .finish()
     }
 }
 

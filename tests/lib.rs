@@ -4,7 +4,7 @@ extern crate uuid;
 use std::env;
 use std::fs;
 use std::io::{Write};
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 
 use clang::*;
 
@@ -32,6 +32,18 @@ fn with_temporary_file<F>(name: &str, contents: &str, mut f: F) where F: FnMut(&
     });
 }
 
+fn with_temporary_files<F>(files: &[(&str, &str)], mut f: F) where F: FnMut(&Path, Vec<PathBuf>) {
+    with_temporary_directory(|d| {
+        let files = files.iter().map(|&(n, v)| {
+            let file = d.join(n);
+            fs::File::create(&file).unwrap().write_all(v.as_bytes()).unwrap();
+            file
+        }).collect::<Vec<_>>();
+
+        f(d, files);
+    });
+}
+
 fn with_translation_unit<'c, F>(
     clang: &'c Clang, name: &str, contents: &str, arguments: &[&str], mut f: F
 ) where F: FnMut(&Path, &Path, TranslationUnit) {
@@ -53,6 +65,7 @@ fn test() {
         let file = tu.get_file(f).unwrap();
         assert!(file.get_id() != (0, 0, 0));
         assert_eq!(file.get_location(1, 5), file.get_offset_location(4));
+        //assert_eq!(file.get_module(), None);
         assert_eq!(file.get_path(), f.to_path_buf());
         assert!(file.get_time() != 0);
         assert!(!file.is_include_guarded());
@@ -82,6 +95,40 @@ fn test() {
     priority.editing = true;
     index.set_background_priority(priority);
     assert_eq!(index.get_background_priority(), priority);
+
+    // Module ____________________________________
+
+    let files = &[
+        ("module.modulemap", "module parent { module child [system] { header \"test.hpp\" } }"),
+        ("test.hpp", ""),
+        ("test.cpp", "#include \"test.hpp\""),
+    ];
+
+    with_temporary_files(files, |_, fs| {
+        let mut index = Index::new(&clang, false, false);
+        let arguments = &["-fmodules"];
+        let options = ParseOptions::default();
+        let tu = TranslationUnit::from_source(&mut index, &fs[2], arguments, &[], options).unwrap();
+
+        let module = tu.get_file(&fs[1]).unwrap().get_module().unwrap();
+        assert_eq!(module.get_file().get_path().extension(), Some(std::ffi::OsStr::new("pcm")));
+        assert_eq!(module.get_full_name(), "parent.child");
+        assert_eq!(module.get_name(), "child");
+        assert!(module.is_system());
+
+        let headers = module.get_top_level_headers();
+        assert_eq!(headers.len(), 1);
+
+        assert_eq!(headers[0], tu.get_file(&fs[1]).unwrap());
+
+        let parent = module.get_parent().unwrap();
+        assert_eq!(parent.get_file().get_path().extension(), Some(std::ffi::OsStr::new("pcm")));
+        assert_eq!(parent.get_full_name(), "parent");
+        assert_eq!(parent.get_name(), "parent");
+        assert!(parent.get_parent().is_none());
+        assert_eq!(parent.get_top_level_headers().len(), 0);
+        assert!(!parent.is_system());
+    });
 
     // SourceLocation ____________________________
 
