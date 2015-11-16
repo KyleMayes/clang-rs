@@ -181,7 +181,7 @@ impl<'tu> File<'tu> {
     /// # Panics
     ///
     /// * `line` or `column` is `0`
-    pub fn get_location(&'tu self, line: u32, column: u32) -> SourceLocation<'tu> {
+    pub fn get_location(&self, line: u32, column: u32) -> SourceLocation<'tu> {
         if line == 0 || column == 0 {
             panic!("`line` or `column` is `0`");
         }
@@ -194,7 +194,7 @@ impl<'tu> File<'tu> {
     }
 
     /// Returns the source location at the supplied character offset in this file.
-    pub fn get_offset_location(&'tu self, offset: u32) -> SourceLocation<'tu> {
+    pub fn get_offset_location(&self, offset: u32) -> SourceLocation<'tu> {
         let raw = unsafe {
             ffi::clang_getLocationForOffset(self.tu.handle, self.handle, offset as c_uint)
         };
@@ -372,7 +372,7 @@ impl<'tu> SourceLocation<'tu> {
     ///
     /// If this source location is inside a macro expansion, the location of the macro expansion is
     /// returned instead.
-    pub fn get_expansion_location(&'tu self) -> Location<'tu> {
+    pub fn get_expansion_location(&self) -> Location<'tu> {
         unsafe { location!(clang_getExpansionLocation, self.raw, self.tu) }
     }
 
@@ -381,7 +381,7 @@ impl<'tu> SourceLocation<'tu> {
     /// If this source location is inside a macro expansion, the location of the macro expansion is
     /// returned instead unless this source location is inside a macro argument. In that case, the
     /// location of the macro argument is returned.
-    pub fn get_file_location(&'tu self) -> Location<'tu> {
+    pub fn get_file_location(&self) -> Location<'tu> {
         unsafe { location!(clang_getFileLocation, self.raw, self.tu) }
     }
 
@@ -396,7 +396,7 @@ impl<'tu> SourceLocation<'tu> {
     }
 
     /// Returns the file, line, column and character offset of this source location.
-    pub fn get_spelling_location(&'tu self) -> Location<'tu> {
+    pub fn get_spelling_location(&self) -> Location<'tu> {
         unsafe { location!(clang_getSpellingLocation, self.raw, self.tu) }
     }
 
@@ -462,13 +462,13 @@ impl<'tu> SourceRange<'tu> {
     //- Accessors --------------------------------
 
     /// Returns the exclusive end of this source range.
-    pub fn get_end(&'tu self) -> SourceLocation<'tu> {
+    pub fn get_end(&self) -> SourceLocation<'tu> {
         let raw = unsafe { ffi::clang_getRangeEnd(self.raw) };
         SourceLocation::from_raw(raw, self.tu)
     }
 
     /// Returns the inclusive start of this source range.
-    pub fn get_start(&'tu self) -> SourceLocation<'tu> {
+    pub fn get_start(&self) -> SourceLocation<'tu> {
         let raw = unsafe { ffi::clang_getRangeStart(self.raw) };
         SourceLocation::from_raw(raw, self.tu)
     }
