@@ -59,6 +59,17 @@ macro_rules! options {
 }
 
 //================================================
+// Traits
+//================================================
+
+// Nullable ______________________________________
+
+/// A type which may be null.
+pub trait Nullable<T> {
+    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Option<U>;
+}
+
+//================================================
 // Enums
 //================================================
 
@@ -205,12 +216,7 @@ impl<'tu> File<'tu> {
     /// Returns the module containing this file, if any.
     pub fn get_module(&self) -> Option<Module<'tu>> {
         let handle = unsafe { ffi::clang_getModuleForFile(self.tu.handle, self.handle) };
-
-        if !handle.0.is_null() {
-            Some(Module::from_ptr(handle, self.tu))
-        } else {
-            None
-        }
+        handle.map(|h| Module::from_ptr(h, self.tu))
     }
 
     /// Returns the source location at the supplied character offset in this file.
@@ -359,12 +365,7 @@ impl<'tu> Module<'tu> {
     /// Returns the parent of this module, if any.
     pub fn get_parent(&self) -> Option<Module<'tu>> {
         let handle = unsafe { ffi::clang_Module_getParent(self.handle) };
-
-        if !handle.0.is_null() {
-            Some(Module::from_ptr(handle, self.tu))
-        } else {
-            None
-        }
+        handle.map(|h| Module::from_ptr(h, self.tu))
     }
 
     /// Returns the top-level headers in this module.
@@ -615,11 +616,7 @@ impl<'i> TranslationUnit<'i> {
             ffi::clang_createTranslationUnit(index.handle, from_path(file).as_ptr())
         };
 
-        if !handle.0.is_null() {
-            Ok(TranslationUnit::from_ptr(handle))
-        } else {
-            Err(())
-        }
+        handle.map(TranslationUnit::from_ptr).ok_or(())
     }
 
     /// Constructs a new `TranslationUnit` from a source file.
@@ -677,12 +674,7 @@ impl<'i> TranslationUnit<'i> {
     /// Returns the file at the supplied path in this translation unit, if any.
     pub fn get_file<F: AsRef<Path>>(&'i self, file: F) -> Option<File<'i>> {
         let file = unsafe { ffi::clang_getFile(self.handle, from_path(file).as_ptr()) };
-
-        if !file.0.is_null() {
-            Some(File::from_ptr(file, self))
-        } else {
-            None
-        }
+        file.map(|f| File::from_ptr(f, self))
     }
 
     /// Returns the memory usage of this translation unit.

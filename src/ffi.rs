@@ -2,6 +2,8 @@
 
 use libc::{c_char, c_int, c_longlong, c_uint, c_ulong, c_ulonglong, c_void, time_t};
 
+use super::{Nullable};
+
 //================================================
 // Typedefs
 //================================================
@@ -721,6 +723,16 @@ macro_rules! opaque {
         #[derive(Copy, Clone, Debug)]
         #[repr(C)]
         pub struct $name(pub *mut c_void);
+
+        impl Nullable<$name> for $name {
+            fn map<U, F: FnOnce($name) -> U>(self, f: F) -> Option<U> {
+                if !self.0.is_null() {
+                    Some(f(self))
+                } else {
+                    None
+                }
+            }
+        }
     );
 }
 
