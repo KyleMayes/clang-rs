@@ -176,7 +176,7 @@ impl<'tu> File<'tu> {
         }
     }
 
-    /// Returns the source location at the supplied line and column.
+    /// Returns the source location at the supplied line and column in this file.
     ///
     /// # Panics
     ///
@@ -193,7 +193,7 @@ impl<'tu> File<'tu> {
         SourceLocation::from_raw(raw, self.tu)
     }
 
-    /// Returns the source location at the supplied character offset.
+    /// Returns the source location at the supplied character offset in this file.
     pub fn get_offset_location(&'tu self, offset: u32) -> SourceLocation<'tu> {
         let raw = unsafe {
             ffi::clang_getLocationForOffset(self.tu.handle, self.handle, offset as c_uint)
