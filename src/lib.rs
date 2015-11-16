@@ -174,15 +174,15 @@ impl Drop for Clang {
 /// A source file.
 #[derive(Copy, Clone)]
 pub struct File<'tu> {
-    handle: ffi::CXFile,
+    ptr: ffi::CXFile,
     tu: &'tu TranslationUnit<'tu>,
 }
 
 impl<'tu> File<'tu> {
     //- Constructors -----------------------------
 
-    fn from_ptr(handle: ffi::CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
-        File { handle: handle, tu: tu }
+    fn from_ptr(ptr: ffi::CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
+        File { ptr: ptr, tu: tu }
     }
 
     //- Accessors --------------------------------
@@ -191,7 +191,7 @@ impl<'tu> File<'tu> {
     pub fn get_id(&self) -> (u64, u64, u64) {
         unsafe {
             let mut id = mem::uninitialized();
-            ffi::clang_getFileUniqueID(self.handle, &mut id);
+            ffi::clang_getFileUniqueID(self.ptr, &mut id);
             (id.data[0] as u64, id.data[1] as u64, id.data[2] as u64)
         }
     }
@@ -206,42 +206,42 @@ impl<'tu> File<'tu> {
             panic!("`line` or `column` is `0`");
         }
 
-        let raw = unsafe {
-            ffi::clang_getLocation(self.tu.handle, self.handle, line as c_uint, column as c_uint)
+        let location = unsafe {
+            ffi::clang_getLocation(self.tu.ptr, self.ptr, line as c_uint, column as c_uint)
         };
 
-        SourceLocation::from_raw(raw, self.tu)
+        SourceLocation::from_raw(location, self.tu)
     }
 
     /// Returns the module containing this file, if any.
     pub fn get_module(&self) -> Option<Module<'tu>> {
-        let handle = unsafe { ffi::clang_getModuleForFile(self.tu.handle, self.handle) };
-        handle.map(|h| Module::from_ptr(h, self.tu))
+        let module = unsafe { ffi::clang_getModuleForFile(self.tu.ptr, self.ptr) };
+        module.map(|m| Module::from_ptr(m, self.tu))
     }
 
     /// Returns the source location at the supplied character offset in this file.
     pub fn get_offset_location(&self, offset: u32) -> SourceLocation<'tu> {
-        let raw = unsafe {
-            ffi::clang_getLocationForOffset(self.tu.handle, self.handle, offset as c_uint)
+        let location = unsafe {
+            ffi::clang_getLocationForOffset(self.tu.ptr, self.ptr, offset as c_uint)
         };
 
-        SourceLocation::from_raw(raw, self.tu)
+        SourceLocation::from_raw(location, self.tu)
     }
 
     /// Returns the absolute path to this file.
     pub fn get_path(&self) -> PathBuf {
-        let path = unsafe { ffi::clang_getFileName(self.handle) };
+        let path = unsafe { ffi::clang_getFileName(self.ptr) };
         Path::new(&to_string(path)).into()
     }
 
     /// Returns the last modification time for this file.
     pub fn get_time(&self) -> time_t {
-        unsafe { ffi::clang_getFileTime(self.handle) }
+        unsafe { ffi::clang_getFileTime(self.ptr) }
     }
 
     /// Returns whether this file is guarded against multiple inclusions.
     pub fn is_include_guarded(&self) -> bool {
-        unsafe { ffi::clang_isFileMultipleIncludeGuarded(self.tu.handle, self.handle) != 0 }
+        unsafe { ffi::clang_isFileMultipleIncludeGuarded(self.tu.ptr, self.ptr) != 0 }
     }
 }
 
@@ -249,7 +249,7 @@ impl<'tu> cmp::Eq for File<'tu> { }
 
 impl<'tu> cmp::PartialEq for File<'tu> {
     fn eq(&self, other: &File<'tu>) -> bool {
-        unsafe { ffi::clang_File_isEqual(self.handle, other.handle) != 0 }
+        unsafe { ffi::clang_File_isEqual(self.ptr, other.ptr) != 0 }
     }
 }
 
@@ -276,7 +276,7 @@ pub struct BackgroundPriority {
 
 /// A collection of translation units.
 pub struct Index<'c> {
-    handle: ffi::CXIndex,
+    ptr: ffi::CXIndex,
     _marker: PhantomData<&'c Clang>,
 }
 
@@ -288,15 +288,15 @@ impl<'c> Index<'c> {
     /// `exclude` determines whether declarations from precompiled headers are excluded and
     /// `diagnostics` determines whether diagnostics are printed while parsing source files.
     pub fn new(_: &'c Clang, exclude: bool, diagnostics: bool) -> Index<'c> {
-        let handle = unsafe { ffi::clang_createIndex(exclude as c_int, diagnostics as c_int) };
-        Index { handle: handle, _marker: PhantomData }
+        let ptr = unsafe { ffi::clang_createIndex(exclude as c_int, diagnostics as c_int) };
+        Index { ptr: ptr, _marker: PhantomData }
     }
 
     //- Accessors --------------------------------
 
     /// Returns which types of threads have background priority.
     pub fn get_background_priority(&self) -> BackgroundPriority {
-        let flags = unsafe { ffi::clang_CXIndex_getGlobalOptions(self.handle) };
+        let flags = unsafe { ffi::clang_CXIndex_getGlobalOptions(self.ptr) };
         let editing = flags.contains(ffi::CXGlobalOpt_ThreadBackgroundPriorityForEditing);
         let indexing = flags.contains(ffi::CXGlobalOpt_ThreadBackgroundPriorityForIndexing);
         BackgroundPriority { editing: editing, indexing: indexing }
@@ -316,13 +316,13 @@ impl<'c> Index<'c> {
             flags.insert(ffi::CXGlobalOpt_ThreadBackgroundPriorityForIndexing);
         }
 
-        unsafe { ffi::clang_CXIndex_setGlobalOptions(self.handle, flags); }
+        unsafe { ffi::clang_CXIndex_setGlobalOptions(self.ptr, flags); }
     }
 }
 
 impl<'c> Drop for Index<'c> {
     fn drop(&mut self) {
-        unsafe { ffi::clang_disposeIndex(self.handle); }
+        unsafe { ffi::clang_disposeIndex(self.ptr); }
     }
 }
 
@@ -331,54 +331,54 @@ impl<'c> Drop for Index<'c> {
 /// A collection of headers.
 #[derive(Copy, Clone)]
 pub struct Module<'tu> {
-    handle: ffi::CXModule,
+    ptr: ffi::CXModule,
     tu: &'tu TranslationUnit<'tu>,
 }
 
 impl<'tu> Module<'tu> {
     //- Constructors -----------------------------
 
-    fn from_ptr(handle: ffi::CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
-        Module { handle: handle, tu: tu }
+    fn from_ptr(ptr: ffi::CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
+        Module { ptr: ptr, tu: tu }
     }
 
     //- Accessors --------------------------------
 
     /// Returns the AST file this module came from.
     pub fn get_file(&self) -> File<'tu> {
-        let handle = unsafe { ffi::clang_Module_getASTFile(self.handle) };
-        File::from_ptr(handle, self.tu)
+        let ptr = unsafe { ffi::clang_Module_getASTFile(self.ptr) };
+        File::from_ptr(ptr, self.tu)
     }
 
     /// Returns the full name of this module (e.g., `std.vector` for the `std.vector` module).
     pub fn get_full_name(&self) -> String {
-        let name = unsafe { ffi::clang_Module_getFullName(self.handle) };
+        let name = unsafe { ffi::clang_Module_getFullName(self.ptr) };
         to_string(name)
     }
 
     /// Returns the name of this module (e.g., `vector` for the `std.vector` module).
     pub fn get_name(&self) -> String {
-        let name = unsafe { ffi::clang_Module_getName(self.handle) };
+        let name = unsafe { ffi::clang_Module_getName(self.ptr) };
         to_string(name)
     }
 
     /// Returns the parent of this module, if any.
     pub fn get_parent(&self) -> Option<Module<'tu>> {
-        let handle = unsafe { ffi::clang_Module_getParent(self.handle) };
-        handle.map(|h| Module::from_ptr(h, self.tu))
+        let parent = unsafe { ffi::clang_Module_getParent(self.ptr) };
+        parent.map(|p| Module::from_ptr(p, self.tu))
     }
 
     /// Returns the top-level headers in this module.
     pub fn get_top_level_headers(&self) -> Vec<File<'tu>> {
         iter!(
-            clang_Module_getNumTopLevelHeaders(self.tu.handle, self.handle),
-            clang_Module_getTopLevelHeader(self.tu.handle, self.handle),
+            clang_Module_getNumTopLevelHeaders(self.tu.ptr, self.ptr),
+            clang_Module_getTopLevelHeader(self.tu.ptr, self.ptr),
         ).map(|h| File::from_ptr(h, self.tu)).collect()
     }
 
     /// Returns whether this module is a system module.
     pub fn is_system(&self) -> bool {
-        unsafe { ffi::clang_Module_isSystem(self.handle) != 0 }
+        unsafe { ffi::clang_Module_isSystem(self.ptr) != 0 }
     }
 }
 
@@ -554,14 +554,14 @@ impl<'tu> SourceRange<'tu> {
 
     /// Returns the exclusive end of this source range.
     pub fn get_end(&self) -> SourceLocation<'tu> {
-        let raw = unsafe { ffi::clang_getRangeEnd(self.raw) };
-        SourceLocation::from_raw(raw, self.tu)
+        let end = unsafe { ffi::clang_getRangeEnd(self.raw) };
+        SourceLocation::from_raw(end, self.tu)
     }
 
     /// Returns the inclusive start of this source range.
     pub fn get_start(&self) -> SourceLocation<'tu> {
-        let raw = unsafe { ffi::clang_getRangeStart(self.raw) };
-        SourceLocation::from_raw(raw, self.tu)
+        let start = unsafe { ffi::clang_getRangeStart(self.raw) };
+        SourceLocation::from_raw(start, self.tu)
     }
 }
 
@@ -593,15 +593,15 @@ impl<'tu> hash::Hash for SourceRange<'tu> {
 
 /// A preprocessed and parsed source file.
 pub struct TranslationUnit<'i> {
-    handle: ffi::CXTranslationUnit,
+    ptr: ffi::CXTranslationUnit,
     _marker: PhantomData<&'i Index<'i>>,
 }
 
 impl<'i> TranslationUnit<'i> {
     //- Constructors -----------------------------
 
-    fn from_ptr(handle: ffi::CXTranslationUnit) -> TranslationUnit<'i> {
-        TranslationUnit{ handle: handle, _marker: PhantomData }
+    fn from_ptr(ptr: ffi::CXTranslationUnit) -> TranslationUnit<'i> {
+        TranslationUnit{ ptr: ptr, _marker: PhantomData }
     }
 
     /// Constructs a new `TranslationUnit` from an AST file.
@@ -612,11 +612,11 @@ impl<'i> TranslationUnit<'i> {
     pub fn from_ast<F: AsRef<Path>>(
         index: &'i mut Index, file: F
     ) -> Result<TranslationUnit<'i>, ()> {
-        let handle = unsafe {
-            ffi::clang_createTranslationUnit(index.handle, from_path(file).as_ptr())
+        let ptr = unsafe {
+            ffi::clang_createTranslationUnit(index.ptr, from_path(file).as_ptr())
         };
 
-        handle.map(TranslationUnit::from_ptr).ok_or(())
+        ptr.map(TranslationUnit::from_ptr).ok_or(())
     }
 
     /// Constructs a new `TranslationUnit` from a source file.
@@ -646,21 +646,21 @@ impl<'i> TranslationUnit<'i> {
         let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
 
         unsafe {
-            let mut handle = mem::uninitialized();
+            let mut ptr = mem::uninitialized();
 
             let code = ffi::clang_parseTranslationUnit2(
-                index.handle,
+                index.ptr,
                 from_path(file).as_ptr(),
                 arguments.as_ptr(),
                 arguments.len() as c_int,
                 mem::transmute(unsaved.as_ptr()),
                 unsaved.len() as c_uint,
                 options.into(),
-                &mut handle,
+                &mut ptr,
             );
 
             match code {
-                ffi::CXErrorCode::Success => Ok(TranslationUnit::from_ptr(handle)),
+                ffi::CXErrorCode::Success => Ok(TranslationUnit::from_ptr(ptr)),
                 ffi::CXErrorCode::ASTReadError => Err(SourceError::AstDeserialization),
                 ffi::CXErrorCode::Crashed => Err(SourceError::Crash),
                 ffi::CXErrorCode::Failure => Err(SourceError::Unknown),
@@ -673,14 +673,14 @@ impl<'i> TranslationUnit<'i> {
 
     /// Returns the file at the supplied path in this translation unit, if any.
     pub fn get_file<F: AsRef<Path>>(&'i self, file: F) -> Option<File<'i>> {
-        let file = unsafe { ffi::clang_getFile(self.handle, from_path(file).as_ptr()) };
+        let file = unsafe { ffi::clang_getFile(self.ptr, from_path(file).as_ptr()) };
         file.map(|f| File::from_ptr(f, self))
     }
 
     /// Returns the memory usage of this translation unit.
     pub fn get_memory_usage(&self) -> HashMap<MemoryUsage, usize> {
         unsafe {
-            let raw = ffi::clang_getCXTUResourceUsage(self.handle);
+            let raw = ffi::clang_getCXTUResourceUsage(self.ptr);
 
             let usage = slice::from_raw_parts(raw.entries, raw.numEntries as usize).iter().map(|u| {
                 (mem::transmute(u.kind), u.amount as usize)
@@ -700,7 +700,7 @@ impl<'i> TranslationUnit<'i> {
     pub fn save<F: AsRef<Path>>(&self, file: F) -> Result<(), SaveError> {
         let code = unsafe {
             ffi::clang_saveTranslationUnit(
-                self.handle, from_path(file).as_ptr(), ffi::CXSaveTranslationUnit_None
+                self.ptr, from_path(file).as_ptr(), ffi::CXSaveTranslationUnit_None
             )
         };
 
@@ -727,7 +727,7 @@ impl<'i> TranslationUnit<'i> {
 
         unsafe {
             let code = ffi::clang_reparseTranslationUnit(
-                self.handle,
+                self.ptr,
                 unsaved.len() as c_uint,
                 mem::transmute(unsaved.as_ptr()),
                 ffi::CXReparse_None,
@@ -746,13 +746,13 @@ impl<'i> TranslationUnit<'i> {
 
 impl<'i> Drop for TranslationUnit<'i> {
     fn drop(&mut self) {
-        unsafe { ffi::clang_disposeTranslationUnit(self.handle); }
+        unsafe { ffi::clang_disposeTranslationUnit(self.ptr); }
     }
 }
 
 impl<'i> fmt::Debug for TranslationUnit<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let spelling = unsafe { ffi::clang_getTranslationUnitSpelling(self.handle) };
+        let spelling = unsafe { ffi::clang_getTranslationUnitSpelling(self.ptr) };
         formatter.debug_struct("TranslationUnit").field("spelling", &to_string(spelling)).finish()
     }
 }
@@ -797,11 +797,11 @@ fn from_string(string: &str) -> std::ffi::CString {
     std::ffi::CString::new(string).expect("invalid C string")
 }
 
-fn to_string(handle: ffi::CXString) -> String {
+fn to_string(clang: ffi::CXString) -> String {
     unsafe {
-        let string = ::std::ffi::CStr::from_ptr(ffi::clang_getCString(handle));
-        let string = string.to_str().expect("invalid Rust string").into();
-        ffi::clang_disposeString(handle);
-        string
+        let c = std::ffi::CStr::from_ptr(ffi::clang_getCString(clang));
+        let rust = c.to_str().expect("invalid Rust string").into();
+        ffi::clang_disposeString(clang);
+        rust
     }
 }
