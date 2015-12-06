@@ -260,7 +260,7 @@ impl<'tu> fmt::Debug for File<'tu> {
 }
 
 impl<'tu> hash::Hash for File<'tu> {
-    fn hash<H>(&self, hasher: &mut H) where H: hash::Hasher {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
         self.get_id().hash(hasher);
     }
 }
@@ -382,11 +382,19 @@ impl<'tu> Module<'tu> {
     }
 }
 
+impl<'tu> cmp::Eq for Module<'tu> { }
+
+impl<'tu> cmp::PartialEq for Module<'tu> {
+    fn eq(&self, other: &Module<'tu>) -> bool {
+        self.get_file() == other.get_file() && self.get_full_name() == other.get_full_name()
+    }
+}
+
 impl<'tu> fmt::Debug for Module<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.debug_struct("Module")
-            .field("full_name", &self.get_full_name())
             .field("file", &self.get_file())
+            .field("full_name", &self.get_full_name())
             .finish()
     }
 }
@@ -523,7 +531,7 @@ impl<'tu> fmt::Debug for SourceLocation<'tu> {
 }
 
 impl<'tu> hash::Hash for SourceLocation<'tu> {
-    fn hash<H>(&self, hasher: &mut H) where H: hash::Hasher {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
         self.get_spelling_location().hash(hasher)
     }
 }
@@ -583,7 +591,7 @@ impl<'tu> fmt::Debug for SourceRange<'tu> {
 }
 
 impl<'tu> hash::Hash for SourceRange<'tu> {
-    fn hash<H>(&self, hasher: &mut H) where H: hash::Hasher {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
         self.get_start().hash(hasher);
         self.get_end().hash(hasher);
     }
@@ -789,7 +797,7 @@ impl Unsaved {
 // Functions
 //================================================
 
-fn from_path<P>(path: P) -> std::ffi::CString where P: AsRef<Path> {
+fn from_path<P: AsRef<Path>>(path: P) -> std::ffi::CString {
     from_string(path.as_ref().as_os_str().to_str().expect("invalid C string"))
 }
 

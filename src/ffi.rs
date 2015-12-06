@@ -1,4 +1,4 @@
-#![allow(non_upper_case_globals, non_snake_case, raw_pointer_derive)]
+#![allow(non_upper_case_globals, non_snake_case)]
 
 use libc::{c_char, c_int, c_longlong, c_uint, c_ulong, c_ulonglong, c_void, time_t};
 
