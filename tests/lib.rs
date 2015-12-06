@@ -86,6 +86,57 @@ fn test() {
         assert!(f.is_include_guarded());
     });
 
+    // Diagnostic ________________________________
+
+    let source = "
+        int add(float a, float b) { return a + b; }
+        template <typename T> struct A { typedef T::U dependent; };
+        struct Integer { int i; }; Integer i = { i: 0 };
+    ";
+
+    with_translation_unit(&clang, "test.cpp", source, &["-Wconversion"], |_, f, tu| {
+        let mut options = FormatOptions::default();
+        options.display_source_location = false;
+        options.display_option = false;
+
+        let file = tu.get_file(f).unwrap();
+
+        let diagnostics = tu.get_diagnostics();
+        assert_eq!(diagnostics.len(), 3);
+
+        let text = "implicit conversion turns floating-point number into integer: 'float' to 'int'";
+        assert_eq!(diagnostics[0].format(options), format!("warning: {}", text));
+        assert_eq!(diagnostics[0].get_fix_its(), &[]);
+        assert_eq!(diagnostics[0].get_location(), file.get_location(2, 46));
+        assert_eq!(diagnostics[0].get_ranges(), &[
+            SourceRange::new(file.get_location(2, 44), file.get_location(2, 49)),
+            SourceRange::new(file.get_location(2, 37), file.get_location(2, 43)),
+        ]);
+        assert_eq!(diagnostics[0].get_severity(), Severity::Warning);
+        assert_eq!(diagnostics[0].get_text(), text);
+
+        let text = "missing 'typename' prior to dependent type name 'T::U'";
+        assert_eq!(diagnostics[1].format(options), format!("error: {}", text));
+        assert_eq!(diagnostics[1].get_fix_its(), &[
+            FixIt::Insertion(file.get_location(3, 50), "typename ".into())
+        ]);
+        assert_eq!(diagnostics[1].get_location(), file.get_location(3, 50));
+        assert_eq!(diagnostics[1].get_ranges(), &[
+            SourceRange::new(file.get_location(3, 50), file.get_location(3, 54))
+        ]);
+        assert_eq!(diagnostics[1].get_severity(), Severity::Error);
+        assert_eq!(diagnostics[1].get_text(), text);
+
+        let text = "use of GNU old-style field designator extension";
+        assert_eq!(diagnostics[2].format(options), format!("warning: {}", text));
+        let range = SourceRange::new(file.get_location(4, 50), file.get_location(4, 52));
+        assert_eq!(diagnostics[2].get_fix_its(), &[FixIt::Replacement(range, ".i = ".into())]);
+        assert_eq!(diagnostics[2].get_location(), range.get_start());
+        assert_eq!(diagnostics[2].get_ranges(), &[]);
+        assert_eq!(diagnostics[2].get_severity(), Severity::Warning);
+        assert_eq!(diagnostics[2].get_text(), text);
+    });
+
     // Index _____________________________________
 
     let mut index = Index::new(&clang, false, false);

@@ -30,9 +30,13 @@ pub mod ffi;
 // iter! _________________________________________
 
 macro_rules! iter {
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *)) => ({
         let count = unsafe { ffi::$num($($num_argument), *) };
         (0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i) })
+    });
+
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
+        iter!($num($($num_argument), *), $get($($get_argument), *))
     });
 }
 
@@ -43,9 +47,15 @@ macro_rules! options {
         $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
     }) => (
         $(#[$attribute])*
-        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
         pub struct $name {
             $($(#[$fattribute])* pub $option: bool), +,
+        }
+
+        impl From<ffi::$underlying> for $name {
+            fn from(flags: ffi::$underlying) -> $name {
+                $name { $($option: flags.contains(ffi::$flag)), + }
+            }
         }
 
         impl Into<ffi::$underlying> for $name {
@@ -120,6 +130,25 @@ pub enum SaveError {
     Unknown,
 }
 
+// Severity ______________________________________
+
+/// Indicates the severity of a diagnostic.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum Severity {
+    /// The diagnostic has been suppressed (e.g., by a command-line option).
+    Ignored = 0,
+    /// The diagnostic is attached to the previous non-note diagnostic.
+    Note = 1,
+    /// The diagnostic targets suspicious code that may or may not be wrong.
+    Warning = 2,
+    /// The diagnostic targets ill-formed code.
+    Error = 3,
+    /// The diagnostic targets code that is ill-formed in such a way that parser recovery is
+    /// unlikely to produce any useful results.
+    Fatal = 4,
+}
+
 // SourceError ___________________________________
 
 /// Indicates the type of error that prevented the loading of a translation unit from a source file.
@@ -166,6 +195,94 @@ impl Clang {
 impl Drop for Clang {
     fn drop(&mut self) {
         AVAILABLE.store(true, Ordering::Relaxed);
+    }
+}
+
+// Diagnostic ____________________________________
+
+/// A suggested fix for an issue with a source file.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum FixIt<'tu> {
+    /// Delete a segment of the source file.
+    Deletion(SourceRange<'tu>),
+    /// Insert a string into the source file.
+    Insertion(SourceLocation<'tu>, String),
+    /// Replace a segment of the source file with a string.
+    Replacement(SourceRange<'tu>, String),
+}
+
+/// A message from the compiler about an issue with a source file.
+#[derive(Copy, Clone)]
+pub struct Diagnostic<'tu> {
+    ptr: ffi::CXDiagnostic,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> Diagnostic<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_ptr(ptr: ffi::CXDiagnostic, tu: &'tu TranslationUnit<'tu>) -> Diagnostic<'tu> {
+        Diagnostic { ptr: ptr, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns this diagnostic as a formatted string.
+    pub fn format(&self, options: FormatOptions) -> String {
+        unsafe { to_string(ffi::clang_formatDiagnostic(self.ptr, options.into())) }
+    }
+
+    /// Returns the fix-its for this diagnostic.
+    pub fn get_fix_its(&self) -> Vec<FixIt<'tu>> {
+        unsafe {
+            (0..ffi::clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
+                let mut range = mem::uninitialized();
+                let string = to_string(ffi::clang_getDiagnosticFixIt(self.ptr, i, &mut range));
+                let range = SourceRange::from_raw(range, self.tu);
+
+                if string.is_empty() {
+                    FixIt::Deletion(range)
+                } else if range.get_start() == range.get_end() {
+                    FixIt::Insertion(range.get_start(), string)
+                } else {
+                    FixIt::Replacement(range, string)
+                }
+            }).collect()
+        }
+    }
+
+    /// Returns the source location of this diagnostic.
+    pub fn get_location(&self) -> SourceLocation<'tu> {
+        unsafe { SourceLocation::from_raw(ffi::clang_getDiagnosticLocation(self.ptr), self.tu) }
+    }
+
+    /// Returns the source ranges of this diagnostic.
+    pub fn get_ranges(&self) -> Vec<SourceRange<'tu>> {
+        iter!(clang_getDiagnosticNumRanges(self.ptr), clang_getDiagnosticRange(self.ptr)).map(|r| {
+            SourceRange::from_raw(r, self.tu)
+        }).collect()
+    }
+
+    /// Returns the severity of this diagnostic.
+    pub fn get_severity(&self) -> Severity {
+        unsafe { mem::transmute(ffi::clang_getDiagnosticSeverity(self.ptr)) }
+    }
+
+    /// Returns the text of this diagnostic.
+    pub fn get_text(&self) -> String {
+        unsafe { to_string(ffi::clang_getDiagnosticSpelling(self.ptr)) }
+    }
+}
+
+impl<'tu> fmt::Debug for Diagnostic<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Diagnostic").finish()
+    }
+}
+
+impl<'tu> fmt::Display for Diagnostic<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.format(FormatOptions::default()))
     }
 }
 
@@ -262,6 +379,37 @@ impl<'tu> fmt::Debug for File<'tu> {
 impl<'tu> hash::Hash for File<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
         self.get_id().hash(hasher);
+    }
+}
+
+// FormatOptions _________________________________
+
+options! {
+    /// A set of options that determines how a diagnostic is formatted.
+    options FormatOptions: CXDiagnosticDisplayOptions {
+        /// Indicates whether the diagnostic text will be prefixed by the file and line of the
+        /// source location the diagnostic indicates. This prefix may also contain column and/or
+        /// source range information.
+        pub display_source_location: CXDiagnostic_DisplaySourceLocation,
+        /// Indicates whether the column will be included in the source location prefix.
+        pub display_column: CXDiagnostic_DisplayColumn,
+        /// Indicates whether the source ranges will be included to the source location prefix.
+        pub display_source_ranges: CXDiagnostic_DisplaySourceRanges,
+        /// Indicates whether the option associated with the diagnostic (e.g., `-Wconversion`) will
+        /// be placed in brackets after the diagnostic text if there is such an option.
+        pub display_option: CXDiagnostic_DisplayOption,
+        /// Indicates whether the category number associated with the diagnostic will be placed in
+        /// brackets after the diagnostic text if there is such a category number.
+        pub display_category_id: CXDiagnostic_DisplayCategoryId,
+        /// Indicates whether the category name associated with the diagnostic will be placed in
+        /// brackets after the diagnostic text if there is such a category name.
+        pub display_category_name: CXDiagnostic_DisplayCategoryName,
+    }
+}
+
+impl Default for FormatOptions {
+    fn default() -> FormatOptions {
+        unsafe { FormatOptions::from(ffi::clang_defaultDiagnosticDisplayOptions()) }
     }
 }
 
@@ -403,6 +551,7 @@ impl<'tu> fmt::Debug for Module<'tu> {
 
 options! {
     /// A set of options that determines how a source file is parsed into a translation unit.
+    #[derive(Default)]
     options ParseOptions: CXTranslationUnit_Flags {
         /// Indicates whether certain code completion results will be cached when the translation
         /// unit is reparsed.
@@ -678,6 +827,13 @@ impl<'i> TranslationUnit<'i> {
     }
 
     //- Accessors --------------------------------
+
+    /// Returns the diagnostics for this translation unit.
+    pub fn get_diagnostics<>(&'i self) -> Vec<Diagnostic<'i>> {
+        iter!(clang_getNumDiagnostics(self.ptr), clang_getDiagnostic(self.ptr),).map(|d| {
+            Diagnostic::from_ptr(d, self)
+        }).collect()
+    }
 
     /// Returns the file at the supplied path in this translation unit, if any.
     pub fn get_file<F: AsRef<Path>>(&'i self, file: F) -> Option<File<'i>> {
