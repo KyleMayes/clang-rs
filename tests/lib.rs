@@ -103,6 +103,7 @@ fn test() {
 
         let cursor = tu.get_cursor();
         assert_eq!(cursor.get_display_name(), Some(f.to_str().unwrap().into()));
+        assert_eq!(cursor.get_kind(), CursorKind::TranslationUnit);
         assert_eq!(cursor.get_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(cursor.get_name_ranges(), &[]);
         assert_eq!(cursor.get_mangled_name(), None);
@@ -112,6 +113,7 @@ fn test() {
         assert_eq!(children.len(), 1);
 
         assert_eq!(children[0].get_display_name(), Some("a".into()));
+        assert_eq!(children[0].get_kind(), CursorKind::VarDecl);
         assert_eq!(children[0].get_location(), file.get_location(1, 5));
         assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
         assert_eq!(children[0].get_name(), Some("a".into()));

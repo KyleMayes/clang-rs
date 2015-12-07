@@ -783,7 +783,9 @@ pub struct CXCursor {
 impl Nullable<CXCursor> for CXCursor {
     fn map<U, F: FnOnce(CXCursor) -> U>(self, f: F) -> Option<U> {
         unsafe {
-            if clang_equalCursors(self, clang_getNullCursor()) == 0 {
+            let null = clang_equalCursors(self, clang_getNullCursor()) != 0;
+
+            if !null && clang_isInvalid(self.kind) == 0 {
                 Some(f(self))
             } else {
                 None
@@ -1238,7 +1240,7 @@ extern {
     pub fn clang_getCursorDisplayName(cursor: CXCursor) -> CXString;
     pub fn clang_getCursorExtent(cursor: CXCursor) -> CXSourceRange;
     pub fn clang_getCursorKind(cursor: CXCursor) -> CXCursorKind;
-    pub fn clang_getCursorKindSpelling(cursor: CXCursorKind) -> CXString;
+    pub fn clang_getCursorKindSpelling(kind: CXCursorKind) -> CXString;
     pub fn clang_getCursorLanguage(cursor: CXCursor) -> CXLanguageKind;
     pub fn clang_getCursorLexicalParent(cursor: CXCursor) -> CXCursor;
     pub fn clang_getCursorLinkage(cursor: CXCursor) -> CXLinkageKind;
@@ -1337,21 +1339,21 @@ extern {
     pub fn clang_index_isEntityObjCContainerKind(info: CXIdxEntityKind) -> c_int;
     pub fn clang_index_setClientContainer(info: *const CXIdxContainerInfo, container: CXIdxClientContainer);
     pub fn clang_index_setClientEntity(info: *const CXIdxEntityInfo, entity: CXIdxClientEntity);
-    pub fn clang_isAttribute(cursor: CXCursorKind) -> c_uint;
+    pub fn clang_isAttribute(kind: CXCursorKind) -> c_uint;
     pub fn clang_isConstQualifiedType(type_: CXType) -> c_uint;
     pub fn clang_isCursorDefinition(cursor: CXCursor) -> c_uint;
-    pub fn clang_isDeclaration(cursor: CXCursorKind) -> c_uint;
-    pub fn clang_isExpression(cursor: CXCursorKind) -> c_uint;
+    pub fn clang_isDeclaration(kind: CXCursorKind) -> c_uint;
+    pub fn clang_isExpression(kind: CXCursorKind) -> c_uint;
     pub fn clang_isFileMultipleIncludeGuarded(tu: CXTranslationUnit, file: CXFile) -> c_uint;
     pub fn clang_isFunctionTypeVariadic(type_: CXType) -> c_uint;
-    pub fn clang_isInvalid(cursor: CXCursorKind) -> c_uint;
+    pub fn clang_isInvalid(kind: CXCursorKind) -> c_uint;
     pub fn clang_isPODType(type_: CXType) -> c_uint;
-    pub fn clang_isPreprocessing(cursor: CXCursorKind) -> c_uint;
-    pub fn clang_isReference(cursor: CXCursorKind) -> c_uint;
+    pub fn clang_isPreprocessing(kind: CXCursorKind) -> c_uint;
+    pub fn clang_isReference(kind: CXCursorKind) -> c_uint;
     pub fn clang_isRestrictQualifiedType(type_: CXType) -> c_uint;
-    pub fn clang_isStatement(cursor: CXCursorKind) -> c_uint;
-    pub fn clang_isTranslationUnit(cursor: CXCursorKind) -> c_uint;
-    pub fn clang_isUnexposed(cursor: CXCursorKind) -> c_uint;
+    pub fn clang_isStatement(kind: CXCursorKind) -> c_uint;
+    pub fn clang_isTranslationUnit(kind: CXCursorKind) -> c_uint;
+    pub fn clang_isUnexposed(kind: CXCursorKind) -> c_uint;
     pub fn clang_isVirtualBase(cursor: CXCursor) -> c_uint;
     pub fn clang_isVolatileQualifiedType(type_: CXType) -> c_uint;
     pub fn clang_loadDiagnostics(file: *const c_char, error: *mut CXLoadDiag_Error, message: *mut CXString) -> CXDiagnosticSet;

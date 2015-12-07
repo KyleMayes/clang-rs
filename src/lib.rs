@@ -97,6 +97,386 @@ pub trait Nullable<T> {
 // Enums
 //================================================
 
+// CursorKind ____________________________________
+
+/// Indicates the type of AST element a cursor references.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum CursorKind {
+    /// A declaration whose specific type is not exposed via this interface.
+    UnexposedDecl = 1,
+    /// A C or C++ struct.
+    StructDecl = 2,
+    /// A C or C++ union.
+    UnionDecl = 3,
+    /// A C++ class.
+    ClassDecl = 4,
+    /// An enum.
+    EnumDecl = 5,
+    /// A C field or C++ non-static data member in a struct, union, or class.
+    FieldDecl = 6,
+    /// An enum constant.
+    EnumConstantDecl = 7,
+    /// A function.
+    FunctionDecl = 8,
+    /// A variable.
+    VarDecl = 9,
+    /// A parameter.
+    ParmDecl = 10,
+    /// An Objective-C `@interface`.
+    ObjCInterfaceDecl = 11,
+    /// An Objective-C `@interface` for a category.
+    ObjCCategoryDecl = 12,
+    /// An Objective-C `@protocol` declaration.
+    ObjCProtocolDecl = 13,
+    /// An Objective-C `@property` declaration.
+    ObjCPropertyDecl = 14,
+    /// An Objective-C instance variable.
+    ObjCIvarDecl = 15,
+    /// An Objective-C instance method.
+    ObjCInstanceMethodDecl = 16,
+    /// An Objective-C class method.
+    ObjCClassMethodDecl = 17,
+    /// An Objective-C `@implementation`.
+    ObjCImplementationDecl = 18,
+    /// An Objective-C `@implementation` for a category.
+    ObjCCategoryImplDecl = 19,
+    /// A typedef.
+    TypedefDecl = 20,
+    /// A C++ method.
+    Method = 21,
+    /// A C++ namespace.
+    Namespace = 22,
+    /// A linkage specification (e.g., `extern "C"`).
+    LinkageSpec = 23,
+    /// A C++ constructor.
+    Constructor = 24,
+    /// A C++ destructor.
+    Destructor = 25,
+    /// A C++ conversion function.
+    ConversionFunction = 26,
+    /// A C++ template type parameter.
+    TemplateTypeParameter = 27,
+    /// A C++ template non-type parameter.
+    NonTypeTemplateParameter = 28,
+    /// A C++ template template parameter.
+    TemplateTemplateParameter = 29,
+    /// A C++ function template.
+    FunctionTemplate = 30,
+    /// A C++ class template.
+    ClassTemplate = 31,
+    /// A C++ class template partial specialization.
+    ClassTemplatePartialSpecialization = 32,
+    /// A C++ namespace alias declaration.
+    NamespaceAlias = 33,
+    /// A C++ using directive.
+    UsingDirective = 34,
+    /// A C++ using declaration.
+    UsingDeclaration = 35,
+    /// A C++ type alias declaration.
+    TypeAliasDecl = 36,
+    /// An Objective-C `@synthesize` definition.
+    ObjCSynthesizeDecl = 37,
+    /// An Objective-C `@dynamic` definition.
+    ObjCDynamicDecl = 38,
+    /// An access specifier.
+    AccessSpecifier = 39,
+    ObjCSuperClassRef = 40,
+    ObjCProtocolRef = 41,
+    ObjCClassRef = 42,
+    /// A reference to a type declaration.
+    TypeRef = 43,
+    BaseSpecifier = 44,
+    /// A reference to a class template, function template, template template parameter, or class
+    /// template partial specialization.
+    TemplateRef = 45,
+    /// A reference to a namespace or namespace alias.
+    NamespaceRef = 46,
+    /// A reference to a member of a struct, union, or class that occurs in some non-expression
+    /// context.
+    MemberRef = 47,
+    /// A reference to a labeled statement.
+    LabelRef = 48,
+    /// A reference to a set of overloaded functions or function templates that has not yet been
+    /// resolved to a specific function or function template.
+    OverloadedDeclRef = 49,
+    /// A reference to a variable that occurs in some non-expression context.
+    VariableRef = 50,
+    /// An expression whose specific kind is not exposed via this interface.
+    UnexposedExpr = 100,
+    /// An expression that refers to some value declaration, such as a function or enumerator.
+    DeclRefExpr = 101,
+    /// An expression that refers to the member of a struct, union, or class.
+    MemberRefExpr = 102,
+    /// An expression that calls a function.
+    CallExpr = 103,
+    /// An expression that sends a message to an Objective-C object or class.
+    ObjCMessageExpr = 104,
+    /// An expression that represents a block literal.
+    BlockExpr = 105,
+    /// An integer literal.
+    IntegerLiteral = 106,
+    /// A floating point number literal.
+    FloatingLiteral = 107,
+    /// An imaginary number literal.
+    ImaginaryLiteral = 108,
+    /// A string literal.
+    StringLiteral = 109,
+    /// A character literal.
+    CharacterLiteral = 110,
+    /// A parenthesized expression.
+    ParenExpr = 111,
+    /// Any unary expression other than `sizeof` and `alignof`.
+    UnaryOperator = 112,
+    /// An array subscript expression (`[C99 6.5.2.1]`).
+    ArraySubscriptExpr = 113,
+    /// A built-in binary expression (e.g., `x + y`).
+    BinaryOperator = 114,
+    /// A compound assignment expression (e.g., `x += y`).
+    CompoundAssignOperator = 115,
+    /// A ternary expression.
+    ConditionalOperator = 116,
+    /// An explicit cast in C or a C-style cast in C++.
+    CStyleCastExpr = 117,
+    /// A compound literal expression (`[C99 6.5.2.5]`).
+    CompoundLiteralExpr = 118,
+    /// A C or C++ initializer list.
+    InitListExpr = 119,
+    /// A GNU address of label expression.
+    AddrLabelExpr = 120,
+    /// A GNU statement expression.
+    StmtExpr = 121,
+    /// A C11 generic selection expression.
+    GenericSelectionExpr = 122,
+    /// A GNU `__null` expression.
+    GNUNullExpr = 123,
+    /// A C++ `static_cast<>` expression.
+    StaticCastExpr = 124,
+    /// A C++ `dynamic_cast<>` expression.
+    DynamicCastExpr = 125,
+    /// A C++ `reinterpret_cast<>` expression.
+    ReinterpretCastExpr = 126,
+    /// A C++ `const_cast<>` expression.
+    ConstCastExpr = 127,
+    /// A C++ cast that uses "function" notation (e.g., `int(0.5)`).
+    FunctionalCastExpr = 128,
+    /// A C++ `typeid` expression.
+    TypeidExpr = 129,
+    /// A C++ boolean literal.
+    BoolLiteralExpr = 130,
+    /// A C++ `nullptr` exrepssion.
+    NullPtrLiteralExpr = 131,
+    /// A C++ `this` expression.
+    ThisExpr = 132,
+    /// A C++ `throw` expression.
+    ThrowExpr = 133,
+    /// A C++ `new` expression.
+    NewExpr = 134,
+    /// A C++ `delete` expression.
+    DeleteExpr = 135,
+    /// A unary expression.
+    UnaryExpr = 136,
+    /// An Objective-C string literal.
+    ObjCStringLiteral = 137,
+    /// An Objective-C `@encode` expression.
+    ObjCEncodeExpr = 138,
+    /// An Objective-C `@selector` expression.
+    ObjCSelectorExpr = 139,
+    /// An Objective-C `@protocol` expression.
+    ObjCProtocolExpr = 140,
+    /// An Objective-C bridged cast expression.
+    ObjCBridgedCastExpr = 141,
+    /// A C++11 parameter pack expansion expression.
+    PackExpansionExpr = 142,
+    /// A C++11 `sizeof...` expression.
+    SizeOfPackExpr = 143,
+    /// A C++11 lambda expression.
+    LambdaExpr = 144,
+    /// An Objective-C boolean literal.
+    ObjCBoolLiteralExpr = 145,
+    /// An Objective-C `self` expression.
+    ObjCSelfExpr = 146,
+    /// A statement whose specific kind is not exposed via this interface.
+    UnexposedStmt = 200,
+    /// A labelled statement in a function.
+    LabelStmt = 201,
+    /// A group of statements (e.g., a function body).
+    CompoundStmt = 202,
+    /// A `case` statement.
+    CaseStmt = 203,
+    /// A `default` statement.
+    DefaultStmt = 204,
+    /// An `if` statement.
+    IfStmt = 205,
+    /// A `switch` statement.
+    SwitchStmt = 206,
+    /// A `while` statement.
+    WhileStmt = 207,
+    /// A `do` statement.
+    DoStmt = 208,
+    /// A `for` statement.
+    ForStmt = 209,
+    /// A `goto` statement.
+    GotoStmt = 210,
+    /// An indirect `goto` statement.
+    IndirectGotoStmt = 211,
+    /// A `continue` statement.
+    ContinueStmt = 212,
+    /// A `break` statement.
+    BreakStmt = 213,
+    /// A `return` statement.
+    ReturnStmt = 214,
+    /// An inline assembly statement.
+    AsmStmt = 215,
+    /// An Objective-C `@try`-`@catch`-`@finally` statement.
+    ObjCAtTryStmt = 216,
+    /// An Objective-C `@catch` statement.
+    ObjCAtCatchStmt = 217,
+    /// An Objective-C `@finally` statement.
+    ObjCAtFinallyStmt = 218,
+    /// An Objective-C `@throw` statement.
+    ObjCAtThrowStmt = 219,
+    /// An Objective-C `@synchronized` statement.
+    ObjCAtSynchronizedStmt = 220,
+    /// An Objective-C autorelease pool statement.
+    ObjCAutoreleasePoolStmt = 221,
+    /// An Objective-C collection statement.
+    ObjCForCollectionStmt = 222,
+    /// A C++ catch statement.
+    CatchStmt = 223,
+    /// A C++ try statement.
+    TryStmt = 224,
+    /// A C++11 range-based for statement.
+    ForRangeStmt = 225,
+    /// A Windows Structured Exception Handling `__try` statement.
+    SehTryStmt = 226,
+    /// A Windows Structured Exception Handling `__except` statement.
+    SehExceptStmt = 227,
+    /// A Windows Structured Exception Handling `__finally` statement.
+    SehFinallyStmt = 228,
+    /// A Windows Structured Exception Handling `__leave` statement.
+    SehLeaveStmt = 247,
+    /// A Microsoft inline assembly statement.
+    MsAsmStmt = 229,
+    /// A null statement.
+    NullStmt = 230,
+    /// An adaptor for mixing declarations with statements and expressions.
+    DeclStmt = 231,
+    /// An OpenMP parallel directive.
+    OmpParallelDirective = 232,
+    /// An OpenMP SIMD directive.
+    OmpSimdDirective = 233,
+    /// An OpenMP for directive.
+    OmpForDirective = 234,
+    /// An OpenMP sections directive.
+    OmpSectionsDirective = 235,
+    /// An OpenMP section directive.
+    OmpSectionDirective = 236,
+    /// An OpenMP single directive.
+    OmpSingleDirective = 237,
+    /// An OpenMP parallel for directive.
+    OmpParallelForDirective = 238,
+    /// An OpenMP parallel sections directive.
+    OmpParallelSectionsDirective = 239,
+    /// An OpenMP task directive.
+    OmpTaskDirective = 240,
+    /// An OpenMP master directive.
+    OmpMasterDirective = 241,
+    /// An OpenMP critical directive.
+    OmpCriticalDirective = 242,
+    /// An OpenMP taskyield directive.
+    OmpTaskyieldDirective = 243,
+    /// An OpenMP barrier directive.
+    OmpBarrierDirective = 244,
+    /// An OpenMP taskwait directive.
+    OmpTaskwaitDirective = 245,
+    /// An OpenMP flush directive.
+    OmpFlushDirective = 246,
+    /// An OpenMP ordered directive.
+    OmpOrderedDirective = 248,
+    /// An OpenMP atomic directive.
+    OmpAtomicDirective = 249,
+    /// An OpenMP for SIMD directive.
+    OmpForSimdDirective = 250,
+    /// An OpenMP parallel for SIMD directive.
+    OmpParallelForSimdDirective = 251,
+    /// An OpenMP target directive.
+    OmpTargetDirective = 252,
+    /// An OpenMP teams directive.
+    OmpTeamsDirective = 253,
+    /// An OpenMP taskgroup directive.
+    OmpTaskgroupDirective = 254,
+    /// An OpenMP cancellation point directive.
+    OmpCancellationPointDirective = 255,
+    /// An OpenMP cancel directive.
+    OmpCancelDirective = 256,
+    /// The top-level AST element which acts as the root for the other elements.
+    TranslationUnit = 300,
+    /// An attribute whose specific kind is not exposed via this interface.
+    UnexposedAttr = 400,
+    IBActionAttr = 401,
+    IBOutletAttr = 402,
+    IBOutletCollectionAttr = 403,
+    FinalAttr = 404,
+    OverrideAttr = 405,
+    AnnotateAttr = 406,
+    AsmLabelAttr = 407,
+    PackedAttr = 408,
+    PureAttr = 409,
+    ConstAttr = 410,
+    NoDuplicateAttr = 411,
+    CudaConstantAttr = 412,
+    CudaDeviceAttr = 413,
+    CudaGlobalAttr = 414,
+    CudaHostAttr = 415,
+    CudaSharedAttr = 416,
+    PreprocessingDirective = 500,
+    MacroDefinition = 501,
+    MacroExpansion = 502,
+    InclusionDirective = 503,
+    ModuleImportDecl = 600,
+    OverloadCandidate = 700,
+}
+
+impl CursorKind {
+    //- Accessors --------------------------------
+
+    /// Returns whether this cursor kind is categorized as an attribute.
+    pub fn is_attribute(&self) -> bool {
+        unsafe { ffi::clang_isAttribute(mem::transmute(*self)) != 0 }
+    }
+
+    /// Returns whether this cursor kind is categorized as a declaration.
+    pub fn is_declaration(&self) -> bool {
+        unsafe { ffi::clang_isDeclaration(mem::transmute(*self)) != 0 }
+    }
+
+    /// Returns whether this cursor kind is categorized as an expression.
+    pub fn is_expression(&self) -> bool {
+        unsafe { ffi::clang_isExpression(mem::transmute(*self)) != 0 }
+    }
+
+    /// Returns whether this cursor kind is categorized as preprocessing.
+    pub fn is_preprocessing(&self) -> bool {
+        unsafe { ffi::clang_isPreprocessing(mem::transmute(*self)) != 0 }
+    }
+
+    /// Returns whether this cursor kind is categorized as a reference.
+    pub fn is_reference(&self) -> bool {
+        unsafe { ffi::clang_isReference(mem::transmute(*self)) != 0 }
+    }
+
+    /// Returns whether this cursor kind is categorized as a statement.
+    pub fn is_statement(&self) -> bool {
+        unsafe { ffi::clang_isStatement(mem::transmute(*self)) != 0 }
+    }
+
+    /// Returns whether this cursor kind is categorized as unexposed.
+    pub fn is_unexposed(&self) -> bool {
+        unsafe { ffi::clang_isUnexposed(mem::transmute(*self)) != 0 }
+    }
+}
+
 // SaveError _____________________________________
 
 /// Indicates how a cursor visitation should proceed.
@@ -303,6 +683,11 @@ impl<'tu> Cursor<'tu> {
         unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
     }
 
+    /// Returns the kind of AST element this cursor references.
+    pub fn get_kind(&self) -> CursorKind {
+        unsafe { mem::transmute(self.raw.kind) }
+    }
+
     /// Returns the cursor that refers to the lexical parent of the AST element this cursor
     /// references, if any.
     pub fn get_lexical_parent(&self) -> Option<Cursor<'tu>> {
@@ -471,7 +856,7 @@ impl<'tu> Cursor<'tu> {
         }
 
         let mut data = (self.tu, Box::new(f) as Box<CursorCallback>);
-        unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
+            unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
     }
 }
 
