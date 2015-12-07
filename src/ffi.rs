@@ -780,6 +780,18 @@ pub struct CXCursor {
     pub data: [*const c_void; 3],
 }
 
+impl Nullable<CXCursor> for CXCursor {
+    fn map<U, F: FnOnce(CXCursor) -> U>(self, f: F) -> Option<U> {
+        unsafe {
+            if clang_equalCursors(self, clang_getNullCursor()) == 0 {
+                Some(f(self))
+            } else {
+                None
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct CXCursorAndRangeVisitor {
@@ -975,6 +987,18 @@ pub struct CXSourceRange {
     pub end_int_data: c_uint,
 }
 
+impl Nullable<CXSourceRange> for CXSourceRange {
+    fn map<U, F: FnOnce(CXSourceRange) -> U>(self, f: F) -> Option<U> {
+        unsafe {
+            if clang_Range_isNull(self) == 0 {
+                Some(f(self))
+            } else {
+                None
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct CXSourceRangeList {
@@ -987,6 +1011,16 @@ pub struct CXSourceRangeList {
 pub struct CXString {
     pub data: *const c_void,
     pub private_flags: c_uint,
+}
+
+impl Nullable<CXString> for CXString {
+    fn map<U, F: FnOnce(CXString) -> U>(self, f: F) -> Option<U> {
+        if !self.data.is_null() {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Copy, Clone)]

@@ -38,6 +38,20 @@ macro_rules! iter {
     ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
         iter!($num($($num_argument), *), $get($($get_argument), *))
     });
+
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *), $panic:expr) => ({
+        let count = unsafe { ffi::$num($($num_argument), *) };
+
+        if count < 0 {
+            panic!($panic);
+        } else {
+            (0..count as c_uint).map(|i| unsafe { ffi::$get($($get_argument), *, i) })
+        }
+    });
+
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *), $panic:expr,) => ({
+        iter!($num($($num_argument), *), $get($($get_argument), *), $panic)
+    });
 }
 
 // options! ______________________________________
@@ -82,6 +96,20 @@ pub trait Nullable<T> {
 //================================================
 // Enums
 //================================================
+
+// SaveError _____________________________________
+
+/// Indicates how a cursor visitation should proceed.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum CursorVisitResult {
+    /// Do not continue visiting cursors.
+    Break = 0,
+    /// Continue visiting sibling cursors but no child cursors.
+    Continue = 1,
+    /// Continue visiting sibling and child cursors.
+    Recurse = 2,
+}
 
 // MemoryUsage ___________________________________
 
@@ -198,6 +226,275 @@ impl Drop for Clang {
     }
 }
 
+// Cursor ________________________________________
+
+/// A reference to an element in the AST of a translation unit.
+#[derive(Copy, Clone)]
+pub struct Cursor<'tu> {
+    raw: ffi::CXCursor,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> Cursor<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXCursor, tu: &'tu TranslationUnit<'tu>) -> Cursor<'tu> {
+        Cursor { raw: raw, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the cursors that refer to the arguments of the function or method this cursor
+    /// references.
+    ///
+    /// # Panics
+    ///
+    /// * this cursor does not refer to a function or a method
+    pub fn get_arguments(&self) -> Vec<Cursor<'tu>> {
+        iter!(
+            clang_Cursor_getNumArguments(self.raw),
+            clang_Cursor_getArgument(self.raw),
+            "this cursor does not refer to a function or a method",
+        ).map(|a| Cursor::from_raw(a, self.tu)).collect()
+    }
+
+    /// Returns the canonical cursor for this cursor.
+    ///
+    /// In the C family of languages, some types of entities can be declared mulitple times. When
+    /// there are multiple declarations of the same entity, only one will be considered canonical.
+    pub fn get_canonical_cursor(&self) -> Cursor<'tu> {
+        unsafe { Cursor::from_raw(ffi::clang_getCanonicalCursor(self.raw), self.tu) }
+    }
+
+    /// Returns the comment associated with the AST element this cursor references, if any.
+    pub fn get_comment(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_Cursor_getRawCommentText(self.raw)) }
+    }
+
+    /// Returns the brief of the comment associated with the AST element this cursor references, if
+    /// any.
+    pub fn get_comment_brief(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_Cursor_getBriefCommentText(self.raw)) }
+    }
+
+    /// Returns the source range of the comment associated with the AST element this cursor refers
+    /// to, if any.
+    pub fn get_comment_range(&self) -> Option<SourceRange<'tu>> {
+        let range = unsafe { ffi::clang_Cursor_getCommentRange(self.raw) };
+        range.map(|r| SourceRange::from_raw(r, self.tu))
+    }
+
+    /// Returns the children of this cursor.
+    pub fn get_children(&self) -> Vec<Cursor<'tu>> {
+        let mut children = vec![];
+
+        self.visit_children(|c, _| {
+            children.push(c);
+            CursorVisitResult::Continue
+        });
+
+        children
+    }
+
+    /// Returns the display name of this cursor.
+    ///
+    /// The display name includes additional information about the entity this cursor references.
+    pub fn get_display_name(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
+    }
+
+    /// Returns the cursor that refers to the lexical parent of the AST element this cursor
+    /// references, if any.
+    pub fn get_lexical_parent(&self) -> Option<Cursor<'tu>> {
+        unsafe { ffi::clang_getCursorLexicalParent(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
+    }
+
+    /// Returns the source location of the AST element this cursor references.
+    ///
+    /// # Panics
+    ///
+    /// * this cursor refers to a translation unit
+    pub fn get_location(&self) -> SourceLocation<'tu> {
+        if self.raw.kind == ffi::CXCursorKind::TranslationUnit {
+            panic!("this cursor refers to a translation unit");
+        }
+
+        unsafe { SourceLocation::from_raw(ffi::clang_getCursorLocation(self.raw), self.tu) }
+    }
+
+    /// Returns the mangled name for the AST element this cursor references, if any.
+    pub fn get_mangled_name(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
+    }
+
+    /// Returns the module imported by the module import declaration this cursor references.
+    ///
+    /// # Panics
+    ///
+    /// * this cursor does not refer to a module import declaration
+    pub fn get_module(&self) -> Module<'tu> {
+        unsafe {
+            ffi::clang_Cursor_getModule(self.raw).map(|m| {
+                Module::from_ptr(m, self.tu)
+            }).expect("this cursor does not refer to a module import declaration")
+        }
+    }
+
+    /// Returns the name for the AST element this cursor references, if any.
+    pub fn get_name(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_getCursorSpelling(self.raw)) }
+    }
+
+    /// Returns the source ranges of the name for the AST element this cursor references, if any.
+    pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
+        use std::ptr;
+        unsafe {
+            (0..).map(|i| ffi::clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
+                if ffi::clang_Range_isNull(*r) != 0 {
+                    false
+                } else {
+                    let mut file = mem::uninitialized();
+
+                    ffi::clang_getSpellingLocation(
+                        ffi::clang_getRangeStart(*r),
+                        &mut file,
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                    );
+
+                    !file.0.is_null()
+                }
+            }).map(|r| SourceRange::from_raw(r, self.tu)).collect()
+        }
+    }
+
+    /// Returns the source range of the AST element this cursor references.
+    ///
+    /// # Panics
+    ///
+    /// * this cursor refers to a translation unit
+    pub fn get_range(&self) -> SourceRange<'tu> {
+        if self.raw.kind == ffi::CXCursorKind::TranslationUnit {
+            panic!("this cursor refers to a translation unit");
+        }
+
+        unsafe { SourceRange::from_raw(ffi::clang_getCursorExtent(self.raw), self.tu) }
+    }
+
+    /// Returns the cursor that refers to the semantic parent of the AST element this cursor
+    /// references, if any.
+    pub fn get_semantic_parent(&self) -> Option<Cursor<'tu>> {
+        let parent = unsafe { ffi::clang_getCursorSemanticParent(self.raw) };
+        parent.map(|p| Cursor::from_raw(p, self.tu))
+    }
+
+    /// Returns the translation unit which contains the AST element this cursor references.
+    pub fn get_translation_unit(&self) -> &'tu TranslationUnit<'tu> {
+        self.tu
+    }
+
+    /// Returns whether this cursor refers to an anonymous record declaration.
+    pub fn is_anonymous(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isAnonymous(self.raw) != 0 }
+    }
+
+    /// Returns whether this cursor refers to a bit field.
+    pub fn is_bit_field(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isBitField(self.raw) != 0 }
+    }
+
+    /// Returns whether this cursor refers to a const method.
+    pub fn is_const_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isConst(self.raw) != 0 }
+    }
+
+    /// Returns whether this cursor refers to a dynamic call.
+    ///
+    /// A dynamic call is either a call to a C++ virtual method or an Objective-C message where the
+    /// receiver is an object instance, not `super` or a specific class.
+    pub fn is_dynamic_call(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isDynamicCall(self.raw) != 0 }
+    }
+
+    /// Returns whether this cursor refers to a pure virtual method.
+    pub fn is_pure_virtual_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isPureVirtual(self.raw) != 0 }
+    }
+
+    /// Returns whether this cursor refers to a static method.
+    pub fn is_static_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isStatic(self.raw) != 0 }
+    }
+
+    /// Returns whether this cursor refers to a variadic function or method.
+    pub fn is_variadic(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isVariadic(self.raw) != 0 }
+    }
+
+    /// Returns whether this cursor refers to a virtual method.
+    pub fn is_virtual_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isVirtual(self.raw) != 0 }
+    }
+
+    /// Visits the children of this cursor recursively and returns whether visitation was ended by
+    /// the callback returning `CursorVisitResult::Break`.
+    ///
+    /// The first argument of the callback is the cursor being visited and the second argument is
+    /// the parent of that cursor. The return value of the callback determines how visitation will
+    /// proceed.
+    pub fn visit_children<F: FnMut(Cursor<'tu>, Cursor<'tu>) -> CursorVisitResult>(
+        &self, f: F
+    ) -> bool {
+        trait CursorCallback<'tu> {
+            fn call(&mut self, cursor: Cursor<'tu>, parent: Cursor<'tu>) -> CursorVisitResult;
+        }
+
+        impl<'tu, F: FnMut(Cursor<'tu>, Cursor<'tu>) -> CursorVisitResult> CursorCallback<'tu> for F {
+            fn call(&mut self, cursor: Cursor<'tu>, parent: Cursor<'tu>) -> CursorVisitResult {
+                self(cursor, parent)
+            }
+        }
+
+        extern fn visit<'tu>(
+            cursor: ffi::CXCursor, parent: ffi::CXCursor, data: ffi::CXClientData
+        ) -> ffi::CXChildVisitResult {
+            unsafe {
+                let &mut (tu, ref mut callback):
+                    &mut (&'tu TranslationUnit<'tu>, Box<CursorCallback<'tu>>) =
+                        mem::transmute(data);
+
+                let cursor = Cursor::from_raw(cursor, tu);
+                let parent = Cursor::from_raw(parent, tu);
+                mem::transmute(callback.call(cursor, parent))
+            }
+        }
+
+        let mut data = (self.tu, Box::new(f) as Box<CursorCallback>);
+        unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
+    }
+}
+
+impl<'tu> cmp::Eq for Cursor<'tu> { }
+
+impl<'tu> cmp::PartialEq for Cursor<'tu> {
+    fn eq(&self, other: &Cursor<'tu>) -> bool {
+        unsafe { ffi::clang_equalCursors(self.raw, other.raw) != 0 }
+    }
+}
+
+impl<'tu> fmt::Debug for Cursor<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Cursor").finish()
+    }
+}
+
+impl<'tu> hash::Hash for Cursor<'tu> {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
+        unsafe { hasher.write_u64(ffi::clang_hashCursor(self.raw) as u64); }
+    }
+}
+
 // Diagnostic ____________________________________
 
 /// A suggested fix for an issue with a source file.
@@ -276,7 +573,11 @@ impl<'tu> Diagnostic<'tu> {
 
 impl<'tu> fmt::Debug for Diagnostic<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Diagnostic").finish()
+        formatter.debug_struct("Diagnostic")
+            .field("location", &self.get_location())
+            .field("severity", &self.get_severity())
+            .field("text", &self.get_text())
+            .finish()
     }
 }
 
@@ -828,6 +1129,11 @@ impl<'i> TranslationUnit<'i> {
 
     //- Accessors --------------------------------
 
+    /// Returns the cursor which references this translation unit.
+    pub fn get_cursor(&'i self) -> Cursor<'i> {
+        unsafe { Cursor::from_raw(ffi::clang_getTranslationUnitCursor(self.ptr), self) }
+    }
+
     /// Returns the diagnostics for this translation unit.
     pub fn get_diagnostics<>(&'i self) -> Vec<Diagnostic<'i>> {
         iter!(clang_getNumDiagnostics(self.ptr), clang_getDiagnostic(self.ptr),).map(|d| {
@@ -968,4 +1274,14 @@ fn to_string(clang: ffi::CXString) -> String {
         ffi::clang_disposeString(clang);
         rust
     }
+}
+
+fn to_string_option(clang: ffi::CXString) -> Option<String> {
+    clang.map(to_string).and_then(|s| {
+        if !s.is_empty() {
+            Some(s)
+        } else {
+            None
+        }
+    })
 }

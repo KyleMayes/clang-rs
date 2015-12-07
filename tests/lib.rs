@@ -21,12 +21,22 @@ macro_rules! assert_location_eq {
     })
 }
 
+macro_rules! range {
+    ($file:expr, $sl:expr, $sc:expr, $el:expr, $ec:expr) => ({
+        SourceRange::new($file.get_location($sl, $sc), $file.get_location($el, $ec))
+    })
+}
+
 //================================================
 // Functions
 //================================================
 
+fn with_cursor<'c, F: FnOnce(Cursor)>(clang: &'c Clang, contents: &str, f: F) {
+    with_translation_unit(clang, "test.cpp", contents, &[], |_, _, tu| f(tu.get_cursor()));
+}
+
 fn with_file<'c, F: FnOnce(&Path, File)>(clang: &'c Clang, contents: &str, f: F) {
-    with_translation_unit(clang, "test.h", contents, &[], |_, file, tu| {
+    with_translation_unit(clang, "test.cpp", contents, &[], |_, file, tu| {
         f(file, tu.get_file(file).unwrap())
     });
 }
@@ -86,6 +96,174 @@ fn test() {
         assert!(f.is_include_guarded());
     });
 
+    // Cursor ____________________________________
+
+    with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+
+        let cursor = tu.get_cursor();
+        assert_eq!(cursor.get_display_name(), Some(f.to_str().unwrap().into()));
+        assert_eq!(cursor.get_name(), Some(f.to_str().unwrap().into()));
+        assert_eq!(cursor.get_name_ranges(), &[]);
+        assert_eq!(cursor.get_mangled_name(), None);
+        assert_eq!(cursor.get_translation_unit().get_file(f), tu.get_file(f));
+
+        let children = cursor.get_children();
+        assert_eq!(children.len(), 1);
+
+        assert_eq!(children[0].get_display_name(), Some("a".into()));
+        assert_eq!(children[0].get_location(), file.get_location(1, 5));
+        assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
+        assert_eq!(children[0].get_name(), Some("a".into()));
+        assert_eq!(children[0].get_name_ranges(), &[range!(file, 1, 5, 1, 6)]);
+        assert_eq!(children[0].get_range(), range!(file, 1, 1, 1, 13));
+        assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
+    });
+
+    let source = "
+        struct A;
+        struct A;
+        struct A { int a; };
+    ";
+
+    with_cursor(&clang, source, |c| {
+        let children = c.get_children();
+        assert_eq!(children.len(), 3);
+
+        assert_eq!(children[0].get_canonical_cursor(), children[0]);
+        assert_eq!(children[1].get_canonical_cursor(), children[0]);
+        assert_eq!(children[2].get_canonical_cursor(), children[0]);
+    });
+
+    let source = "
+        int a;
+        /// \\brief A global integer.
+        int b;
+    ";
+
+    with_translation_unit(&clang, "test.cpp", source, &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+
+        let children = tu.get_cursor().get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_comment(), None);
+        assert_eq!(children[0].get_comment_brief(), None);
+        assert_eq!(children[0].get_comment_range(), None);
+
+        assert_eq!(children[1].get_comment(), Some("/// \\brief A global integer.".into()));
+        assert_eq!(children[1].get_comment_brief(), Some("A global integer.".into()));
+        assert_eq!(children[1].get_comment_range(), Some(range!(file, 3, 9, 3, 39)));
+    });
+
+    let source = "
+        struct A { struct { int b; }; int i : 322; };
+    ";
+
+    with_cursor(&clang, source, |c| {
+        let children = c.get_children();
+        assert_eq!(children.len(), 1);
+
+        assert!(!children[0].is_anonymous());
+
+        let children = children[0].get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_name(), None);
+        assert_eq!(children[0].get_display_name(), None);
+        assert!(children[0].is_anonymous());
+        assert!(!children[0].is_bit_field());
+
+        assert_eq!(children[1].get_name(), Some("i".into()));
+        assert_eq!(children[1].get_display_name(), Some("i".into()));
+        assert!(!children[1].is_anonymous());
+        assert!(children[1].is_bit_field());
+    });
+
+    let source = "
+        struct A { void a(); };
+        void A::a() { }
+    ";
+
+    with_cursor(&clang, source, |c| {
+        assert_eq!(c.get_lexical_parent(), None);
+        assert_eq!(c.get_semantic_parent(), None);
+
+        let children = c.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_lexical_parent(), Some(c));
+        assert_eq!(children[0].get_semantic_parent(), Some(c));
+
+        assert_eq!(children[1].get_lexical_parent(), Some(c));
+        assert_eq!(children[1].get_semantic_parent(), Some(children[0]));
+    });
+
+    let source = "
+        class Class {
+            void a() const { }
+            virtual void b() = 0;
+            static void c() { }
+            virtual void d() { }
+        };
+    ";
+
+    with_cursor(&clang, source, |c| {
+        let children = c.get_children()[0].get_children();
+        assert_eq!(children.len(), 4);
+
+        macro_rules! method {
+            ($cursor:expr, $c:expr, $pv:expr, $s:expr, $v:expr) => ({
+                assert_eq!($cursor.is_const_method(), $c);
+                assert_eq!($cursor.is_pure_virtual_method(), $pv);
+                assert_eq!($cursor.is_static_method(), $s);
+                assert_eq!($cursor.is_virtual_method(), $v);
+            });
+        }
+
+        method!(children[0], true, false, false, false);
+        method!(children[1], false, true, false, true);
+        method!(children[2], false, false, true, false);
+        method!(children[3], false, false, false, true);
+    });
+
+    let source = "
+        struct A {
+            void a() { }
+            virtual void b() { }
+        };
+
+        void function() {
+            A a;
+            a.a();
+            a.b();
+        }
+    ";
+
+    with_cursor(&clang, source, |c| {
+        let children = c.get_children()[1].get_children()[0].get_children();
+        assert_eq!(children.len(), 3);
+
+        assert!(!children[1].is_dynamic_call());
+        assert!(children[2].is_dynamic_call());
+    });
+
+    let source = "
+        void a() { }
+        void b(...) { }
+    ";
+
+    with_cursor(&clang, source, |c| {
+        let children = c.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_display_name(), Some("a()".into()));
+        assert!(!children[0].is_variadic());
+
+        assert_eq!(children[1].get_display_name(), Some("b(...)".into()));
+        assert!(children[1].is_variadic());
+    });
+
     // Diagnostic ________________________________
 
     let source = "
@@ -109,8 +287,8 @@ fn test() {
         assert_eq!(diagnostics[0].get_fix_its(), &[]);
         assert_eq!(diagnostics[0].get_location(), file.get_location(2, 46));
         assert_eq!(diagnostics[0].get_ranges(), &[
-            SourceRange::new(file.get_location(2, 44), file.get_location(2, 49)),
-            SourceRange::new(file.get_location(2, 37), file.get_location(2, 43)),
+            range!(file, 2, 44, 2, 49),
+            range!(file, 2, 37, 2, 43),
         ]);
         assert_eq!(diagnostics[0].get_severity(), Severity::Warning);
         assert_eq!(diagnostics[0].get_text(), text);
@@ -121,15 +299,13 @@ fn test() {
             FixIt::Insertion(file.get_location(3, 50), "typename ".into())
         ]);
         assert_eq!(diagnostics[1].get_location(), file.get_location(3, 50));
-        assert_eq!(diagnostics[1].get_ranges(), &[
-            SourceRange::new(file.get_location(3, 50), file.get_location(3, 54))
-        ]);
+        assert_eq!(diagnostics[1].get_ranges(), &[range!(file, 3, 50, 3, 54)]);
         assert_eq!(diagnostics[1].get_severity(), Severity::Error);
         assert_eq!(diagnostics[1].get_text(), text);
 
         let text = "use of GNU old-style field designator extension";
         assert_eq!(diagnostics[2].format(options), format!("warning: {}", text));
-        let range = SourceRange::new(file.get_location(4, 50), file.get_location(4, 52));
+        let range = range!(file, 4, 50, 4, 52);
         assert_eq!(diagnostics[2].get_fix_its(), &[FixIt::Replacement(range, ".i = ".into())]);
         assert_eq!(diagnostics[2].get_location(), range.get_start());
         assert_eq!(diagnostics[2].get_ranges(), &[]);
@@ -182,16 +358,16 @@ fn test() {
 
     let source = "
         #define ADD(LEFT, RIGHT) (LEFT + RIGHT)
-        #line 322 \"presumed.h\"
+        #line 322 \"presumed.hpp\"
         int add(int left, int right) { return ADD(left, right); }
     ";
 
     with_file(&clang, source, |_, f| {
         let location = f.get_location(3, 51);
-        assert_location_eq!(location.get_expansion_location(), f, 3, 31, 79);
-        assert_location_eq!(location.get_file_location(), f, 3, 31, 79);
-        assert_eq!(location.get_presumed_location(), ("presumed.h".into(), 321, 31));
-        assert_location_eq!(location.get_spelling_location(), f, 3, 31, 79);
+        assert_location_eq!(location.get_expansion_location(), f, 3, 33, 81);
+        assert_location_eq!(location.get_file_location(), f, 3, 33, 81);
+        assert_eq!(location.get_presumed_location(), ("presumed.hpp".into(), 321, 33));
+        assert_location_eq!(location.get_spelling_location(), f, 3, 33, 81);
         assert!(location.is_in_main_file());
         assert!(!location.is_in_system_header());
     });
@@ -199,22 +375,18 @@ fn test() {
     // SourceRange _______________________________
 
     with_file(&clang, "int a = 322", |_, f| {
-        let range = SourceRange::new(f.get_location(1, 5), f.get_location(1, 6));
+        let range = range!(f, 1, 5, 1, 6);
         assert_location_eq!(range.get_end().get_spelling_location(), f, 1, 6, 5);
         assert_location_eq!(range.get_start().get_spelling_location(), f, 1, 5, 4);
     });
 
     // TranslationUnit ___________________________
 
-    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |_, f, tu| {
-        assert_eq!(format!("{:?}", tu), format!("TranslationUnit {{ spelling: {:?} }}", f));
-    });
-
     //- from_ast ---------------------------------
     //- save -------------------------------------
 
-    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |d, _, tu| {
-        let file = d.join("test.c.gch");
+    with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |d, _, tu| {
+        let file = d.join("test.cpp.gch");
         tu.save(&file).unwrap();
         let mut index = Index::new(&clang, false, false);
         let _ = TranslationUnit::from_ast(&mut index, &file).unwrap();
@@ -222,7 +394,7 @@ fn test() {
 
     //- from_source ------------------------------
 
-    with_temporary_file("test.c", "int a = 322;", |_, f| {
+    with_temporary_file("test.cpp", "int a = 322;", |_, f| {
         let mut index = Index::new(&clang, false, false);
         let unsaved = &[Unsaved::new(f, "int a = 644;")];
         let options = ParseOptions::default();
@@ -231,20 +403,20 @@ fn test() {
 
     //- get_file ---------------------------------
 
-    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |d, _, tu| {
-        assert_eq!(tu.get_file(d.join("test.cpp")), None);
+    with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |d, _, tu| {
+        assert_eq!(tu.get_file(d.join("test.c")), None);
     });
 
     //- get_memory_usage -------------------------
 
-    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |_, _, tu| {
+    with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, _, tu| {
         let usage = tu.get_memory_usage();
         assert_eq!(usage.get(&MemoryUsage::Selectors), Some(&0));
     });
 
     //- reparse ----------------------------------
 
-    with_translation_unit(&clang, "test.c", "int a = 322;", &[], |_, f, tu| {
+    with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
         let _ = tu.reparse(&[Unsaved::new(f, "int a = 644;")]).unwrap();
     });
 }
