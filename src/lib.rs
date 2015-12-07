@@ -870,7 +870,17 @@ impl<'tu> cmp::PartialEq for Cursor<'tu> {
 
 impl<'tu> fmt::Debug for Cursor<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Cursor").finish()
+        let location = if self.get_kind() != CursorKind::TranslationUnit {
+            Some(self.get_location())
+        } else {
+            None
+        };
+
+        formatter.debug_struct("Cursor")
+            .field("location", &location)
+            .field("kind", &self.get_kind())
+            .field("display_name", &self.get_display_name())
+            .finish()
     }
 }
 
