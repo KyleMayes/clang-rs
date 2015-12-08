@@ -123,6 +123,29 @@ fn test() {
     });
 
     let source = "
+        class A {
+        private:
+            void a() { };
+        protected:
+            void b() { };
+        public:
+            void c() { };
+        };
+    ";
+
+    with_cursor(&clang, source, |c| {
+        let children = c.get_children()[0].get_children();
+        assert_eq!(children.len(), 6);
+
+        assert_eq!(children[0].get_access_specifier(), Some(AccessSpecifier::Private));
+        assert_eq!(children[1].get_access_specifier(), Some(AccessSpecifier::Private));
+        assert_eq!(children[2].get_access_specifier(), Some(AccessSpecifier::Protected));
+        assert_eq!(children[3].get_access_specifier(), Some(AccessSpecifier::Protected));
+        assert_eq!(children[4].get_access_specifier(), Some(AccessSpecifier::Public));
+        assert_eq!(children[5].get_access_specifier(), Some(AccessSpecifier::Public));
+    });
+
+    let source = "
         struct A;
         struct A;
         struct A { int a; };
@@ -133,8 +156,13 @@ fn test() {
         assert_eq!(children.len(), 3);
 
         assert_eq!(children[0].get_canonical_cursor(), children[0]);
+        assert_eq!(children[0].get_definition(), Some(children[2]));
+
         assert_eq!(children[1].get_canonical_cursor(), children[0]);
+        assert_eq!(children[1].get_definition(), Some(children[2]));
+
         assert_eq!(children[2].get_canonical_cursor(), children[0]);
+        assert_eq!(children[2].get_definition(), Some(children[2]));
     });
 
     let source = "
@@ -148,6 +176,10 @@ fn test() {
 
         let children = tu.get_cursor().get_children();
         assert_eq!(children.len(), 2);
+
+        assert_eq!(file.get_location(2, 13).get_cursor(), Some(children[0]));
+        assert_eq!(file.get_location(3, 13).get_cursor(), None);
+        assert_eq!(file.get_location(4, 13).get_cursor(), Some(children[1]));
 
         assert_eq!(children[0].get_comment(), None);
         assert_eq!(children[0].get_comment_brief(), None);
@@ -180,6 +212,19 @@ fn test() {
         assert_eq!(children[1].get_display_name(), Some("i".into()));
         assert!(!children[1].is_anonymous());
         assert!(children[1].is_bit_field());
+    });
+
+    let source = "
+        void a() { }
+        class B { void b() { } };
+    ";
+
+    with_cursor(&clang, source, |c| {
+        let children = c.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_language(), Some(Language::C));
+        assert_eq!(children[1].get_language(), Some(Language::Cpp));
     });
 
     let source = "

@@ -97,6 +97,36 @@ pub trait Nullable<T> {
 // Enums
 //================================================
 
+// AccessSpecifier _______________________________
+
+/// Indicates the accessibility of a C++ AST element.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum AccessSpecifier {
+    /// The element is private.
+    Private = 3,
+    /// The element is protected.
+    Protected = 2,
+    /// The element is public.
+    Public = 1,
+}
+
+// Availability __________________________________
+
+/// Indicates the availability of an AST element.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum Availability {
+    /// The element is available.
+    Available = 0,
+    /// The element is available, but has been deprecated.
+    Deprecated = 1,
+    /// The element is not available and any usage of it will be an error.
+    Unavailable = 2,
+    /// The element is available but is not accessible and usage of it will be an error.
+    Inaccessible = 3,
+}
+
 // CursorKind ____________________________________
 
 /// Indicates the type of AST element a cursor references.
@@ -477,7 +507,7 @@ impl CursorKind {
     }
 }
 
-// SaveError _____________________________________
+// CursorVisitResult _____________________________
 
 /// Indicates how a cursor visitation should proceed.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -489,6 +519,20 @@ pub enum CursorVisitResult {
     Continue = 1,
     /// Continue visiting sibling and child cursors.
     Recurse = 2,
+}
+
+// Language ______________________________________
+
+/// Indicates the language used by an AST element.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum Language {
+    /// The element uses the C programming language.
+    C = 1,
+    /// The element uses the C++ programming language.
+    Cpp = 3,
+    /// The element uses the Objective-C programming language.
+    ObjectiveC = 2,
 }
 
 // MemoryUsage ___________________________________
@@ -624,6 +668,19 @@ impl<'tu> Cursor<'tu> {
 
     //- Accessors --------------------------------
 
+    /// Returns the accessibility of the C++ AST element this cursor references, if any.
+    pub fn get_access_specifier(&self) -> Option<AccessSpecifier> {
+        unsafe {
+            let specifier = ffi::clang_getCXXAccessSpecifier(self.raw);
+
+            if specifier != ffi::CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier {
+                Some(mem::transmute(specifier))
+            } else {
+                None
+            }
+        }
+    }
+
     /// Returns the cursors that refer to the arguments of the function or method this cursor
     /// references.
     ///
@@ -636,6 +693,11 @@ impl<'tu> Cursor<'tu> {
             clang_Cursor_getArgument(self.raw),
             "this cursor does not refer to a function or a method",
         ).map(|a| Cursor::from_raw(a, self.tu)).collect()
+    }
+
+    /// Returns the availability of the AST element this cursor references.
+    pub fn get_availability(&self) -> Availability {
+        unsafe { mem::transmute(ffi::clang_getCursorAvailability(self.raw)) }
     }
 
     /// Returns the canonical cursor for this cursor.
@@ -676,6 +738,12 @@ impl<'tu> Cursor<'tu> {
         children
     }
 
+    /// Returns the cursor that refers to the AST element that describes the definition of the AST
+    /// element this cursor references, if any.
+    pub fn get_definition(&self) -> Option<Cursor<'tu>> {
+        unsafe { ffi::clang_getCursorDefinition(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
+    }
+
     /// Returns the display name of this cursor.
     ///
     /// The display name includes additional information about the entity this cursor references.
@@ -685,7 +753,25 @@ impl<'tu> Cursor<'tu> {
 
     /// Returns the kind of AST element this cursor references.
     pub fn get_kind(&self) -> CursorKind {
-        unsafe { mem::transmute(self.raw.kind) }
+        unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
+    }
+
+    /// Returns the language used by the AST element this cursor references if this cursor
+    /// references a declaration.
+    ///
+    /// # Panics
+    ///
+    /// * this cursor does not refer to a declaration
+    pub fn get_language(&self) -> Language {
+        unsafe {
+            let language = ffi::clang_getCursorLanguage(self.raw);
+
+            if language == ffi::CXLanguageKind::Invalid {
+                panic!("this cursor does not refer to a declaration");
+            }
+
+            mem::transmute(language)
+        }
     }
 
     /// Returns the cursor that refers to the lexical parent of the AST element this cursor
@@ -765,6 +851,12 @@ impl<'tu> Cursor<'tu> {
         }
 
         unsafe { SourceRange::from_raw(ffi::clang_getCursorExtent(self.raw), self.tu) }
+    }
+
+    /// Returns the cursor that refers to the AST element referred to by the AST element this cursor
+    /// references.
+    pub fn get_reference(&self) -> Option<Cursor<'tu>> {
+        unsafe { ffi::clang_getCursorReferenced(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
     }
 
     /// Returns the cursor that refers to the semantic parent of the AST element this cursor
@@ -856,7 +948,7 @@ impl<'tu> Cursor<'tu> {
         }
 
         let mut data = (self.tu, Box::new(f) as Box<CursorCallback>);
-            unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
+        unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
     }
 }
 
@@ -1311,6 +1403,11 @@ impl<'tu> SourceLocation<'tu> {
     }
 
     //- Accessors --------------------------------
+
+    /// Returns the cursor that refers to the AST element at this source location, if any.
+    pub fn get_cursor(&self) -> Option<Cursor<'tu>> {
+        unsafe { ffi::clang_getCursor(self.tu.ptr, self.raw).map(|c| Cursor::from_raw(c, self.tu)) }
+    }
 
     /// Returns the file, line, column and character offset of this source location.
     ///
