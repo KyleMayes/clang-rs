@@ -1,12 +1,16 @@
 extern crate clang;
+extern crate libc;
 extern crate uuid;
 
 use std::env;
 use std::fs;
+use std::mem;
 use std::io::{Write};
 use std::path::{Path, PathBuf};
 
 use clang::*;
+
+use libc::{c_int};
 
 use uuid::{Uuid};
 
@@ -72,6 +76,12 @@ fn with_translation_unit<'c, F>(
         let options = ParseOptions::default();
         let tu = TranslationUnit::from_source(&mut index, file, arguments, &[], options).unwrap();
         f(d, &file, tu);
+    });
+}
+
+fn with_types<'c, F: FnOnce(Vec<Type>)>(clang: &'c Clang, contents: &str, f: F) {
+    with_translation_unit(clang, "test.cpp", contents, &[], |_, _, tu| {
+        f(tu.get_entity().get_children().iter().flat_map(|e| e.get_type().into_iter()).collect());
     });
 }
 
@@ -428,7 +438,7 @@ fn test() {
 
     // SourceRange _______________________________
 
-    with_file(&clang, "int a = 322", |_, f| {
+    with_file(&clang, "int a = 322;", |_, f| {
         let range = range!(f, 1, 5, 1, 6);
         assert_location_eq!(range.get_end().get_spelling_location(), f, 1, 6, 5);
         assert_location_eq!(range.get_start().get_spelling_location(), f, 1, 5, 4);
@@ -472,5 +482,182 @@ fn test() {
 
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
         let _ = tu.reparse(&[Unsaved::new(f, "int a = 644;")]).unwrap();
+    });
+
+    // Type ______________________________________
+
+    with_entity(&clang, "int a = 322;", |e| {
+        assert_eq!(e.get_type(), None);
+
+        let type_ = e.get_children()[0].get_type().unwrap();
+        assert_eq!(type_.get_display_name(), "int");
+        assert_eq!(type_.get_kind(), TypeKind::Int);
+    });
+
+    let source = "
+        int integer = 322;
+        int function(int argument) { return argument; }
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_argument_types(), None);
+        assert_eq!(ts[0].get_result_type(), None);
+
+        assert_eq!(ts[1].get_argument_types(), Some(vec![ts[0]]));
+        assert_eq!(ts[1].get_result_type(), Some(ts[0]));
+    });
+
+    let source = "
+        template <typename T> struct A { T a; int b; };
+        typedef A<int> B;
+        struct C { int a; int b; };
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_alignof(), Err(AlignofError::Incomplete));
+        assert_eq!(ts[0].get_offsetof("b"), Err(OffsetofError::Parent));
+        assert_eq!(ts[0].get_sizeof(), Err(SizeofError::Incomplete));
+
+        let size = mem::size_of::<c_int>();
+        assert_eq!(ts[1].get_alignof(), Ok(size));
+        assert_eq!(ts[1].get_offsetof("b"), Ok(size * 8));
+        assert_eq!(ts[1].get_sizeof(), Ok(size * 2));
+    });
+
+    let source = "
+        int integer = 322;
+        void a() { }
+        __attribute__((vectorcall)) void b() { }
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_calling_convention(), None);
+        assert_eq!(ts[1].get_calling_convention(), Some(CallingConvention::Cdecl));
+        assert_eq!(ts[2].get_calling_convention(), Some(CallingConvention::Vectorcall));
+    });
+
+    let source = "
+        int integer;
+        typedef int Integer;
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_canonical_type(), ts[0]);
+        assert_eq!(ts[1].get_canonical_type(), ts[0]);
+    });
+
+    let source = "
+        struct Struct { int member; };
+        int Struct::*pointer = &Struct::member;
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_class_type(), None);
+        assert_eq!(ts[1].get_class_type(), Some(ts[0]));
+    });
+
+    let source = "
+        typedef int Integer;
+        Integer integer;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let types = e.get_children().iter().map(|e| e.get_type().unwrap()).collect::<Vec<_>>();
+        assert_eq!(types[0].get_declaration(), Some(e.get_children()[0]));
+        assert_eq!(types[1].get_declaration(), Some(e.get_children()[0]));
+    });
+
+    let source = "
+        int integer = 322;
+        int array[3] = { 3, 2, 2 };
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_element_type(), None);
+        assert_eq!(ts[0].get_size(), None);
+
+        assert_eq!(ts[1].get_element_type(), Some(ts[0]));
+        assert_eq!(ts[1].get_size(), Some(3));
+    });
+
+    let source = "
+        int integer = 322;
+        int* pointer = &integer;
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_pointee_type(), None);
+        assert_eq!(ts[1].get_pointee_type(), Some(ts[0]));
+    });
+
+    let source = "
+        class Class {
+            void a();
+            void b() &;
+            void c() &&;
+        };
+    ";
+
+    with_types(&clang, source, |ts| {
+        let types = ts[0].get_declaration().unwrap().get_children().into_iter().map(|c| {
+            c.get_type().unwrap()
+        }).collect::<Vec<_>>();
+
+        assert_eq!(types[0].get_ref_qualifier(), None);
+        assert_eq!(types[1].get_ref_qualifier(), Some(RefQualifier::LValue));
+        assert_eq!(types[2].get_ref_qualifier(), Some(RefQualifier::RValue));
+    });
+
+    let source = "
+        template <typename T, int I> class Class { int member; };
+        int integer = 322;
+        template <> class Class<int, 322> { int member; };
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert_eq!(ts[0].get_template_argument_types(), None);
+        assert_eq!(ts[1].get_template_argument_types(), Some(vec![Some(ts[0]), None]));
+    });
+
+    let source = "
+        int a = 322;
+        const int b = 322;
+        int* __restrict__ c = &a;
+        volatile int d = 322;
+    ";
+
+    with_types(&clang, source, |ts| {
+        macro_rules! qualifiers {
+            ($type_:expr, $c:expr, $r:expr, $v:expr) => ({
+                assert_eq!($type_.is_const_qualified(), $c);
+                assert_eq!($type_.is_restrict_qualified(), $r);
+                assert_eq!($type_.is_volatile_qualified(), $v);
+            });
+        }
+
+        qualifiers!(ts[0], false, false, false);
+        qualifiers!(ts[1], true, false, false);
+        qualifiers!(ts[2], false, true, false);
+        qualifiers!(ts[3], false, false, true);
+    });
+
+    let source = "
+        struct A { };
+        struct B { ~B() { } };
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert!(ts[0].is_pod());
+        assert!(!ts[1].is_pod());
+    });
+
+    let source = "
+        void a() { }
+        void b(...) { }
+    ";
+
+    with_types(&clang, source, |ts| {
+        assert!(!ts[0].is_variadic());
+        assert!(ts[1].is_variadic());
     });
 }

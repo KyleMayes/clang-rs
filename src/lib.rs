@@ -115,6 +115,17 @@ pub enum Accessibility {
     Public = 1,
 }
 
+// AlignofError __________________________________
+
+/// Indicates the error that prevented determining the alignment of a type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AlignofError {
+    /// The type is a dependent type.
+    Dependent,
+    /// The type is an incomplete type.
+    Incomplete,
+}
+
 // Availability __________________________________
 
 /// Indicates the availability of an AST entity.
@@ -131,9 +142,41 @@ pub enum Availability {
     Inaccessible = 3,
 }
 
+// CallingConvention _____________________________
+
+/// Indicates the calling convention specified for a function type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum CallingConvention {
+    /// The function type uses the x86 `cdecl` calling convention.
+    Cdecl = 1,
+    /// The function type uses the x86 `fastcall` calling convention.
+    Fastcall = 3,
+    /// The function type uses the x86 `stdcall` calling convention.
+    Stdcall = 2,
+    /// The function type uses the x86 `thiscall` calling convention.
+    Thiscall = 4,
+    /// The function type uses the x86 `vectorcall` calling convention.
+    Vectorcall = 12,
+    /// The function type uses the x86 `pascal` calling convention.
+    Pascal = 5,
+    /// The function type uses the ARM AACPS calling convention.
+    Aapcs = 6,
+    /// The function type uses the ARM AACPS-VFP calling convention.
+    AapcsVfp = 7,
+    /// The function type uses the calling convention for Intel OpenCL built-ins.
+    IntelOcl = 9,
+    /// The function type uses the x64 C calling convention as implemented on Windows.
+    Win64 = 10,
+    /// The function type uses the x64 C calling convention as specified in the System V ABI.
+    SysV64= 11,
+    /// The function type uses a calling convention that is not exposed via this interface.
+    Unexposed = 200,
+}
+
 // EntityKind ____________________________________
 
-/// Indicates the type of an AST entity.
+/// Indicates the kind of an AST entity.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum EntityKind {
@@ -537,6 +580,31 @@ pub enum MemoryUsage {
     SourceManagerMMap = 8,
 }
 
+// OffsetofError _________________________________
+
+/// Indicates the error that prevented determining the offset of a field in a record type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum OffsetofError {
+    /// The record type is a dependent type.
+    Dependent,
+    /// The record type is an incomplete type.
+    Incomplete,
+    /// The record type does not contain a field with the supplied name.
+    Name,
+    /// The record type has an invalid parent declaration.
+    Parent,
+}
+
+// RefQualifier __________________________________
+
+/// Indicates the ref qualifier of a C++ function or method type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum RefQualifier {
+    LValue = 1,
+    RValue = 2,
+}
+
 // SaveError _____________________________________
 
 /// Indicates the type of error that prevented the saving of a translation unit to an AST file.
@@ -567,6 +635,19 @@ pub enum Severity {
     Fatal = 4,
 }
 
+// SizeofError ___________________________________
+
+/// Indicates the error that prevented determining the size of a type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SizeofError {
+    /// The type is a dependent type.
+    Dependent,
+    /// The type is an incomplete type.
+    Incomplete,
+    /// The type is a variable size type.
+    VariableSize,
+}
+
 // SourceError ___________________________________
 
 /// Indicates the type of error that prevented the loading of a translation unit from a source file.
@@ -578,6 +659,66 @@ pub enum SourceError {
     Crash,
     /// An unknown error occurred.
     Unknown,
+}
+
+// TypeKind ______________________________________
+
+/// Indicates the kind of a type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum TypeKind {
+    /// A type whose specific kind is not exposed via this interface.
+    Unexposed = 1,
+    Void = 2,
+    Bool = 3,
+    /// The `char` type when it is signed by default.
+    CharS = 13,
+    /// The `char` type when it is unsigned by default.
+    CharU = 4,
+    /// The `signed char` type.
+    SChar = 14,
+    /// The `unsigned char` type.
+    UChar = 5,
+    WChar = 15,
+    Char16 = 6,
+    Char32 = 7,
+    Short = 16,
+    UShort = 8,
+    Int = 17,
+    UInt = 9,
+    Long = 18,
+    ULong = 10,
+    LongLong = 19,
+    ULongLong = 11,
+    Int128 = 20,
+    UInt128 = 12,
+    Float = 21,
+    Double = 22,
+    LongDouble = 23,
+    Nullptr = 24,
+    Overload = 25,
+    Dependent = 26,
+    ObjCId = 27,
+    ObjCClass = 28,
+    ObjCSel = 29,
+    Complex = 100,
+    Pointer = 101,
+    BlockPointer = 102,
+    LValueReference = 103,
+    RValueReference = 104,
+    Record = 105,
+    Enum = 106,
+    Typedef = 107,
+    ObjCInterface = 108,
+    ObjCObjectPointer = 109,
+    FunctionNoPrototype = 110,
+    FunctionPrototype = 111,
+    ConstantArray = 112,
+    Vector = 113,
+    IncompleteArray = 114,
+    VariableArray = 115,
+    DependentSizedArray = 116,
+    MemberPointer = 117,
 }
 
 //================================================
@@ -885,6 +1026,11 @@ impl<'tu> Entity<'tu> {
     /// Returns the translation unit which contains this AST entity.
     pub fn get_translation_unit(&self) -> &'tu TranslationUnit<'tu> {
         self.tu
+    }
+
+    /// Returns the type of this AST entity, if any.
+    pub fn get_type(&self) -> Option<Type<'tu>> {
+        unsafe { ffi::clang_getCursorType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns whether this AST entity is an anonymous record declaration.
@@ -1534,7 +1680,7 @@ impl<'i> TranslationUnit<'i> {
         unsaved: &[Unsaved],
         options: ParseOptions,
     ) -> Result<TranslationUnit<'i>, SourceError> {
-        let arguments = arguments.iter().map(|a| from_string(a)).collect::<Vec<_>>();
+        let arguments = arguments.iter().map(from_string).collect::<Vec<_>>();
         let arguments = arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
         let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
 
@@ -1659,6 +1805,210 @@ impl<'i> fmt::Debug for TranslationUnit<'i> {
     }
 }
 
+// Type __________________________________________
+
+/// The type of an AST entity.
+#[derive(Copy, Clone)]
+pub struct Type<'tu> {
+    raw: ffi::CXType,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> Type<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXType, tu: &'tu TranslationUnit<'tu>) -> Type<'tu> {
+        Type { raw: raw, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the alignment of this type in bytes.
+    ///
+    /// # Failures
+    ///
+    /// * this type is a dependent type
+    /// * this type is an incomplete type
+    pub fn get_alignof(&self) -> Result<usize, AlignofError> {
+        unsafe {
+            match ffi::clang_Type_getAlignOf(self.raw) {
+                -3 => Err(AlignofError::Dependent),
+                -2 => Err(AlignofError::Incomplete),
+                other => Ok(other as usize),
+            }
+        }
+    }
+
+    /// Returns the argument types for this function or method type, if applicable.
+    pub fn get_argument_types(&self) -> Option<Vec<Type<'tu>>> {
+        iter_option!(
+            clang_getNumArgTypes(self.raw),
+            clang_getArgType(self.raw),
+        ).map(|i| i.map(|t| Type::from_raw(t, self.tu)).collect())
+    }
+
+    /// Returns the calling convention specified for this function type, if applicable.
+    pub fn get_calling_convention(&self) -> Option<CallingConvention> {
+        unsafe {
+            match ffi::clang_getFunctionTypeCallingConv(self.raw) {
+                ffi::CXCallingConv::Invalid => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
+    /// Returns the canonical type for this type.
+    ///
+    /// The canonical type is the underlying type with all "sugar" removed (e.g., typedefs).
+    pub fn get_canonical_type(&self) -> Type<'tu> {
+        unsafe { Type::from_raw(ffi::clang_getCanonicalType(self.raw), self.tu) }
+    }
+
+    /// Returns the class type for this member pointer type, if applicable.
+    pub fn get_class_type(&self) -> Option<Type<'tu>> {
+        unsafe { ffi::clang_Type_getClassType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the AST entity that declared this type, if any.
+    pub fn get_declaration(&self) -> Option<Entity<'tu>> {
+        unsafe { ffi::clang_getTypeDeclaration(self.raw).map(|e| Entity::from_raw(e, self.tu)) }
+    }
+
+    /// Returns the display name of this type.
+    pub fn get_display_name(&self) -> String {
+        unsafe { to_string(ffi::clang_getTypeSpelling(self.raw)) }
+    }
+
+    /// Returns the element type for this array, complex, or vector type, if applicable.
+    pub fn get_element_type(&self) -> Option<Type<'tu>> {
+        unsafe { ffi::clang_getElementType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the offset of the field with the supplied name in this record type in bits.
+    ///
+    /// # Failures
+    ///
+    /// * this record type is a dependent type
+    /// * this record record type is an incomplete type
+    /// * this record type does not contain a field with the supplied name
+    pub fn get_offsetof<F: AsRef<str>>(&self, field: F) -> Result<usize, OffsetofError> {
+        unsafe {
+            match ffi::clang_Type_getOffsetOf(self.raw, from_string(field).as_ptr()) {
+                -1 => Err(OffsetofError::Parent),
+                -2 => Err(OffsetofError::Incomplete),
+                -3 => Err(OffsetofError::Dependent),
+                -5 => Err(OffsetofError::Name),
+                other => Ok(other as usize),
+            }
+        }
+    }
+
+    /// Returns the kind of this type.
+    pub fn get_kind(&self) -> TypeKind {
+        unsafe { mem::transmute(self.raw.kind) }
+    }
+
+    /// Returns the pointee type for this pointer type, if applicable.
+    pub fn get_pointee_type(&self) -> Option<Type<'tu>> {
+        unsafe { ffi::clang_getPointeeType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the ref qualifier for this C++ function or method type, if applicable.
+    pub fn get_ref_qualifier(&self) -> Option<RefQualifier> {
+        unsafe {
+            match ffi::clang_Type_getCXXRefQualifier(self.raw) {
+                ffi::CXRefQualifierKind::None => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
+    /// Returns the result type for this function or method type, if applicable.
+    pub fn get_result_type(&self) -> Option<Type<'tu>> {
+        unsafe { ffi::clang_getResultType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the size of this constant array or vector type, if applicable.
+    pub fn get_size(&self) -> Option<usize> {
+        let size = unsafe { ffi::clang_getNumElements(self.raw) };
+
+        if size >= 0 {
+            Some(size as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the size of this type in bytes.
+    ///
+    /// # Failures
+    ///
+    /// * this type is a dependent type
+    /// * this type is an incomplete type
+    /// * this type is a variable size type
+    pub fn get_sizeof(&self) -> Result<usize, SizeofError> {
+        unsafe {
+            match ffi::clang_Type_getSizeOf(self.raw) {
+                -2 => Err(SizeofError::Incomplete),
+                -3 => Err(SizeofError::Dependent),
+                -4 => Err(SizeofError::VariableSize),
+                other => Ok(other as usize),
+            }
+        }
+    }
+
+    /// Returns the template argument types for this template class specialization type, if
+    /// applicable.
+    pub fn get_template_argument_types(&self) -> Option<Vec<Option<Type<'tu>>>> {
+        iter_option!(
+            clang_Type_getNumTemplateArguments(self.raw),
+            clang_Type_getTemplateArgumentAsType(self.raw),
+        ).map(|i| i.map(|t| t.map(|t| Type::from_raw(t, self.tu))).collect())
+    }
+
+    /// Returns whether this type is qualified with const.
+    pub fn is_const_qualified(&self) -> bool {
+        unsafe { ffi::clang_isConstQualifiedType(self.raw) != 0 }
+    }
+
+    /// Returns whether this type is plain old data (POD).
+    pub fn is_pod(&self) -> bool {
+        unsafe { ffi::clang_isPODType(self.raw) != 0 }
+    }
+
+    /// Returns whether this type is qualified with restrict.
+    pub fn is_restrict_qualified(&self) -> bool {
+        unsafe { ffi::clang_isRestrictQualifiedType(self.raw) != 0 }
+    }
+
+    /// Returns whether this type is a variadic function type.
+    pub fn is_variadic(&self) -> bool {
+        unsafe { ffi::clang_isFunctionTypeVariadic(self.raw) != 0 }
+    }
+
+    /// Returns whether this type is qualified with volatile.
+    pub fn is_volatile_qualified(&self) -> bool {
+        unsafe { ffi::clang_isVolatileQualifiedType(self.raw) != 0 }
+    }
+}
+
+impl<'tu> cmp::Eq for Type<'tu> { }
+
+impl<'tu> cmp::PartialEq for Type<'tu> {
+    fn eq(&self, other: &Type<'tu>) -> bool {
+        unsafe { ffi::clang_equalTypes(self.raw, other.raw) != 0 }
+    }
+}
+
+impl<'tu> fmt::Debug for Type<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Type")
+            .field("kind", &self.get_kind())
+            .field("display_name", &self.get_display_name())
+            .finish()
+    }
+}
+
 // Unsaved _______________________________________
 
 /// The path to and unsaved contents of a previously existing file.
@@ -1672,7 +2022,7 @@ impl Unsaved {
     //- Constructors -----------------------------
 
     /// Constructs a new `Unsaved`.
-    pub fn new<P: AsRef<Path>>(path: P, contents: &str) -> Unsaved {
+    pub fn new<P: AsRef<Path>, C: AsRef<str>>(path: P, contents: C) -> Unsaved {
         Unsaved { path: from_path(path), contents: from_string(contents) }
     }
 
@@ -1695,8 +2045,8 @@ fn from_path<P: AsRef<Path>>(path: P) -> std::ffi::CString {
     from_string(path.as_ref().as_os_str().to_str().expect("invalid C string"))
 }
 
-fn from_string(string: &str) -> std::ffi::CString {
-    std::ffi::CString::new(string).expect("invalid C string")
+fn from_string<S: AsRef<str>>(string: S) -> std::ffi::CString {
+    std::ffi::CString::new(string.as_ref()).expect("invalid C string")
 }
 
 fn to_string(clang: ffi::CXString) -> String {

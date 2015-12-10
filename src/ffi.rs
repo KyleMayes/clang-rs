@@ -1066,6 +1066,16 @@ pub struct CXType {
     pub data: [*mut c_void; 2],
 }
 
+impl Nullable<CXType> for CXType {
+    fn map<U, F: FnOnce(CXType) -> U>(self, f: F) -> Option<U> {
+        if self.kind != CXTypeKind::Invalid {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct CXUnsavedFile {
