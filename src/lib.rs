@@ -38,19 +38,23 @@ macro_rules! iter {
     ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
         iter!($num($($num_argument), *), $get($($get_argument), *))
     });
+}
 
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *), $panic:expr) => ({
+// iter_option! __________________________________
+
+macro_rules! iter_option {
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *)) => ({
         let count = unsafe { ffi::$num($($num_argument), *) };
 
-        if count < 0 {
-            panic!($panic);
+        if count >= 0 {
+            Some((0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i as c_uint) }))
         } else {
-            (0..count as c_uint).map(|i| unsafe { ffi::$get($($get_argument), *, i) })
+            None
         }
     });
 
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *), $panic:expr,) => ({
-        iter!($num($($num_argument), *), $get($($get_argument), *), $panic)
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
+        iter_option!($num($($num_argument), *), $get($($get_argument), *))
     });
 }
 
@@ -97,39 +101,39 @@ pub trait Nullable<T> {
 // Enums
 //================================================
 
-// AccessSpecifier _______________________________
+// Accessibility _________________________________
 
-/// Indicates the accessibility of a C++ AST element.
+/// Indicates the accessibility of a declaration or base class specifier.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
-pub enum AccessSpecifier {
-    /// The element is private.
+pub enum Accessibility {
+    /// The declaration or base class specifier is private.
     Private = 3,
-    /// The element is protected.
+    /// The declaration or base class specifier is protected.
     Protected = 2,
-    /// The element is public.
+    /// The declaration or base class specifier is public.
     Public = 1,
 }
 
 // Availability __________________________________
 
-/// Indicates the availability of an AST element.
+/// Indicates the availability of an AST entity.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Availability {
-    /// The element is available.
+    /// The entity is available.
     Available = 0,
-    /// The element is available, but has been deprecated.
+    /// The entity is available but has been deprecated and any usage of it will be a warning.
     Deprecated = 1,
-    /// The element is not available and any usage of it will be an error.
+    /// The entity is not available and any usage of it will be an error.
     Unavailable = 2,
-    /// The element is available but is not accessible and usage of it will be an error.
+    /// The entity is available but is not accessible and any usage of it will be an error.
     Inaccessible = 3,
 }
 
 // CursorKind ____________________________________
 
-/// Indicates the type of AST element a cursor references.
+/// Indicates the type of AST entity a cursor references.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum CursorKind {
@@ -216,6 +220,7 @@ pub enum CursorKind {
     ObjCClassRef = 42,
     /// A reference to a type declaration.
     TypeRef = 43,
+    /// A base class specifier.
     BaseSpecifier = 44,
     /// A reference to a class template, function template, template template parameter, or class
     /// template partial specialization.
@@ -440,7 +445,7 @@ pub enum CursorKind {
     OmpCancellationPointDirective = 255,
     /// An OpenMP cancel directive.
     OmpCancelDirective = 256,
-    /// The top-level AST element which acts as the root for the other elements.
+    /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
     /// An attribute whose specific kind is not exposed via this interface.
     UnexposedAttr = 400,
@@ -515,23 +520,23 @@ impl CursorKind {
 pub enum CursorVisitResult {
     /// Do not continue visiting cursors.
     Break = 0,
-    /// Continue visiting sibling cursors but no child cursors.
+    /// Continue visiting sibling cursors iteratively, skipping child cursors.
     Continue = 1,
-    /// Continue visiting sibling and child cursors.
+    /// Continue visiting sibling and child cursors recursively, children first.
     Recurse = 2,
 }
 
 // Language ______________________________________
 
-/// Indicates the language used by an AST element.
+/// Indicates the language used by an AST entity.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Language {
-    /// The element uses the C programming language.
+    /// The entity uses the C programming language.
     C = 1,
-    /// The element uses the C++ programming language.
+    /// The entity uses the C++ programming language.
     Cpp = 3,
-    /// The element uses the Objective-C programming language.
+    /// The entity uses the Objective-C programming language.
     ObjectiveC = 2,
 }
 
@@ -541,7 +546,7 @@ pub enum Language {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum MemoryUsage {
-    /// Expressions, declarations and types.
+    /// Expressions, declarations, and types.
     Ast = 1,
     /// Various tables used by the AST.
     AstSideTables = 6,
@@ -622,7 +627,7 @@ pub enum SourceError {
 
 lazy_static! { static ref AVAILABLE: AtomicBool = AtomicBool::new(true); }
 
-/// An empty type which prevents the use of this library from multiple threads.
+/// An empty type which prevents the use of this library from multiple threads simultaneously.
 pub struct Clang;
 
 impl Clang {
@@ -652,7 +657,7 @@ impl Drop for Clang {
 
 // Cursor ________________________________________
 
-/// A reference to an element in the AST of a translation unit.
+/// A reference to an entity in the AST of a translation unit.
 #[derive(Copy, Clone)]
 pub struct Cursor<'tu> {
     raw: ffi::CXCursor,
@@ -668,34 +673,27 @@ impl<'tu> Cursor<'tu> {
 
     //- Accessors --------------------------------
 
-    /// Returns the accessibility of the C++ AST element this cursor references, if any.
-    pub fn get_access_specifier(&self) -> Option<AccessSpecifier> {
+    /// Returns the accessibility of the declaration or base class specifier this cursor
+    /// references, if applicable.
+    pub fn get_accessibility(&self) -> Option<Accessibility> {
         unsafe {
-            let specifier = ffi::clang_getCXXAccessSpecifier(self.raw);
-
-            if specifier != ffi::CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier {
-                Some(mem::transmute(specifier))
-            } else {
-                None
+            match ffi::clang_getCXXAccessSpecifier(self.raw) {
+                ffi::CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier => None,
+                other => Some(mem::transmute(other)),
             }
         }
     }
 
     /// Returns the cursors that refer to the arguments of the function or method this cursor
-    /// references.
-    ///
-    /// # Panics
-    ///
-    /// * this cursor does not refer to a function or a method
-    pub fn get_arguments(&self) -> Vec<Cursor<'tu>> {
-        iter!(
+    /// references, if applicable.
+    pub fn get_arguments(&self) -> Option<Vec<Cursor<'tu>>> {
+        iter_option!(
             clang_Cursor_getNumArguments(self.raw),
             clang_Cursor_getArgument(self.raw),
-            "this cursor does not refer to a function or a method",
-        ).map(|a| Cursor::from_raw(a, self.tu)).collect()
+        ).map(|i| i.map(|a| Cursor::from_raw(a, self.tu)).collect())
     }
 
-    /// Returns the availability of the AST element this cursor references.
+    /// Returns the availability of the AST entity this cursor references.
     pub fn get_availability(&self) -> Availability {
         unsafe { mem::transmute(ffi::clang_getCursorAvailability(self.raw)) }
     }
@@ -708,18 +706,18 @@ impl<'tu> Cursor<'tu> {
         unsafe { Cursor::from_raw(ffi::clang_getCanonicalCursor(self.raw), self.tu) }
     }
 
-    /// Returns the comment associated with the AST element this cursor references, if any.
+    /// Returns the comment associated with the AST entity this cursor references, if any.
     pub fn get_comment(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_Cursor_getRawCommentText(self.raw)) }
     }
 
-    /// Returns the brief of the comment associated with the AST element this cursor references, if
+    /// Returns the brief of the comment associated with the AST entity this cursor references, if
     /// any.
     pub fn get_comment_brief(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_Cursor_getBriefCommentText(self.raw)) }
     }
 
-    /// Returns the source range of the comment associated with the AST element this cursor refers
+    /// Returns the source range of the comment associated with the AST entity this cursor refers
     /// to, if any.
     pub fn get_comment_range(&self) -> Option<SourceRange<'tu>> {
         let range = unsafe { ffi::clang_Cursor_getCommentRange(self.raw) };
@@ -738,85 +736,66 @@ impl<'tu> Cursor<'tu> {
         children
     }
 
-    /// Returns the cursor that refers to the AST element that describes the definition of the AST
-    /// element this cursor references, if any.
+    /// Returns the cursor that refers to the AST entity that describes the definition of the AST
+    /// entity this cursor references, if any.
     pub fn get_definition(&self) -> Option<Cursor<'tu>> {
         unsafe { ffi::clang_getCursorDefinition(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
     }
 
-    /// Returns the display name of this cursor.
+    /// Returns the display name of this cursor, if any.
     ///
     /// The display name includes additional information about the entity this cursor references.
     pub fn get_display_name(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
     }
 
-    /// Returns the kind of AST element this cursor references.
+    /// Returns the kind of AST entity this cursor references.
     pub fn get_kind(&self) -> CursorKind {
         unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
     }
 
-    /// Returns the language used by the AST element this cursor references if this cursor
-    /// references a declaration.
-    ///
-    /// # Panics
-    ///
-    /// * this cursor does not refer to a declaration
-    pub fn get_language(&self) -> Language {
+    /// Returns the language used by the declaration this cursor references, if applicable.
+    pub fn get_language(&self) -> Option<Language> {
         unsafe {
-            let language = ffi::clang_getCursorLanguage(self.raw);
-
-            if language == ffi::CXLanguageKind::Invalid {
-                panic!("this cursor does not refer to a declaration");
+            match ffi::clang_getCursorLanguage(self.raw) {
+                ffi::CXLanguageKind::Invalid => None,
+                other => Some(mem::transmute(other)),
             }
-
-            mem::transmute(language)
         }
     }
 
-    /// Returns the cursor that refers to the lexical parent of the AST element this cursor
+    /// Returns the cursor that refers to the lexical parent of the AST entity this cursor
     /// references, if any.
     pub fn get_lexical_parent(&self) -> Option<Cursor<'tu>> {
-        unsafe { ffi::clang_getCursorLexicalParent(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
+        let parent = unsafe { ffi::clang_getCursorLexicalParent(self.raw) };
+        parent.map(|p| Cursor::from_raw(p, self.tu))
     }
 
-    /// Returns the source location of the AST element this cursor references.
-    ///
-    /// # Panics
-    ///
-    /// * this cursor refers to a translation unit
-    pub fn get_location(&self) -> SourceLocation<'tu> {
-        if self.raw.kind == ffi::CXCursorKind::TranslationUnit {
-            panic!("this cursor refers to a translation unit");
+    /// Returns the source location of the AST entity this cursor references, if any.
+    pub fn get_location(&self) -> Option<SourceLocation<'tu>> {
+        unsafe {
+            let location = ffi::clang_getCursorLocation(self.raw);
+            location.map(|l| SourceLocation::from_raw(l, self.tu))
         }
-
-        unsafe { SourceLocation::from_raw(ffi::clang_getCursorLocation(self.raw), self.tu) }
     }
 
-    /// Returns the mangled name for the AST element this cursor references, if any.
+    /// Returns the mangled name for the AST entity this cursor references, if any.
     pub fn get_mangled_name(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
     }
 
-    /// Returns the module imported by the module import declaration this cursor references.
-    ///
-    /// # Panics
-    ///
-    /// * this cursor does not refer to a module import declaration
-    pub fn get_module(&self) -> Module<'tu> {
-        unsafe {
-            ffi::clang_Cursor_getModule(self.raw).map(|m| {
-                Module::from_ptr(m, self.tu)
-            }).expect("this cursor does not refer to a module import declaration")
-        }
+    /// Returns the module imported by the module import declaration this cursor references, if
+    /// applicable.
+    pub fn get_module(&self) -> Option<Module<'tu>> {
+        unsafe { ffi::clang_Cursor_getModule(self.raw).map(|m| Module::from_ptr(m, self.tu)) }
     }
 
-    /// Returns the name for the AST element this cursor references, if any.
+    /// Returns the name for the AST entity this cursor references, if any.
     pub fn get_name(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_getCursorSpelling(self.raw)) }
     }
 
-    /// Returns the source ranges of the name for the AST element this cursor references, if any.
+    /// Returns the source ranges of the name for the AST entity this cursor references, if any.
     pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
         use std::ptr;
         unsafe {
@@ -840,33 +819,28 @@ impl<'tu> Cursor<'tu> {
         }
     }
 
-    /// Returns the source range of the AST element this cursor references.
-    ///
-    /// # Panics
-    ///
-    /// * this cursor refers to a translation unit
-    pub fn get_range(&self) -> SourceRange<'tu> {
-        if self.raw.kind == ffi::CXCursorKind::TranslationUnit {
-            panic!("this cursor refers to a translation unit");
+    /// Returns the source range of the AST entity this cursor references, if any.
+    pub fn get_range(&self) -> Option<SourceRange<'tu>> {
+        unsafe {
+            let range = ffi::clang_getCursorExtent(self.raw);
+            range.map(|r| SourceRange::from_raw(r, self.tu))
         }
-
-        unsafe { SourceRange::from_raw(ffi::clang_getCursorExtent(self.raw), self.tu) }
     }
 
-    /// Returns the cursor that refers to the AST element referred to by the AST element this cursor
-    /// references.
+    /// Returns the cursor that refers to the AST entity referred to by the AST entity this cursor
+    /// references, if any.
     pub fn get_reference(&self) -> Option<Cursor<'tu>> {
         unsafe { ffi::clang_getCursorReferenced(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
     }
 
-    /// Returns the cursor that refers to the semantic parent of the AST element this cursor
+    /// Returns the cursor that refers to the semantic parent of the AST entity this cursor
     /// references, if any.
     pub fn get_semantic_parent(&self) -> Option<Cursor<'tu>> {
         let parent = unsafe { ffi::clang_getCursorSemanticParent(self.raw) };
         parent.map(|p| Cursor::from_raw(p, self.tu))
     }
 
-    /// Returns the translation unit which contains the AST element this cursor references.
+    /// Returns the translation unit which contains the AST entity this cursor references.
     pub fn get_translation_unit(&self) -> &'tu TranslationUnit<'tu> {
         self.tu
     }
@@ -962,14 +936,8 @@ impl<'tu> cmp::PartialEq for Cursor<'tu> {
 
 impl<'tu> fmt::Debug for Cursor<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let location = if self.get_kind() != CursorKind::TranslationUnit {
-            Some(self.get_location())
-        } else {
-            None
-        };
-
         formatter.debug_struct("Cursor")
-            .field("location", &location)
+            .field("location", &self.get_location())
             .field("kind", &self.get_kind())
             .field("display_name", &self.get_display_name())
             .finish()
@@ -978,7 +946,11 @@ impl<'tu> fmt::Debug for Cursor<'tu> {
 
 impl<'tu> hash::Hash for Cursor<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
-        unsafe { hasher.write_u64(ffi::clang_hashCursor(self.raw) as u64); }
+        unsafe {
+            let integer = ffi::clang_hashCursor(self.raw);
+            let slice = slice::from_raw_parts(mem::transmute(&integer), mem::size_of_val(&integer));
+            hasher.write(slice);
+        }
     }
 }
 
@@ -1111,10 +1083,8 @@ impl<'tu> File<'tu> {
             panic!("`line` or `column` is `0`");
         }
 
-        let location = unsafe {
-            ffi::clang_getLocation(self.tu.ptr, self.ptr, line as c_uint, column as c_uint)
-        };
-
+        let (line, column) = (line, column) as (c_uint, c_uint);
+        let location = unsafe { ffi::clang_getLocation(self.tu.ptr, self.ptr, line, column) };
         SourceLocation::from_raw(location, self.tu)
     }
 
@@ -1126,10 +1096,8 @@ impl<'tu> File<'tu> {
 
     /// Returns the source location at the supplied character offset in this file.
     pub fn get_offset_location(&self, offset: u32) -> SourceLocation<'tu> {
-        let location = unsafe {
-            ffi::clang_getLocationForOffset(self.tu.ptr, self.ptr, offset as c_uint)
-        };
-
+        let offset = offset as c_uint;
+        let location = unsafe { ffi::clang_getLocationForOffset(self.tu.ptr, self.ptr, offset) };
         SourceLocation::from_raw(location, self.tu)
     }
 
@@ -1203,13 +1171,6 @@ impl Default for FormatOptions {
 
 // Index _________________________________________
 
-/// Indicates which types of threads have background priority.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct BackgroundPriority {
-    pub editing: bool,
-    pub indexing: bool,
-}
-
 /// A collection of translation units.
 pub struct Index<'c> {
     ptr: ffi::CXIndex,
@@ -1230,29 +1191,16 @@ impl<'c> Index<'c> {
 
     //- Accessors --------------------------------
 
-    /// Returns which types of threads have background priority.
-    pub fn get_background_priority(&self) -> BackgroundPriority {
-        let flags = unsafe { ffi::clang_CXIndex_getGlobalOptions(self.ptr) };
-        let editing = flags.contains(ffi::CXGlobalOpt_ThreadBackgroundPriorityForEditing);
-        let indexing = flags.contains(ffi::CXGlobalOpt_ThreadBackgroundPriorityForIndexing);
-        BackgroundPriority { editing: editing, indexing: indexing }
+    /// Returns the thread options for this index.
+    pub fn get_thread_options(&self) -> ThreadOptions {
+        unsafe { ThreadOptions::from(ffi::clang_CXIndex_getGlobalOptions(self.ptr)) }
     }
 
     //- Mutators ---------------------------------
 
-    /// Sets which types of threads have background priority.
-    pub fn set_background_priority(&mut self, priority: BackgroundPriority) {
-        let mut flags = ffi::CXGlobalOptFlags::empty();
-
-        if priority.editing {
-            flags.insert(ffi::CXGlobalOpt_ThreadBackgroundPriorityForEditing);
-        }
-
-        if priority.indexing {
-            flags.insert(ffi::CXGlobalOpt_ThreadBackgroundPriorityForIndexing);
-        }
-
-        unsafe { ffi::clang_CXIndex_setGlobalOptions(self.ptr, flags); }
+    /// Sets the thread options for this index.
+    pub fn set_thread_options(&mut self, options: ThreadOptions) {
+        unsafe { ffi::clang_CXIndex_setGlobalOptions(self.ptr, options.into()); }
     }
 }
 
@@ -1404,7 +1352,7 @@ impl<'tu> SourceLocation<'tu> {
 
     //- Accessors --------------------------------
 
-    /// Returns the cursor that refers to the AST element at this source location, if any.
+    /// Returns the cursor that refers to the AST entity at this source location, if any.
     pub fn get_cursor(&self) -> Option<Cursor<'tu>> {
         unsafe { ffi::clang_getCursor(self.tu.ptr, self.raw).map(|c| Cursor::from_raw(c, self.tu)) }
     }
@@ -1539,6 +1487,19 @@ impl<'tu> hash::Hash for SourceRange<'tu> {
     }
 }
 
+// ThreadOptions _________________________________
+
+options! {
+    /// A set of options that determines which types of threads should use background priority.
+    #[derive(Default)]
+    options ThreadOptions: CXGlobalOptFlags {
+        /// Indicates whether threads creating for editing purposes should use background priority.
+        pub editing: CXGlobalOpt_ThreadBackgroundPriorityForEditing,
+        /// Indicates whether threads creating for indexing purposes should use background priority.
+        pub indexing: CXGlobalOpt_ThreadBackgroundPriorityForIndexing,
+    }
+}
+
 // TranslationUnit _______________________________
 
 /// A preprocessed and parsed source file.
@@ -1562,10 +1523,7 @@ impl<'i> TranslationUnit<'i> {
     pub fn from_ast<F: AsRef<Path>>(
         index: &'i mut Index, file: F
     ) -> Result<TranslationUnit<'i>, ()> {
-        let ptr = unsafe {
-            ffi::clang_createTranslationUnit(index.ptr, from_path(file).as_ptr())
-        };
-
+        let ptr = unsafe { ffi::clang_createTranslationUnit(index.ptr, from_path(file).as_ptr()) };
         ptr.map(TranslationUnit::from_ptr).ok_or(())
     }
 
@@ -1643,11 +1601,8 @@ impl<'i> TranslationUnit<'i> {
     pub fn get_memory_usage(&self) -> HashMap<MemoryUsage, usize> {
         unsafe {
             let raw = ffi::clang_getCXTUResourceUsage(self.ptr);
-
-            let usage = slice::from_raw_parts(raw.entries, raw.numEntries as usize).iter().map(|u| {
-                (mem::transmute(u.kind), u.amount as usize)
-            }).collect();
-
+            let raws = slice::from_raw_parts(raw.entries, raw.numEntries as usize);
+            let usage = raws.iter().map(|u| (mem::transmute(u.kind), u.amount as usize)).collect();
             ffi::clang_disposeCXTUResourceUsage(raw);
             usage
         }

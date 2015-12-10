@@ -981,6 +981,18 @@ pub struct CXSourceLocation {
     pub int_data: c_uint,
 }
 
+impl Nullable<CXSourceLocation> for CXSourceLocation {
+    fn map<U, F: FnOnce(CXSourceLocation) -> U>(self, f: F) -> Option<U> {
+        unsafe {
+            if clang_equalLocations(self, clang_getNullLocation()) == 0 {
+                Some(f(self))
+            } else {
+                None
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct CXSourceRange {

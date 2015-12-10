@@ -104,9 +104,10 @@ fn test() {
         let cursor = tu.get_cursor();
         assert_eq!(cursor.get_display_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(cursor.get_kind(), CursorKind::TranslationUnit);
+        assert_eq!(cursor.get_location(), None);
+        assert_eq!(cursor.get_mangled_name(), None);
         assert_eq!(cursor.get_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(cursor.get_name_ranges(), &[]);
-        assert_eq!(cursor.get_mangled_name(), None);
         assert_eq!(cursor.get_translation_unit().get_file(f), tu.get_file(f));
 
         let children = cursor.get_children();
@@ -114,16 +115,17 @@ fn test() {
 
         assert_eq!(children[0].get_display_name(), Some("a".into()));
         assert_eq!(children[0].get_kind(), CursorKind::VarDecl);
-        assert_eq!(children[0].get_location(), file.get_location(1, 5));
+        assert_eq!(children[0].get_location(), Some(file.get_location(1, 5)));
         assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
         assert_eq!(children[0].get_name(), Some("a".into()));
         assert_eq!(children[0].get_name_ranges(), &[range!(file, 1, 5, 1, 6)]);
-        assert_eq!(children[0].get_range(), range!(file, 1, 1, 1, 13));
+        assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
         assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
     });
 
     let source = "
-        class A {
+        class B { };
+        class A : public B {
         private:
             void a() { };
         protected:
@@ -134,15 +136,18 @@ fn test() {
     ";
 
     with_cursor(&clang, source, |c| {
-        let children = c.get_children()[0].get_children();
-        assert_eq!(children.len(), 6);
+        assert_eq!(c.get_accessibility(), None);
 
-        assert_eq!(children[0].get_access_specifier(), Some(AccessSpecifier::Private));
-        assert_eq!(children[1].get_access_specifier(), Some(AccessSpecifier::Private));
-        assert_eq!(children[2].get_access_specifier(), Some(AccessSpecifier::Protected));
-        assert_eq!(children[3].get_access_specifier(), Some(AccessSpecifier::Protected));
-        assert_eq!(children[4].get_access_specifier(), Some(AccessSpecifier::Public));
-        assert_eq!(children[5].get_access_specifier(), Some(AccessSpecifier::Public));
+        let children = c.get_children()[1].get_children();
+        assert_eq!(children.len(), 7);
+
+        assert_eq!(children[0].get_accessibility(), Some(Accessibility::Public));
+        assert_eq!(children[1].get_accessibility(), Some(Accessibility::Private));
+        assert_eq!(children[2].get_accessibility(), Some(Accessibility::Private));
+        assert_eq!(children[3].get_accessibility(), Some(Accessibility::Protected));
+        assert_eq!(children[4].get_accessibility(), Some(Accessibility::Protected));
+        assert_eq!(children[5].get_accessibility(), Some(Accessibility::Public));
+        assert_eq!(children[6].get_accessibility(), Some(Accessibility::Public));
     });
 
     let source = "
@@ -220,6 +225,8 @@ fn test() {
     ";
 
     with_cursor(&clang, source, |c| {
+        assert_eq!(c.get_language(), None);
+
         let children = c.get_children();
         assert_eq!(children.len(), 2);
 
@@ -364,12 +371,12 @@ fn test() {
 
     let mut index = Index::new(&clang, false, false);
 
-    let mut priority = BackgroundPriority { editing: false, indexing: false };
-    assert_eq!(index.get_background_priority(), priority);
+    let mut options = ThreadOptions::default();
+    assert_eq!(index.get_thread_options(), options);
 
-    priority.editing = true;
-    index.set_background_priority(priority);
-    assert_eq!(index.get_background_priority(), priority);
+    options.editing = true;
+    index.set_thread_options(options);
+    assert_eq!(index.get_thread_options(), options);
 
     // Module ____________________________________
 
