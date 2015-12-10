@@ -31,8 +31,8 @@ macro_rules! range {
 // Functions
 //================================================
 
-fn with_cursor<'c, F: FnOnce(Cursor)>(clang: &'c Clang, contents: &str, f: F) {
-    with_translation_unit(clang, "test.cpp", contents, &[], |_, _, tu| f(tu.get_cursor()));
+fn with_entity<'c, F: FnOnce(Entity)>(clang: &'c Clang, contents: &str, f: F) {
+    with_translation_unit(clang, "test.cpp", contents, &[], |_, _, tu| f(tu.get_entity()));
 }
 
 fn with_file<'c, F: FnOnce(&Path, File)>(clang: &'c Clang, contents: &str, f: F) {
@@ -96,228 +96,6 @@ fn test() {
         assert!(f.is_include_guarded());
     });
 
-    // Cursor ____________________________________
-
-    with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
-        let file = tu.get_file(f).unwrap();
-
-        let cursor = tu.get_cursor();
-        assert_eq!(cursor.get_display_name(), Some(f.to_str().unwrap().into()));
-        assert_eq!(cursor.get_kind(), CursorKind::TranslationUnit);
-        assert_eq!(cursor.get_location(), None);
-        assert_eq!(cursor.get_mangled_name(), None);
-        assert_eq!(cursor.get_name(), Some(f.to_str().unwrap().into()));
-        assert_eq!(cursor.get_name_ranges(), &[]);
-        assert_eq!(cursor.get_translation_unit().get_file(f), tu.get_file(f));
-
-        let children = cursor.get_children();
-        assert_eq!(children.len(), 1);
-
-        assert_eq!(children[0].get_display_name(), Some("a".into()));
-        assert_eq!(children[0].get_kind(), CursorKind::VarDecl);
-        assert_eq!(children[0].get_location(), Some(file.get_location(1, 5)));
-        assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
-        assert_eq!(children[0].get_name(), Some("a".into()));
-        assert_eq!(children[0].get_name_ranges(), &[range!(file, 1, 5, 1, 6)]);
-        assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
-        assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
-    });
-
-    let source = "
-        class B { };
-        class A : public B {
-        private:
-            void a() { };
-        protected:
-            void b() { };
-        public:
-            void c() { };
-        };
-    ";
-
-    with_cursor(&clang, source, |c| {
-        assert_eq!(c.get_accessibility(), None);
-
-        let children = c.get_children()[1].get_children();
-        assert_eq!(children.len(), 7);
-
-        assert_eq!(children[0].get_accessibility(), Some(Accessibility::Public));
-        assert_eq!(children[1].get_accessibility(), Some(Accessibility::Private));
-        assert_eq!(children[2].get_accessibility(), Some(Accessibility::Private));
-        assert_eq!(children[3].get_accessibility(), Some(Accessibility::Protected));
-        assert_eq!(children[4].get_accessibility(), Some(Accessibility::Protected));
-        assert_eq!(children[5].get_accessibility(), Some(Accessibility::Public));
-        assert_eq!(children[6].get_accessibility(), Some(Accessibility::Public));
-    });
-
-    let source = "
-        struct A;
-        struct A;
-        struct A { int a; };
-    ";
-
-    with_cursor(&clang, source, |c| {
-        let children = c.get_children();
-        assert_eq!(children.len(), 3);
-
-        assert_eq!(children[0].get_canonical_cursor(), children[0]);
-        assert_eq!(children[0].get_definition(), Some(children[2]));
-
-        assert_eq!(children[1].get_canonical_cursor(), children[0]);
-        assert_eq!(children[1].get_definition(), Some(children[2]));
-
-        assert_eq!(children[2].get_canonical_cursor(), children[0]);
-        assert_eq!(children[2].get_definition(), Some(children[2]));
-    });
-
-    let source = "
-        int a;
-        /// \\brief A global integer.
-        int b;
-    ";
-
-    with_translation_unit(&clang, "test.cpp", source, &[], |_, f, tu| {
-        let file = tu.get_file(f).unwrap();
-
-        let children = tu.get_cursor().get_children();
-        assert_eq!(children.len(), 2);
-
-        assert_eq!(file.get_location(2, 13).get_cursor(), Some(children[0]));
-        assert_eq!(file.get_location(3, 13).get_cursor(), None);
-        assert_eq!(file.get_location(4, 13).get_cursor(), Some(children[1]));
-
-        assert_eq!(children[0].get_comment(), None);
-        assert_eq!(children[0].get_comment_brief(), None);
-        assert_eq!(children[0].get_comment_range(), None);
-
-        assert_eq!(children[1].get_comment(), Some("/// \\brief A global integer.".into()));
-        assert_eq!(children[1].get_comment_brief(), Some("A global integer.".into()));
-        assert_eq!(children[1].get_comment_range(), Some(range!(file, 3, 9, 3, 39)));
-    });
-
-    let source = "
-        struct A { struct { int b; }; int i : 322; };
-    ";
-
-    with_cursor(&clang, source, |c| {
-        let children = c.get_children();
-        assert_eq!(children.len(), 1);
-
-        assert!(!children[0].is_anonymous());
-
-        let children = children[0].get_children();
-        assert_eq!(children.len(), 2);
-
-        assert_eq!(children[0].get_name(), None);
-        assert_eq!(children[0].get_display_name(), None);
-        assert!(children[0].is_anonymous());
-        assert!(!children[0].is_bit_field());
-
-        assert_eq!(children[1].get_name(), Some("i".into()));
-        assert_eq!(children[1].get_display_name(), Some("i".into()));
-        assert!(!children[1].is_anonymous());
-        assert!(children[1].is_bit_field());
-    });
-
-    let source = "
-        void a() { }
-        class B { void b() { } };
-    ";
-
-    with_cursor(&clang, source, |c| {
-        assert_eq!(c.get_language(), None);
-
-        let children = c.get_children();
-        assert_eq!(children.len(), 2);
-
-        assert_eq!(children[0].get_language(), Some(Language::C));
-        assert_eq!(children[1].get_language(), Some(Language::Cpp));
-    });
-
-    let source = "
-        struct A { void a(); };
-        void A::a() { }
-    ";
-
-    with_cursor(&clang, source, |c| {
-        assert_eq!(c.get_lexical_parent(), None);
-        assert_eq!(c.get_semantic_parent(), None);
-
-        let children = c.get_children();
-        assert_eq!(children.len(), 2);
-
-        assert_eq!(children[0].get_lexical_parent(), Some(c));
-        assert_eq!(children[0].get_semantic_parent(), Some(c));
-
-        assert_eq!(children[1].get_lexical_parent(), Some(c));
-        assert_eq!(children[1].get_semantic_parent(), Some(children[0]));
-    });
-
-    let source = "
-        class Class {
-            void a() const { }
-            virtual void b() = 0;
-            static void c() { }
-            virtual void d() { }
-        };
-    ";
-
-    with_cursor(&clang, source, |c| {
-        let children = c.get_children()[0].get_children();
-        assert_eq!(children.len(), 4);
-
-        macro_rules! method {
-            ($cursor:expr, $c:expr, $pv:expr, $s:expr, $v:expr) => ({
-                assert_eq!($cursor.is_const_method(), $c);
-                assert_eq!($cursor.is_pure_virtual_method(), $pv);
-                assert_eq!($cursor.is_static_method(), $s);
-                assert_eq!($cursor.is_virtual_method(), $v);
-            });
-        }
-
-        method!(children[0], true, false, false, false);
-        method!(children[1], false, true, false, true);
-        method!(children[2], false, false, true, false);
-        method!(children[3], false, false, false, true);
-    });
-
-    let source = "
-        struct A {
-            void a() { }
-            virtual void b() { }
-        };
-
-        void function() {
-            A a;
-            a.a();
-            a.b();
-        }
-    ";
-
-    with_cursor(&clang, source, |c| {
-        let children = c.get_children()[1].get_children()[0].get_children();
-        assert_eq!(children.len(), 3);
-
-        assert!(!children[1].is_dynamic_call());
-        assert!(children[2].is_dynamic_call());
-    });
-
-    let source = "
-        void a() { }
-        void b(...) { }
-    ";
-
-    with_cursor(&clang, source, |c| {
-        let children = c.get_children();
-        assert_eq!(children.len(), 2);
-
-        assert_eq!(children[0].get_display_name(), Some("a()".into()));
-        assert!(!children[0].is_variadic());
-
-        assert_eq!(children[1].get_display_name(), Some("b(...)".into()));
-        assert!(children[1].is_variadic());
-    });
-
     // Diagnostic ________________________________
 
     let source = "
@@ -365,6 +143,228 @@ fn test() {
         assert_eq!(diagnostics[2].get_ranges(), &[]);
         assert_eq!(diagnostics[2].get_severity(), Severity::Warning);
         assert_eq!(diagnostics[2].get_text(), text);
+    });
+
+    // Entity ____________________________________
+
+    with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+
+        let entity = tu.get_entity();
+        assert_eq!(entity.get_display_name(), Some(f.to_str().unwrap().into()));
+        assert_eq!(entity.get_kind(), EntityKind::TranslationUnit);
+        assert_eq!(entity.get_location(), None);
+        assert_eq!(entity.get_mangled_name(), None);
+        assert_eq!(entity.get_name(), Some(f.to_str().unwrap().into()));
+        assert_eq!(entity.get_name_ranges(), &[]);
+        assert_eq!(entity.get_translation_unit().get_file(f), tu.get_file(f));
+
+        let children = entity.get_children();
+        assert_eq!(children.len(), 1);
+
+        assert_eq!(children[0].get_display_name(), Some("a".into()));
+        assert_eq!(children[0].get_kind(), EntityKind::VarDecl);
+        assert_eq!(children[0].get_location(), Some(file.get_location(1, 5)));
+        assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
+        assert_eq!(children[0].get_name(), Some("a".into()));
+        assert_eq!(children[0].get_name_ranges(), &[range!(file, 1, 5, 1, 6)]);
+        assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
+        assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
+    });
+
+    let source = "
+        class B { };
+        class A : public B {
+        private:
+            void a() { };
+        protected:
+            void b() { };
+        public:
+            void c() { };
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        assert_eq!(e.get_accessibility(), None);
+
+        let children = e.get_children()[1].get_children();
+        assert_eq!(children.len(), 7);
+
+        assert_eq!(children[0].get_accessibility(), Some(Accessibility::Public));
+        assert_eq!(children[1].get_accessibility(), Some(Accessibility::Private));
+        assert_eq!(children[2].get_accessibility(), Some(Accessibility::Private));
+        assert_eq!(children[3].get_accessibility(), Some(Accessibility::Protected));
+        assert_eq!(children[4].get_accessibility(), Some(Accessibility::Protected));
+        assert_eq!(children[5].get_accessibility(), Some(Accessibility::Public));
+        assert_eq!(children[6].get_accessibility(), Some(Accessibility::Public));
+    });
+
+    let source = "
+        struct A;
+        struct A;
+        struct A { int a; };
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 3);
+
+        assert_eq!(children[0].get_canonical_entity(), children[0]);
+        assert_eq!(children[0].get_definition(), Some(children[2]));
+
+        assert_eq!(children[1].get_canonical_entity(), children[0]);
+        assert_eq!(children[1].get_definition(), Some(children[2]));
+
+        assert_eq!(children[2].get_canonical_entity(), children[0]);
+        assert_eq!(children[2].get_definition(), Some(children[2]));
+    });
+
+    let source = "
+        int a;
+        /// \\brief A global integer.
+        int b;
+    ";
+
+    with_translation_unit(&clang, "test.cpp", source, &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+
+        let children = tu.get_entity().get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(file.get_location(2, 13).get_entity(), Some(children[0]));
+        assert_eq!(file.get_location(3, 13).get_entity(), None);
+        assert_eq!(file.get_location(4, 13).get_entity(), Some(children[1]));
+
+        assert_eq!(children[0].get_comment(), None);
+        assert_eq!(children[0].get_comment_brief(), None);
+        assert_eq!(children[0].get_comment_range(), None);
+
+        assert_eq!(children[1].get_comment(), Some("/// \\brief A global integer.".into()));
+        assert_eq!(children[1].get_comment_brief(), Some("A global integer.".into()));
+        assert_eq!(children[1].get_comment_range(), Some(range!(file, 3, 9, 3, 39)));
+    });
+
+    let source = "
+        struct A { struct { int b; }; int i : 322; };
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 1);
+
+        assert!(!children[0].is_anonymous());
+
+        let children = children[0].get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_name(), None);
+        assert_eq!(children[0].get_display_name(), None);
+        assert!(children[0].is_anonymous());
+        assert!(!children[0].is_bit_field());
+
+        assert_eq!(children[1].get_name(), Some("i".into()));
+        assert_eq!(children[1].get_display_name(), Some("i".into()));
+        assert!(!children[1].is_anonymous());
+        assert!(children[1].is_bit_field());
+    });
+
+    let source = "
+        void a() { }
+        class B { void b() { } };
+    ";
+
+    with_entity(&clang, source, |e| {
+        assert_eq!(e.get_language(), None);
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_language(), Some(Language::C));
+        assert_eq!(children[1].get_language(), Some(Language::Cpp));
+    });
+
+    let source = "
+        struct A { void a(); };
+        void A::a() { }
+    ";
+
+    with_entity(&clang, source, |e| {
+        assert_eq!(e.get_lexical_parent(), None);
+        assert_eq!(e.get_semantic_parent(), None);
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_lexical_parent(), Some(e));
+        assert_eq!(children[0].get_semantic_parent(), Some(e));
+
+        assert_eq!(children[1].get_lexical_parent(), Some(e));
+        assert_eq!(children[1].get_semantic_parent(), Some(children[0]));
+    });
+
+    let source = "
+        class Class {
+            void a() const { }
+            virtual void b() = 0;
+            static void c() { }
+            virtual void d() { }
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 4);
+
+        macro_rules! method {
+            ($entity:expr, $c:expr, $pv:expr, $s:expr, $v:expr) => ({
+                assert_eq!($entity.is_const_method(), $c);
+                assert_eq!($entity.is_pure_virtual_method(), $pv);
+                assert_eq!($entity.is_static_method(), $s);
+                assert_eq!($entity.is_virtual_method(), $v);
+            });
+        }
+
+        method!(children[0], true, false, false, false);
+        method!(children[1], false, true, false, true);
+        method!(children[2], false, false, true, false);
+        method!(children[3], false, false, false, true);
+    });
+
+    let source = "
+        struct A {
+            void a() { }
+            virtual void b() { }
+        };
+
+        void function() {
+            A a;
+            a.a();
+            a.b();
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children()[1].get_children()[0].get_children();
+        assert_eq!(children.len(), 3);
+
+        assert!(!children[1].is_dynamic_call());
+        assert!(children[2].is_dynamic_call());
+    });
+
+    let source = "
+        void a() { }
+        void b(...) { }
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_display_name(), Some("a()".into()));
+        assert!(!children[0].is_variadic());
+
+        assert_eq!(children[1].get_display_name(), Some("b(...)".into()));
+        assert!(children[1].is_variadic());
     });
 
     // Index _____________________________________

@@ -131,12 +131,12 @@ pub enum Availability {
     Inaccessible = 3,
 }
 
-// CursorKind ____________________________________
+// EntityKind ____________________________________
 
-/// Indicates the type of AST entity a cursor references.
+/// Indicates the type of an AST entity.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
-pub enum CursorKind {
+pub enum EntityKind {
     /// A declaration whose specific type is not exposed via this interface.
     UnexposedDecl = 1,
     /// A C or C++ struct.
@@ -473,56 +473,17 @@ pub enum CursorKind {
     OverloadCandidate = 700,
 }
 
-impl CursorKind {
-    //- Accessors --------------------------------
+// EntityVisitResult _____________________________
 
-    /// Returns whether this cursor kind is categorized as an attribute.
-    pub fn is_attribute(&self) -> bool {
-        unsafe { ffi::clang_isAttribute(mem::transmute(*self)) != 0 }
-    }
-
-    /// Returns whether this cursor kind is categorized as a declaration.
-    pub fn is_declaration(&self) -> bool {
-        unsafe { ffi::clang_isDeclaration(mem::transmute(*self)) != 0 }
-    }
-
-    /// Returns whether this cursor kind is categorized as an expression.
-    pub fn is_expression(&self) -> bool {
-        unsafe { ffi::clang_isExpression(mem::transmute(*self)) != 0 }
-    }
-
-    /// Returns whether this cursor kind is categorized as preprocessing.
-    pub fn is_preprocessing(&self) -> bool {
-        unsafe { ffi::clang_isPreprocessing(mem::transmute(*self)) != 0 }
-    }
-
-    /// Returns whether this cursor kind is categorized as a reference.
-    pub fn is_reference(&self) -> bool {
-        unsafe { ffi::clang_isReference(mem::transmute(*self)) != 0 }
-    }
-
-    /// Returns whether this cursor kind is categorized as a statement.
-    pub fn is_statement(&self) -> bool {
-        unsafe { ffi::clang_isStatement(mem::transmute(*self)) != 0 }
-    }
-
-    /// Returns whether this cursor kind is categorized as unexposed.
-    pub fn is_unexposed(&self) -> bool {
-        unsafe { ffi::clang_isUnexposed(mem::transmute(*self)) != 0 }
-    }
-}
-
-// CursorVisitResult _____________________________
-
-/// Indicates how a cursor visitation should proceed.
+/// Indicates how a entity visitation should proceed.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
-pub enum CursorVisitResult {
-    /// Do not continue visiting cursors.
+pub enum EntityVisitResult {
+    /// Do not continue visiting entities.
     Break = 0,
-    /// Continue visiting sibling cursors iteratively, skipping child cursors.
+    /// Continue visiting sibling entities iteratively, skipping child entities.
     Continue = 1,
-    /// Continue visiting sibling and child cursors recursively, children first.
+    /// Continue visiting sibling and child entities recursively, children first.
     Recurse = 2,
 }
 
@@ -655,305 +616,6 @@ impl Drop for Clang {
     }
 }
 
-// Cursor ________________________________________
-
-/// A reference to an entity in the AST of a translation unit.
-#[derive(Copy, Clone)]
-pub struct Cursor<'tu> {
-    raw: ffi::CXCursor,
-    tu: &'tu TranslationUnit<'tu>,
-}
-
-impl<'tu> Cursor<'tu> {
-    //- Constructors -----------------------------
-
-    fn from_raw(raw: ffi::CXCursor, tu: &'tu TranslationUnit<'tu>) -> Cursor<'tu> {
-        Cursor { raw: raw, tu: tu }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the accessibility of the declaration or base class specifier this cursor
-    /// references, if applicable.
-    pub fn get_accessibility(&self) -> Option<Accessibility> {
-        unsafe {
-            match ffi::clang_getCXXAccessSpecifier(self.raw) {
-                ffi::CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier => None,
-                other => Some(mem::transmute(other)),
-            }
-        }
-    }
-
-    /// Returns the cursors that refer to the arguments of the function or method this cursor
-    /// references, if applicable.
-    pub fn get_arguments(&self) -> Option<Vec<Cursor<'tu>>> {
-        iter_option!(
-            clang_Cursor_getNumArguments(self.raw),
-            clang_Cursor_getArgument(self.raw),
-        ).map(|i| i.map(|a| Cursor::from_raw(a, self.tu)).collect())
-    }
-
-    /// Returns the availability of the AST entity this cursor references.
-    pub fn get_availability(&self) -> Availability {
-        unsafe { mem::transmute(ffi::clang_getCursorAvailability(self.raw)) }
-    }
-
-    /// Returns the canonical cursor for this cursor.
-    ///
-    /// In the C family of languages, some types of entities can be declared mulitple times. When
-    /// there are multiple declarations of the same entity, only one will be considered canonical.
-    pub fn get_canonical_cursor(&self) -> Cursor<'tu> {
-        unsafe { Cursor::from_raw(ffi::clang_getCanonicalCursor(self.raw), self.tu) }
-    }
-
-    /// Returns the comment associated with the AST entity this cursor references, if any.
-    pub fn get_comment(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_Cursor_getRawCommentText(self.raw)) }
-    }
-
-    /// Returns the brief of the comment associated with the AST entity this cursor references, if
-    /// any.
-    pub fn get_comment_brief(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_Cursor_getBriefCommentText(self.raw)) }
-    }
-
-    /// Returns the source range of the comment associated with the AST entity this cursor refers
-    /// to, if any.
-    pub fn get_comment_range(&self) -> Option<SourceRange<'tu>> {
-        let range = unsafe { ffi::clang_Cursor_getCommentRange(self.raw) };
-        range.map(|r| SourceRange::from_raw(r, self.tu))
-    }
-
-    /// Returns the children of this cursor.
-    pub fn get_children(&self) -> Vec<Cursor<'tu>> {
-        let mut children = vec![];
-
-        self.visit_children(|c, _| {
-            children.push(c);
-            CursorVisitResult::Continue
-        });
-
-        children
-    }
-
-    /// Returns the cursor that refers to the AST entity that describes the definition of the AST
-    /// entity this cursor references, if any.
-    pub fn get_definition(&self) -> Option<Cursor<'tu>> {
-        unsafe { ffi::clang_getCursorDefinition(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
-    }
-
-    /// Returns the display name of this cursor, if any.
-    ///
-    /// The display name includes additional information about the entity this cursor references.
-    pub fn get_display_name(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
-    }
-
-    /// Returns the kind of AST entity this cursor references.
-    pub fn get_kind(&self) -> CursorKind {
-        unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
-    }
-
-    /// Returns the language used by the declaration this cursor references, if applicable.
-    pub fn get_language(&self) -> Option<Language> {
-        unsafe {
-            match ffi::clang_getCursorLanguage(self.raw) {
-                ffi::CXLanguageKind::Invalid => None,
-                other => Some(mem::transmute(other)),
-            }
-        }
-    }
-
-    /// Returns the cursor that refers to the lexical parent of the AST entity this cursor
-    /// references, if any.
-    pub fn get_lexical_parent(&self) -> Option<Cursor<'tu>> {
-        let parent = unsafe { ffi::clang_getCursorLexicalParent(self.raw) };
-        parent.map(|p| Cursor::from_raw(p, self.tu))
-    }
-
-    /// Returns the source location of the AST entity this cursor references, if any.
-    pub fn get_location(&self) -> Option<SourceLocation<'tu>> {
-        unsafe {
-            let location = ffi::clang_getCursorLocation(self.raw);
-            location.map(|l| SourceLocation::from_raw(l, self.tu))
-        }
-    }
-
-    /// Returns the mangled name for the AST entity this cursor references, if any.
-    pub fn get_mangled_name(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
-    }
-
-    /// Returns the module imported by the module import declaration this cursor references, if
-    /// applicable.
-    pub fn get_module(&self) -> Option<Module<'tu>> {
-        unsafe { ffi::clang_Cursor_getModule(self.raw).map(|m| Module::from_ptr(m, self.tu)) }
-    }
-
-    /// Returns the name for the AST entity this cursor references, if any.
-    pub fn get_name(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_getCursorSpelling(self.raw)) }
-    }
-
-    /// Returns the source ranges of the name for the AST entity this cursor references, if any.
-    pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
-        use std::ptr;
-        unsafe {
-            (0..).map(|i| ffi::clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
-                if ffi::clang_Range_isNull(*r) != 0 {
-                    false
-                } else {
-                    let mut file = mem::uninitialized();
-
-                    ffi::clang_getSpellingLocation(
-                        ffi::clang_getRangeStart(*r),
-                        &mut file,
-                        ptr::null_mut(),
-                        ptr::null_mut(),
-                        ptr::null_mut(),
-                    );
-
-                    !file.0.is_null()
-                }
-            }).map(|r| SourceRange::from_raw(r, self.tu)).collect()
-        }
-    }
-
-    /// Returns the source range of the AST entity this cursor references, if any.
-    pub fn get_range(&self) -> Option<SourceRange<'tu>> {
-        unsafe {
-            let range = ffi::clang_getCursorExtent(self.raw);
-            range.map(|r| SourceRange::from_raw(r, self.tu))
-        }
-    }
-
-    /// Returns the cursor that refers to the AST entity referred to by the AST entity this cursor
-    /// references, if any.
-    pub fn get_reference(&self) -> Option<Cursor<'tu>> {
-        unsafe { ffi::clang_getCursorReferenced(self.raw).map(|p| Cursor::from_raw(p, self.tu)) }
-    }
-
-    /// Returns the cursor that refers to the semantic parent of the AST entity this cursor
-    /// references, if any.
-    pub fn get_semantic_parent(&self) -> Option<Cursor<'tu>> {
-        let parent = unsafe { ffi::clang_getCursorSemanticParent(self.raw) };
-        parent.map(|p| Cursor::from_raw(p, self.tu))
-    }
-
-    /// Returns the translation unit which contains the AST entity this cursor references.
-    pub fn get_translation_unit(&self) -> &'tu TranslationUnit<'tu> {
-        self.tu
-    }
-
-    /// Returns whether this cursor refers to an anonymous record declaration.
-    pub fn is_anonymous(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isAnonymous(self.raw) != 0 }
-    }
-
-    /// Returns whether this cursor refers to a bit field.
-    pub fn is_bit_field(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isBitField(self.raw) != 0 }
-    }
-
-    /// Returns whether this cursor refers to a const method.
-    pub fn is_const_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isConst(self.raw) != 0 }
-    }
-
-    /// Returns whether this cursor refers to a dynamic call.
-    ///
-    /// A dynamic call is either a call to a C++ virtual method or an Objective-C message where the
-    /// receiver is an object instance, not `super` or a specific class.
-    pub fn is_dynamic_call(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isDynamicCall(self.raw) != 0 }
-    }
-
-    /// Returns whether this cursor refers to a pure virtual method.
-    pub fn is_pure_virtual_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isPureVirtual(self.raw) != 0 }
-    }
-
-    /// Returns whether this cursor refers to a static method.
-    pub fn is_static_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isStatic(self.raw) != 0 }
-    }
-
-    /// Returns whether this cursor refers to a variadic function or method.
-    pub fn is_variadic(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isVariadic(self.raw) != 0 }
-    }
-
-    /// Returns whether this cursor refers to a virtual method.
-    pub fn is_virtual_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isVirtual(self.raw) != 0 }
-    }
-
-    /// Visits the children of this cursor recursively and returns whether visitation was ended by
-    /// the callback returning `CursorVisitResult::Break`.
-    ///
-    /// The first argument of the callback is the cursor being visited and the second argument is
-    /// the parent of that cursor. The return value of the callback determines how visitation will
-    /// proceed.
-    pub fn visit_children<F: FnMut(Cursor<'tu>, Cursor<'tu>) -> CursorVisitResult>(
-        &self, f: F
-    ) -> bool {
-        trait CursorCallback<'tu> {
-            fn call(&mut self, cursor: Cursor<'tu>, parent: Cursor<'tu>) -> CursorVisitResult;
-        }
-
-        impl<'tu, F: FnMut(Cursor<'tu>, Cursor<'tu>) -> CursorVisitResult> CursorCallback<'tu> for F {
-            fn call(&mut self, cursor: Cursor<'tu>, parent: Cursor<'tu>) -> CursorVisitResult {
-                self(cursor, parent)
-            }
-        }
-
-        extern fn visit<'tu>(
-            cursor: ffi::CXCursor, parent: ffi::CXCursor, data: ffi::CXClientData
-        ) -> ffi::CXChildVisitResult {
-            unsafe {
-                let &mut (tu, ref mut callback):
-                    &mut (&'tu TranslationUnit<'tu>, Box<CursorCallback<'tu>>) =
-                        mem::transmute(data);
-
-                let cursor = Cursor::from_raw(cursor, tu);
-                let parent = Cursor::from_raw(parent, tu);
-                mem::transmute(callback.call(cursor, parent))
-            }
-        }
-
-        let mut data = (self.tu, Box::new(f) as Box<CursorCallback>);
-        unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
-    }
-}
-
-impl<'tu> cmp::Eq for Cursor<'tu> { }
-
-impl<'tu> cmp::PartialEq for Cursor<'tu> {
-    fn eq(&self, other: &Cursor<'tu>) -> bool {
-        unsafe { ffi::clang_equalCursors(self.raw, other.raw) != 0 }
-    }
-}
-
-impl<'tu> fmt::Debug for Cursor<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Cursor")
-            .field("location", &self.get_location())
-            .field("kind", &self.get_kind())
-            .field("display_name", &self.get_display_name())
-            .finish()
-    }
-}
-
-impl<'tu> hash::Hash for Cursor<'tu> {
-    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
-        unsafe {
-            let integer = ffi::clang_hashCursor(self.raw);
-            let slice = slice::from_raw_parts(mem::transmute(&integer), mem::size_of_val(&integer));
-            hasher.write(slice);
-        }
-    }
-}
-
 // Diagnostic ____________________________________
 
 /// A suggested fix for an issue with a source file.
@@ -1043,6 +705,329 @@ impl<'tu> fmt::Debug for Diagnostic<'tu> {
 impl<'tu> fmt::Display for Diagnostic<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.format(FormatOptions::default()))
+    }
+}
+
+// Entity ________________________________________
+
+/// An AST entity.
+#[derive(Copy, Clone)]
+pub struct Entity<'tu> {
+    raw: ffi::CXCursor,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> Entity<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXCursor, tu: &'tu TranslationUnit<'tu>) -> Entity<'tu> {
+        Entity { raw: raw, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the accessibility of this declaration or base class specifier, if applicable.
+    pub fn get_accessibility(&self) -> Option<Accessibility> {
+        unsafe {
+            match ffi::clang_getCXXAccessSpecifier(self.raw) {
+                ffi::CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
+    /// Returns the arguments of this function or method, if applicable.
+    pub fn get_arguments(&self) -> Option<Vec<Entity<'tu>>> {
+        iter_option!(
+            clang_Cursor_getNumArguments(self.raw),
+            clang_Cursor_getArgument(self.raw),
+        ).map(|i| i.map(|a| Entity::from_raw(a, self.tu)).collect())
+    }
+
+    /// Returns the availability of this AST entity.
+    pub fn get_availability(&self) -> Availability {
+        unsafe { mem::transmute(ffi::clang_getCursorAvailability(self.raw)) }
+    }
+
+    /// Returns the canonical entity for this AST entity.
+    ///
+    /// In the C family of languages, some types of entities can be declared multiple times. When
+    /// there are multiple declarations of the same entity, only one will be considered canonical.
+    pub fn get_canonical_entity(&self) -> Entity<'tu> {
+        unsafe { Entity::from_raw(ffi::clang_getCanonicalCursor(self.raw), self.tu) }
+    }
+
+    /// Returns the comment associated with this AST entity, if any.
+    pub fn get_comment(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_Cursor_getRawCommentText(self.raw)) }
+    }
+
+    /// Returns the brief of the comment associated with this AST entity, if any.
+    pub fn get_comment_brief(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_Cursor_getBriefCommentText(self.raw)) }
+    }
+
+    /// Returns the source range of the comment associated with this AST entity, if any.
+    pub fn get_comment_range(&self) -> Option<SourceRange<'tu>> {
+        let range = unsafe { ffi::clang_Cursor_getCommentRange(self.raw) };
+        range.map(|r| SourceRange::from_raw(r, self.tu))
+    }
+
+    /// Returns the children of this AST entity.
+    pub fn get_children(&self) -> Vec<Entity<'tu>> {
+        let mut children = vec![];
+
+        self.visit_children(|c, _| {
+            children.push(c);
+            EntityVisitResult::Continue
+        });
+
+        children
+    }
+
+    /// Returns the AST entity that describes the definition of this AST entity, if any.
+    pub fn get_definition(&self) -> Option<Entity<'tu>> {
+        unsafe { ffi::clang_getCursorDefinition(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
+    }
+
+    /// Returns the display name of this AST entity, if any.
+    pub fn get_display_name(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
+    }
+
+    /// Returns the kind of this AST entity.
+    pub fn get_kind(&self) -> EntityKind {
+        unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
+    }
+
+    /// Returns the language used by this declaration, if applicable.
+    pub fn get_language(&self) -> Option<Language> {
+        unsafe {
+            match ffi::clang_getCursorLanguage(self.raw) {
+                ffi::CXLanguageKind::Invalid => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
+    /// Returns the lexical parent of this AST entity, if any.
+    pub fn get_lexical_parent(&self) -> Option<Entity<'tu>> {
+        let parent = unsafe { ffi::clang_getCursorLexicalParent(self.raw) };
+        parent.map(|p| Entity::from_raw(p, self.tu))
+    }
+
+    /// Returns the source location of this AST entity, if any.
+    pub fn get_location(&self) -> Option<SourceLocation<'tu>> {
+        unsafe {
+            let location = ffi::clang_getCursorLocation(self.raw);
+            location.map(|l| SourceLocation::from_raw(l, self.tu))
+        }
+    }
+
+    /// Returns the mangled name of this AST entity, if any.
+    pub fn get_mangled_name(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
+    }
+
+    /// Returns the module imported by this module import declaration, if applicable.
+    pub fn get_module(&self) -> Option<Module<'tu>> {
+        unsafe { ffi::clang_Cursor_getModule(self.raw).map(|m| Module::from_ptr(m, self.tu)) }
+    }
+
+    /// Returns the name of this AST entity, if any.
+    pub fn get_name(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_getCursorSpelling(self.raw)) }
+    }
+
+    /// Returns the source ranges of the name of this AST entity.
+    pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
+        use std::ptr;
+        unsafe {
+            (0..).map(|i| ffi::clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
+                if ffi::clang_Range_isNull(*r) != 0 {
+                    false
+                } else {
+                    let mut file = mem::uninitialized();
+
+                    ffi::clang_getSpellingLocation(
+                        ffi::clang_getRangeStart(*r),
+                        &mut file,
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                    );
+
+                    !file.0.is_null()
+                }
+            }).map(|r| SourceRange::from_raw(r, self.tu)).collect()
+        }
+    }
+
+    /// Returns the source range of this AST entity, if any.
+    pub fn get_range(&self) -> Option<SourceRange<'tu>> {
+        unsafe {
+            let range = ffi::clang_getCursorExtent(self.raw);
+            range.map(|r| SourceRange::from_raw(r, self.tu))
+        }
+    }
+
+    /// Returns the AST entity referred to by this AST entity, if any.
+    pub fn get_reference(&self) -> Option<Entity<'tu>> {
+        unsafe { ffi::clang_getCursorReferenced(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
+    }
+
+    /// Returns the semantic parent of this AST entity, if any.
+    pub fn get_semantic_parent(&self) -> Option<Entity<'tu>> {
+        let parent = unsafe { ffi::clang_getCursorSemanticParent(self.raw) };
+        parent.map(|p| Entity::from_raw(p, self.tu))
+    }
+
+    /// Returns the translation unit which contains this AST entity.
+    pub fn get_translation_unit(&self) -> &'tu TranslationUnit<'tu> {
+        self.tu
+    }
+
+    /// Returns whether this AST entity is an anonymous record declaration.
+    pub fn is_anonymous(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isAnonymous(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an attribute.
+    pub fn is_attribute(&self) -> bool {
+        unsafe { ffi::clang_isAttribute(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a bit field.
+    pub fn is_bit_field(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isBitField(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a const method.
+    pub fn is_const_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isConst(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a declaration.
+    pub fn is_declaration(&self) -> bool {
+        unsafe { ffi::clang_isDeclaration(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a dynamic call.
+    ///
+    /// A dynamic call is either a call to a C++ virtual method or an Objective-C message where the
+    /// receiver is an object instance, not `super` or a specific class.
+    pub fn is_dynamic_call(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isDynamicCall(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an expression.
+    pub fn is_expression(&self) -> bool {
+        unsafe { ffi::clang_isExpression(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a preprocessing entity.
+    pub fn is_preprocessing(&self) -> bool {
+        unsafe { ffi::clang_isPreprocessing(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a pure virtual method.
+    pub fn is_pure_virtual_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isPureVirtual(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is categorized as a reference.
+    pub fn is_reference(&self) -> bool {
+        unsafe { ffi::clang_isReference(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a statement.
+    pub fn is_statement(&self) -> bool {
+        unsafe { ffi::clang_isStatement(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a static method.
+    pub fn is_static_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isStatic(self.raw) != 0 }
+    }
+
+    /// Returns whether the specific kind of this AST entity is unexposed.
+    pub fn is_unexposed(&self) -> bool {
+        unsafe { ffi::clang_isUnexposed(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a variadic function or method.
+    pub fn is_variadic(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isVariadic(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a virtual method.
+    pub fn is_virtual_method(&self) -> bool {
+        unsafe { ffi::clang_CXXMethod_isVirtual(self.raw) != 0 }
+    }
+
+    /// Visits the children of this AST entity recursively and returns whether visitation was ended
+    /// by the callback returning `EntityVisitResult::Break`.
+    ///
+    /// The first argument of the callback is the AST entity being visited and the second argument
+    /// is the parent of that AST entity. The return value of the callback determines how visitation
+    /// will proceed.
+    pub fn visit_children<F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult>(
+        &self, f: F
+    ) -> bool {
+        trait EntityCallback<'tu> {
+            fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult;
+        }
+
+        impl<'tu, F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult> EntityCallback<'tu> for F {
+            fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult {
+                self(entity, parent)
+            }
+        }
+
+        extern fn visit<'tu>(
+            cursor: ffi::CXCursor, parent: ffi::CXCursor, data: ffi::CXClientData
+        ) -> ffi::CXChildVisitResult {
+            unsafe {
+                let &mut (tu, ref mut callback):
+                    &mut (&'tu TranslationUnit<'tu>, Box<EntityCallback<'tu>>) =
+                        mem::transmute(data);
+
+                let entity = Entity::from_raw(cursor, tu);
+                let parent = Entity::from_raw(parent, tu);
+                mem::transmute(callback.call(entity, parent))
+            }
+        }
+
+        let mut data = (self.tu, Box::new(f) as Box<EntityCallback>);
+        unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
+    }
+}
+
+impl<'tu> cmp::Eq for Entity<'tu> { }
+
+impl<'tu> cmp::PartialEq for Entity<'tu> {
+    fn eq(&self, other: &Entity<'tu>) -> bool {
+        unsafe { ffi::clang_equalCursors(self.raw, other.raw) != 0 }
+    }
+}
+
+impl<'tu> fmt::Debug for Entity<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Entity")
+            .field("location", &self.get_location())
+            .field("kind", &self.get_kind())
+            .field("display_name", &self.get_display_name())
+            .finish()
+    }
+}
+
+impl<'tu> hash::Hash for Entity<'tu> {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
+        unsafe {
+            let integer = ffi::clang_hashCursor(self.raw);
+            let slice = slice::from_raw_parts(mem::transmute(&integer), mem::size_of_val(&integer));
+            hasher.write(slice);
+        }
     }
 }
 
@@ -1352,9 +1337,9 @@ impl<'tu> SourceLocation<'tu> {
 
     //- Accessors --------------------------------
 
-    /// Returns the cursor that refers to the AST entity at this source location, if any.
-    pub fn get_cursor(&self) -> Option<Cursor<'tu>> {
-        unsafe { ffi::clang_getCursor(self.tu.ptr, self.raw).map(|c| Cursor::from_raw(c, self.tu)) }
+    /// Returns the AST entity at this source location, if any.
+    pub fn get_entity(&self) -> Option<Entity<'tu>> {
+        unsafe { ffi::clang_getCursor(self.tu.ptr, self.raw).map(|c| Entity::from_raw(c, self.tu)) }
     }
 
     /// Returns the file, line, column and character offset of this source location.
@@ -1579,16 +1564,16 @@ impl<'i> TranslationUnit<'i> {
 
     //- Accessors --------------------------------
 
-    /// Returns the cursor which references this translation unit.
-    pub fn get_cursor(&'i self) -> Cursor<'i> {
-        unsafe { Cursor::from_raw(ffi::clang_getTranslationUnitCursor(self.ptr), self) }
-    }
-
     /// Returns the diagnostics for this translation unit.
     pub fn get_diagnostics<>(&'i self) -> Vec<Diagnostic<'i>> {
         iter!(clang_getNumDiagnostics(self.ptr), clang_getDiagnostic(self.ptr),).map(|d| {
             Diagnostic::from_ptr(d, self)
         }).collect()
+    }
+
+    /// Returns the entity for this translation unit.
+    pub fn get_entity(&'i self) -> Entity<'i> {
+        unsafe { Entity::from_raw(ffi::clang_getTranslationUnitCursor(self.ptr), self) }
     }
 
     /// Returns the file at the supplied path in this translation unit, if any.
