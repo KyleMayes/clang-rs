@@ -749,6 +749,13 @@ impl Clang {
             Err(())
         }
     }
+
+    //- Static -----------------------------------
+
+    /// Returns the version string for the version of `libclang` in use.
+    pub fn get_version() -> String {
+        unsafe { to_string(ffi::clang_getClangVersion()) }
+    }
 }
 
 impl Drop for Clang {
