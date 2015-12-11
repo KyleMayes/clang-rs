@@ -544,6 +544,22 @@ pub enum Language {
     ObjectiveC = 2,
 }
 
+// Linkage _______________________________________
+
+/// Indicates the linkage of an AST entity.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum Linkage {
+    /// The AST entity has automatic storage (e.g., variables or parameters).
+    Automatic = 1,
+    /// The AST entity is a static variable or static function.
+    Internal = 2,
+    /// The AST entity has external linkage.
+    External = 4,
+    /// The AST entity has external linkage and lives in a C++ anonymous namespace.
+    UniqueExternal = 3,
+}
+
 // MemoryUsage ___________________________________
 
 /// Indicates the usage category of a quantity of memory.
@@ -659,6 +675,37 @@ pub enum SourceError {
     Crash,
     /// An unknown error occurred.
     Unknown,
+}
+
+// StorageClass __________________________________
+
+/// Indicates the storage class of a declaration.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum StorageClass {
+    None = 1,
+    Extern = 2,
+    Static = 3,
+    PrivateExtern = 4,
+    OpenClWorkGroupLocal = 5,
+    Auto = 6,
+    Register = 7,
+}
+
+// TemplateArgument ______________________________
+
+/// An argument to a template function specialization.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TemplateArgument<'tu> {
+    Null,
+    Type(Type<'tu>),
+    Declaration,
+    Nullptr,
+    Integral(i64, u64),
+    Template,
+    TemplateExpansion,
+    Expression,
+    Pack,
 }
 
 // TypeKind ______________________________________
@@ -897,6 +944,19 @@ impl<'tu> Entity<'tu> {
         unsafe { mem::transmute(ffi::clang_getCursorAvailability(self.raw)) }
     }
 
+    /// Returns the width of this bit field, if applicable.
+    pub fn get_bit_field_width(&self) -> Option<usize> {
+        unsafe {
+            let width = ffi::clang_getFieldDeclBitWidth(self.raw);
+
+            if width >= 0 {
+                Some(width as usize)
+            } else {
+                None
+            }
+        }
+    }
+
     /// Returns the canonical entity for this AST entity.
     ///
     /// In the C family of languages, some types of entities can be declared multiple times. When
@@ -943,6 +1003,24 @@ impl<'tu> Entity<'tu> {
         unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
     }
 
+    /// Returns the value of this enum constant declaration, if applicable.
+    pub fn get_enum_constant_value(&self) -> Option<(i64, u64)> {
+        unsafe {
+            if self.get_kind() == EntityKind::EnumConstantDecl {
+                let signed = ffi::clang_getEnumConstantDeclValue(self.raw);
+                let unsigned = ffi::clang_getEnumConstantDeclUnsignedValue(self.raw);
+                Some((signed, unsigned))
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Returns the underlying type for this enum declaration, if applicable.
+    pub fn get_enum_underlying_type(&self) -> Option<Type<'tu>> {
+        unsafe { ffi::clang_getEnumDeclIntegerType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
     /// Returns the kind of this AST entity.
     pub fn get_kind(&self) -> EntityKind {
         unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
@@ -962,6 +1040,16 @@ impl<'tu> Entity<'tu> {
     pub fn get_lexical_parent(&self) -> Option<Entity<'tu>> {
         let parent = unsafe { ffi::clang_getCursorLexicalParent(self.raw) };
         parent.map(|p| Entity::from_raw(p, self.tu))
+    }
+
+    /// Returns the linkage of this AST entity, if any.
+    pub fn get_linkage(&self) -> Option<Linkage> {
+        unsafe {
+            match ffi::clang_getCursorLinkage(self.raw) {
+                ffi::CXLinkageKind::Invalid => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
     }
 
     /// Returns the source location of this AST entity, if any.
@@ -1011,6 +1099,40 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns the overloaded declarations referenced by this overloaded declaration reference, if
+    /// applicable.
+    pub fn get_overloaded_declarations(&self) -> Option<Vec<Entity<'tu>>> {
+        let declarations = iter!(
+            clang_getNumOverloadedDecls(self.raw),
+            clang_getOverloadedDecl(self.raw),
+        ).map(|e| Entity::from_raw(e, self.tu)).collect::<Vec<_>>();
+
+        if !declarations.is_empty() {
+            Some(declarations)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the methods that were overridden by this method, if applicable.
+    pub fn get_overridden_methods(&self) -> Option<Vec<Entity<'tu>>> {
+        unsafe {
+            let (mut raws, mut count) = mem::uninitialized();
+            ffi::clang_getOverriddenCursors(self.raw, &mut raws, &mut count);
+
+            if !raws.is_null() {
+                let methods = slice::from_raw_parts(raws, count as usize).iter().map(|e| {
+                    Entity::from_raw(*e, self.tu)
+                }).collect();
+
+                ffi::clang_disposeOverriddenCursors(raws);
+                Some(methods)
+            } else {
+                None
+            }
+        }
+    }
+
     /// Returns the source range of this AST entity, if any.
     pub fn get_range(&self) -> Option<SourceRange<'tu>> {
         unsafe {
@@ -1030,6 +1152,68 @@ impl<'tu> Entity<'tu> {
         parent.map(|p| Entity::from_raw(p, self.tu))
     }
 
+    /// Returns the storage class of this declaration, if applicable.
+    pub fn get_storage_class(&self) -> Option<StorageClass> {
+        unsafe {
+            match ffi::clang_Cursor_getStorageClass(self.raw) {
+                ffi::CX_StorageClass::Invalid => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
+    /// Returns the template declaration this template specialization was instantiated from, if
+    /// applicable.
+    pub fn get_template(&self) -> Option<Entity<'tu>> {
+        let parent = unsafe { ffi::clang_getSpecializedCursorTemplate(self.raw) };
+        parent.map(|p| Entity::from_raw(p, self.tu))
+    }
+
+    /// Returns the template arguments to this template function specialization, if applicable.
+    pub fn get_template_arguments(&self) -> Option<Vec<TemplateArgument<'tu>>> {
+        let get_type = &ffi::clang_Cursor_getTemplateArgumentType;
+        let get_signed = &ffi::clang_Cursor_getTemplateArgumentValue;
+        let get_unsigned = &ffi::clang_Cursor_getTemplateArgumentUnsignedValue;
+
+        iter_option!(
+            clang_Cursor_getNumTemplateArguments(self.raw),
+            clang_Cursor_getTemplateArgumentKind(self.raw),
+        ).map(|i| {
+            i.enumerate().map(|(i, t)| {
+                match t {
+                    ffi::CXTemplateArgumentKind::Null => TemplateArgument::Null,
+                    ffi::CXTemplateArgumentKind::Type => {
+                        let type_ = unsafe { get_type(self.raw, i as c_uint) };
+                        TemplateArgument::Type(Type::from_raw(type_, self.tu))
+                    },
+                    ffi::CXTemplateArgumentKind::Declaration => TemplateArgument::Declaration,
+                    ffi::CXTemplateArgumentKind::NullPtr => TemplateArgument::Nullptr,
+                    ffi::CXTemplateArgumentKind::Integral => {
+                        let signed = unsafe { get_signed(self.raw, i as c_uint) };
+                        let unsigned = unsafe { get_unsigned(self.raw, i as c_uint) };
+                        TemplateArgument::Integral(signed as i64, unsigned as u64)
+                    },
+                    ffi::CXTemplateArgumentKind::Template => TemplateArgument::Template,
+                    ffi::CXTemplateArgumentKind::TemplateExpansion => TemplateArgument::TemplateExpansion,
+                    ffi::CXTemplateArgumentKind::Expression => TemplateArgument::Expression,
+                    ffi::CXTemplateArgumentKind::Pack => TemplateArgument::Pack,
+                    _ => unreachable!(),
+                }
+            }).collect()
+        })
+    }
+
+    /// Returns the kind of template specialization that would result from instantiating this
+    /// template declaration, if applicable.
+    pub fn get_template_kind(&self) -> Option<EntityKind> {
+        unsafe {
+            match ffi::clang_getTemplateCursorKind(self.raw) {
+                ffi::CXCursorKind::NoDeclFound => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
     /// Returns the translation unit which contains this AST entity.
     pub fn get_translation_unit(&self) -> &'tu TranslationUnit<'tu> {
         self.tu
@@ -1038,6 +1222,14 @@ impl<'tu> Entity<'tu> {
     /// Returns the type of this AST entity, if any.
     pub fn get_type(&self) -> Option<Type<'tu>> {
         unsafe { ffi::clang_getCursorType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the underlying type for this typedef declaration, if applicable.
+    pub fn get_typedef_underlying_type(&self) -> Option<Type<'tu>> {
+        unsafe {
+            let type_ = ffi::clang_getTypedefDeclUnderlyingType(self.raw);
+            type_.map(|t| Type::from_raw(t, self.tu))
+        }
     }
 
     /// Returns whether this AST entity is an anonymous record declaration.
@@ -1063,6 +1255,12 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is a declaration.
     pub fn is_declaration(&self) -> bool {
         unsafe { ffi::clang_isDeclaration(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is a declaration and also the definition of that
+    /// declaration.
+    pub fn is_definition(&self) -> bool {
+        unsafe { ffi::clang_isCursorDefinition(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a dynamic call.
@@ -1111,6 +1309,11 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is a variadic function or method.
     pub fn is_variadic(&self) -> bool {
         unsafe { ffi::clang_Cursor_isVariadic(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a virtual base class specifier.
+    pub fn is_virtual_base(&self) -> bool {
+        unsafe { ffi::clang_isVirtualBase(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a virtual method.

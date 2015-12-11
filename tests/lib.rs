@@ -221,12 +221,41 @@ fn test() {
 
         assert_eq!(children[0].get_canonical_entity(), children[0]);
         assert_eq!(children[0].get_definition(), Some(children[2]));
+        assert!(!children[0].is_definition());
 
         assert_eq!(children[1].get_canonical_entity(), children[0]);
         assert_eq!(children[1].get_definition(), Some(children[2]));
+        assert!(!children[1].is_definition());
 
         assert_eq!(children[2].get_canonical_entity(), children[0]);
         assert_eq!(children[2].get_definition(), Some(children[2]));
+        assert!(children[2].is_definition());
+    });
+
+    let source = "
+        struct A { struct { int b; }; int i : 322; };
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 1);
+
+        assert!(!children[0].is_anonymous());
+
+        let children = children[0].get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_bit_field_width(), None);
+        assert_eq!(children[0].get_name(), None);
+        assert_eq!(children[0].get_display_name(), None);
+        assert!(children[0].is_anonymous());
+        assert!(!children[0].is_bit_field());
+
+        assert_eq!(children[1].get_bit_field_width(), Some(322));
+        assert_eq!(children[1].get_name(), Some("i".into()));
+        assert_eq!(children[1].get_display_name(), Some("i".into()));
+        assert!(!children[1].is_anonymous());
+        assert!(children[1].is_bit_field());
     });
 
     let source = "
@@ -255,27 +284,27 @@ fn test() {
     });
 
     let source = "
-        struct A { struct { int b; }; int i : 322; };
+        unsigned int integer = 322;
+        enum A { B = 322, C = 644 };
     ";
 
     with_entity(&clang, source, |e| {
+        assert_eq!(e.get_language(), None);
+
         let children = e.get_children();
-        assert_eq!(children.len(), 1);
-
-        assert!(!children[0].is_anonymous());
-
-        let children = children[0].get_children();
         assert_eq!(children.len(), 2);
 
-        assert_eq!(children[0].get_name(), None);
-        assert_eq!(children[0].get_display_name(), None);
-        assert!(children[0].is_anonymous());
-        assert!(!children[0].is_bit_field());
+        assert_eq!(children[0].get_enum_constant_value(), None);
+        assert_eq!(children[0].get_enum_underlying_type(), None);
 
-        assert_eq!(children[1].get_name(), Some("i".into()));
-        assert_eq!(children[1].get_display_name(), Some("i".into()));
-        assert!(!children[1].is_anonymous());
-        assert!(children[1].is_bit_field());
+        assert_eq!(children[1].get_enum_constant_value(), None);
+        assert_eq!(children[1].get_enum_underlying_type(), Some(children[0].get_type().unwrap()));
+
+        let children = children[1].get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_enum_constant_value(), Some((322, 322)));
+        assert_eq!(children[1].get_enum_constant_value(), Some((644, 644)));
     });
 
     let source = "
@@ -310,6 +339,105 @@ fn test() {
 
         assert_eq!(children[1].get_lexical_parent(), Some(e));
         assert_eq!(children[1].get_semantic_parent(), Some(children[0]));
+    });
+
+    let source = "
+        void a() { }
+        static void b() { }
+    ";
+
+    with_entity(&clang, source, |e| {
+        assert_eq!(e.get_linkage(), None);
+        assert_eq!(e.get_storage_class(), None);
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_linkage(), Some(Linkage::External));
+        assert_eq!(children[0].get_storage_class(), Some(StorageClass::None));
+
+        assert_eq!(children[1].get_linkage(), Some(Linkage::Internal));
+        assert_eq!(children[1].get_storage_class(), Some(StorageClass::Static));
+    });
+
+    let source = "
+        void a(int i) { }
+        void a(float f) { }
+        template <typename T> void b(T t) { a(t); }
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 3);
+
+        let children = children[2].get_children();
+        assert_eq!(children.len(), 3);
+
+        let children = children[2].get_children();
+        assert_eq!(children.len(), 1);
+
+        let children = children[0].get_children();
+        assert_eq!(children.len(), 2);
+
+        let children = children[0].get_children();
+        assert_eq!(children.len(), 1);
+
+        let declarations = vec![e.get_children()[1], e.get_children()[0]];
+        assert_eq!(children[0].get_overloaded_declarations(), Some(declarations));
+    });
+
+    let source = "
+        struct A { virtual void a() { } };
+        struct B : public A { virtual void a() { } };
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_children()[0].get_overridden_methods(), None);
+        assert_eq!(children[1].get_children()[1].get_overridden_methods(), Some(vec![
+            children[0].get_children()[0]
+        ]));
+    });
+
+    let source = "
+        int integer = 322;
+        template <typename T, int I> void function() { }
+        template <> void function<int, 322>() { }
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 3);
+
+        assert_eq!(children[0].get_template(), None);
+        assert_eq!(children[0].get_template_arguments(), None);
+        assert_eq!(children[0].get_template_kind(), None);
+
+        assert_eq!(children[1].get_template(), None);
+        assert_eq!(children[1].get_template_arguments(), None);
+        assert_eq!(children[1].get_template_kind(), Some(EntityKind::FunctionDecl));
+
+        assert_eq!(children[2].get_template(), Some(children[1]));
+        assert_eq!(children[2].get_template_arguments(), Some(vec![
+            TemplateArgument::Type(children[0].get_type().unwrap()),
+            TemplateArgument::Integral(322, 322),
+        ]));
+        assert_eq!(children[2].get_template_kind(), None);
+    });
+
+    let source = "
+        int integer = 322;
+        typedef int Integer;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        assert_eq!(children[0].get_typedef_underlying_type(), None);
+        assert_eq!(children[1].get_typedef_underlying_type(), Some(children[0].get_type().unwrap()));
     });
 
     let source = "
@@ -370,11 +498,22 @@ fn test() {
         let children = e.get_children();
         assert_eq!(children.len(), 2);
 
-        assert_eq!(children[0].get_display_name(), Some("a()".into()));
         assert!(!children[0].is_variadic());
-
-        assert_eq!(children[1].get_display_name(), Some("b(...)".into()));
         assert!(children[1].is_variadic());
+    });
+
+    let source = "
+        struct A { };
+        struct B : A { };
+        struct C : virtual A { };
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+        assert_eq!(children.len(), 3);
+
+        assert!(!children[1].get_children()[0].is_virtual_base());
+        assert!(children[2].get_children()[0].is_virtual_base());
     });
 
     // Index _____________________________________

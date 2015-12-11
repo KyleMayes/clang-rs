@@ -548,14 +548,14 @@ pub enum CX_CXXAccessSpecifier {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum CX_StorageClass {
-    SC_Invalid = 0,
-    SC_None = 1,
-    SC_Extern = 2,
-    SC_Static = 3,
-    SC_PrivateExtern = 4,
-    SC_OpenCLWorkGroupLocal = 5,
-    SC_Auto = 6,
-    SC_Register = 7,
+    Invalid = 0,
+    None = 1,
+    Extern = 2,
+    Static = 3,
+    PrivateExtern = 4,
+    OpenCLWorkGroupLocal = 5,
+    Auto = 6,
+    Register = 7,
 }
 
 //================================================
