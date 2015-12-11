@@ -1340,12 +1340,12 @@ impl<'tu> Entity<'tu> {
             }
         }
 
-        extern fn visit<'tu>(
+        extern fn visit(
             cursor: ffi::CXCursor, parent: ffi::CXCursor, data: ffi::CXClientData
         ) -> ffi::CXChildVisitResult {
             unsafe {
                 let &mut (tu, ref mut callback):
-                    &mut (&'tu TranslationUnit<'tu>, Box<EntityCallback<'tu>>) =
+                    &mut (&TranslationUnit, Box<EntityCallback>) =
                         mem::transmute(data);
 
                 let entity = Entity::from_raw(cursor, tu);
