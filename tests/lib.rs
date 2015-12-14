@@ -116,8 +116,8 @@ fn test() {
 
     with_translation_unit(&clang, "test.cpp", source, &["-Wconversion"], |_, f, tu| {
         let mut options = FormatOptions::default();
-        options.display_source_location = false;
-        options.display_option = false;
+        options.source_location = false;
+        options.option = false;
 
         let file = tu.get_file(f).unwrap();
 

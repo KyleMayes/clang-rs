@@ -182,7 +182,7 @@ pub enum CallingConvention {
 
 // EntityKind ____________________________________
 
-/// Indicates the kind of an AST entity.
+/// Indicates the categorization of an AST entity.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum EntityKind {
@@ -564,7 +564,7 @@ pub enum EntityVisitResult {
 
 // Language ______________________________________
 
-/// Indicates the language used by an AST entity.
+/// Indicates the language used by a declaration.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Language {
@@ -763,7 +763,7 @@ pub enum TemplateArgument<'tu> {
 
 // TypeKind ______________________________________
 
-/// Indicates the kind of a type.
+/// Indicates the categorization of a type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum TypeKind {
@@ -1094,6 +1094,9 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the display name of this AST entity, if any.
+    ///
+    /// The display name of an entity contains additional information that helps identify the
+    /// entity.
     pub fn get_display_name(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
     }
@@ -1111,12 +1114,12 @@ impl<'tu> Entity<'tu> {
         }
     }
 
-    /// Returns the underlying type for this enum declaration, if applicable.
+    /// Returns the underlying type of this enum declaration, if applicable.
     pub fn get_enum_underlying_type(&self) -> Option<Type<'tu>> {
         unsafe { ffi::clang_getEnumDeclIntegerType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
-    /// Returns the kind of this AST entity.
+    /// Returns the categorization of this AST entity.
     pub fn get_kind(&self) -> EntityKind {
         unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
     }
@@ -1264,7 +1267,7 @@ impl<'tu> Entity<'tu> {
         parent.map(|p| Entity::from_raw(p, self.tu))
     }
 
-    /// Returns the template arguments to this template function specialization, if applicable.
+    /// Returns the template arguments for this template function specialization, if applicable.
     pub fn get_template_arguments(&self) -> Option<Vec<TemplateArgument<'tu>>> {
         let get_type = &ffi::clang_Cursor_getTemplateArgumentType;
         let get_signed = &ffi::clang_Cursor_getTemplateArgumentValue;
@@ -1298,8 +1301,8 @@ impl<'tu> Entity<'tu> {
         })
     }
 
-    /// Returns the kind of template specialization that would result from instantiating this
-    /// template declaration, if applicable.
+    /// Returns the categorization of the template specialization that would result from
+    /// instantiating this template declaration, if applicable.
     pub fn get_template_kind(&self) -> Option<EntityKind> {
         unsafe {
             match ffi::clang_getTemplateCursorKind(self.raw) {
@@ -1319,7 +1322,7 @@ impl<'tu> Entity<'tu> {
         unsafe { ffi::clang_getCursorType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
-    /// Returns the underlying type for this typedef declaration, if applicable.
+    /// Returns the underlying type of this typedef declaration, if applicable.
     pub fn get_typedef_underlying_type(&self) -> Option<Type<'tu>> {
         unsafe {
             let type_ = ffi::clang_getTypedefDeclUnderlyingType(self.raw);
@@ -1332,11 +1335,6 @@ impl<'tu> Entity<'tu> {
         unsafe { ffi::clang_Cursor_isAnonymous(self.raw) != 0 }
     }
 
-    /// Returns whether this AST entity is an attribute.
-    pub fn is_attribute(&self) -> bool {
-        unsafe { ffi::clang_isAttribute(self.raw.kind) != 0 }
-    }
-
     /// Returns whether this AST entity is a bit field.
     pub fn is_bit_field(&self) -> bool {
         unsafe { ffi::clang_Cursor_isBitField(self.raw) != 0 }
@@ -1345,11 +1343,6 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is a const method.
     pub fn is_const_method(&self) -> bool {
         unsafe { ffi::clang_CXXMethod_isConst(self.raw) != 0 }
-    }
-
-    /// Returns whether this AST entity is a declaration.
-    pub fn is_declaration(&self) -> bool {
-        unsafe { ffi::clang_isDeclaration(self.raw.kind) != 0 }
     }
 
     /// Returns whether this AST entity is a declaration and also the definition of that
@@ -1366,39 +1359,14 @@ impl<'tu> Entity<'tu> {
         unsafe { ffi::clang_Cursor_isDynamicCall(self.raw) != 0 }
     }
 
-    /// Returns whether this AST entity is an expression.
-    pub fn is_expression(&self) -> bool {
-        unsafe { ffi::clang_isExpression(self.raw.kind) != 0 }
-    }
-
-    /// Returns whether this AST entity is a preprocessing entity.
-    pub fn is_preprocessing(&self) -> bool {
-        unsafe { ffi::clang_isPreprocessing(self.raw.kind) != 0 }
-    }
-
     /// Returns whether this AST entity is a pure virtual method.
     pub fn is_pure_virtual_method(&self) -> bool {
         unsafe { ffi::clang_CXXMethod_isPureVirtual(self.raw) != 0 }
     }
 
-    /// Returns whether this AST entity is categorized as a reference.
-    pub fn is_reference(&self) -> bool {
-        unsafe { ffi::clang_isReference(self.raw.kind) != 0 }
-    }
-
-    /// Returns whether this AST entity is a statement.
-    pub fn is_statement(&self) -> bool {
-        unsafe { ffi::clang_isStatement(self.raw.kind) != 0 }
-    }
-
     /// Returns whether this AST entity is a static method.
     pub fn is_static_method(&self) -> bool {
         unsafe { ffi::clang_CXXMethod_isStatic(self.raw) != 0 }
-    }
-
-    /// Returns whether the specific kind of this AST entity is unexposed.
-    pub fn is_unexposed(&self) -> bool {
-        unsafe { ffi::clang_isUnexposed(self.raw.kind) != 0 }
     }
 
     /// Returns whether this AST entity is a variadic function or method.
@@ -1451,6 +1419,43 @@ impl<'tu> Entity<'tu> {
 
         let mut data = (self.tu, Box::new(f) as Box<EntityCallback>);
         unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
+    }
+
+    //- Categorization ---------------------------
+
+    /// Returns whether this AST entity is categorized as an attribute.
+    pub fn is_attribute(&self) -> bool {
+        unsafe { ffi::clang_isAttribute(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is categorized as a declaration.
+    pub fn is_declaration(&self) -> bool {
+        unsafe { ffi::clang_isDeclaration(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is categorized as an expression.
+    pub fn is_expression(&self) -> bool {
+        unsafe { ffi::clang_isExpression(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is categorized as a preprocessing entity.
+    pub fn is_preprocessing(&self) -> bool {
+        unsafe { ffi::clang_isPreprocessing(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is categorized as a reference.
+    pub fn is_reference(&self) -> bool {
+        unsafe { ffi::clang_isReference(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether this AST entity is categorized as a statement.
+    pub fn is_statement(&self) -> bool {
+        unsafe { ffi::clang_isStatement(self.raw.kind) != 0 }
+    }
+
+    /// Returns whether the categorization of this AST entity is unexposed.
+    pub fn is_unexposed(&self) -> bool {
+        unsafe { ffi::clang_isUnexposed(self.raw.kind) != 0 }
     }
 }
 
@@ -1582,20 +1587,20 @@ options! {
         /// Indicates whether the diagnostic text will be prefixed by the file and line of the
         /// source location the diagnostic indicates. This prefix may also contain column and/or
         /// source range information.
-        pub display_source_location: CXDiagnostic_DisplaySourceLocation,
+        pub source_location: CXDiagnostic_DisplaySourceLocation,
         /// Indicates whether the column will be included in the source location prefix.
-        pub display_column: CXDiagnostic_DisplayColumn,
+        pub column: CXDiagnostic_DisplayColumn,
         /// Indicates whether the source ranges will be included to the source location prefix.
-        pub display_source_ranges: CXDiagnostic_DisplaySourceRanges,
+        pub source_ranges: CXDiagnostic_DisplaySourceRanges,
         /// Indicates whether the option associated with the diagnostic (e.g., `-Wconversion`) will
         /// be placed in brackets after the diagnostic text if there is such an option.
-        pub display_option: CXDiagnostic_DisplayOption,
+        pub option: CXDiagnostic_DisplayOption,
         /// Indicates whether the category number associated with the diagnostic will be placed in
         /// brackets after the diagnostic text if there is such a category number.
-        pub display_category_id: CXDiagnostic_DisplayCategoryId,
+        pub category_id: CXDiagnostic_DisplayCategoryId,
         /// Indicates whether the category name associated with the diagnostic will be placed in
         /// brackets after the diagnostic text if there is such a category name.
-        pub display_category_name: CXDiagnostic_DisplayCategoryName,
+        pub category_name: CXDiagnostic_DisplayCategoryName,
     }
 }
 
@@ -1730,20 +1735,20 @@ options! {
         ///
         /// This option increases the time it takes to reparse the translation unit but improves
         /// code completion performance.
-        pub cache_completion_results: CXTranslationUnit_CacheCompletionResults,
-        /// Indicates whether a detailed preprocessing record will be constructed which includes all
+        pub cached_completion_results: CXTranslationUnit_CacheCompletionResults,
+        /// Indicates whether a detailed preprocessing record will be constructed which tracks all
         /// macro definitions and instantiations.
         pub detailed_preprocessing_record: CXTranslationUnit_DetailedPreprocessingRecord,
-        /// Indicates whether brief documentation comments will be included in code completion
+        /// Indicates whether documentation comment briefs will be included in code completion
         /// results.
-        pub include_brief_comments_in_code_completion: CXTranslationUnit_IncludeBriefCommentsInCodeCompletion,
+        pub briefs_in_completion_results: CXTranslationUnit_IncludeBriefCommentsInCodeCompletion,
         /// Indicates whether the translation unit will be considered incomplete.
         ///
         /// This option suppresses certain semantic analyses and is typically used when parsing
         /// headers with the intent of creating a precompiled header.
         pub incomplete: CXTranslationUnit_Incomplete,
         /// Indicates whether function and method bodies will be skipped.
-        pub skip_function_bodies: CXTranslationUnit_SkipFunctionBodies,
+        pub skipped_function_bodies: CXTranslationUnit_SkipFunctionBodies,
     }
 }
 
