@@ -1,3 +1,7 @@
+//! Bindings and idiomatic wrapper for `libclang`.
+
+#![warn(missing_docs)]
+
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", warn(clippy))]
@@ -94,6 +98,8 @@ macro_rules! options {
 
 /// A type which may be null.
 pub trait Nullable<T> {
+    /// Transforms this value into an `Option<U>`, mapping a null value to `None` and a non-null
+    /// value to `Some(v)` where `v` is the result of applying the supplied function to this value.
     fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Option<U>;
 }
 
@@ -258,8 +264,11 @@ pub enum EntityKind {
     ObjCDynamicDecl = 38,
     /// An access specifier.
     AccessSpecifier = 39,
+    /// A reference to a super class in Objective-C.
     ObjCSuperClassRef = 40,
+    /// A reference to a protocol in Objective-C.
     ObjCProtocolRef = 41,
+    /// A reference to a class in Objective-C.
     ObjCClassRef = 42,
     /// A reference to a type declaration.
     TypeRef = 43,
@@ -492,27 +501,50 @@ pub enum EntityKind {
     TranslationUnit = 300,
     /// An attribute whose specific kind is not exposed via this interface.
     UnexposedAttr = 400,
-    IBActionAttr = 401,
-    IBOutletAttr = 402,
-    IBOutletCollectionAttr = 403,
+    /// An attribute applied to an Objective-C IBAction.
+    IbActionAttr = 401,
+    /// An attribute applied to an Objective-C IBOutlet.
+    IbOutletAttr = 402,
+    /// An attribute applied to an Objective-C IBOutletCollection.
+    IbOutletCollectionAttr = 403,
+    /// The `final` attribute.
     FinalAttr = 404,
+    /// The `override` attribute.
     OverrideAttr = 405,
+    /// An annotation attribute.
     AnnotateAttr = 406,
+    /// An ASM label attribute.
     AsmLabelAttr = 407,
+    /// An attribute that requests for packed records (e.g., `__attribute__ ((__packed__))`).
     PackedAttr = 408,
+    /// An attribute that asserts a function has no side effects (e.g., `__attribute__((pure))`).
     PureAttr = 409,
+    /// The `const` attribute.
     ConstAttr = 410,
+    /// An attribute that allows calls to a function to be duplicated by the optimized
+    /// (e.g., `__attribute__((noduplicate))`).
     NoDuplicateAttr = 411,
+    /// A CUDA constant attribute.
     CudaConstantAttr = 412,
+    /// A CUDA device attribute.
     CudaDeviceAttr = 413,
+    /// A CUDA global attribute.
     CudaGlobalAttr = 414,
+    /// A CUDA host attribute.
     CudaHostAttr = 415,
+    /// A CUDA shared attribute.
     CudaSharedAttr = 416,
+    /// A preprocessing directive.
     PreprocessingDirective = 500,
+    /// A macro definition.
     MacroDefinition = 501,
+    /// A macro expansion.
     MacroExpansion = 502,
+    /// An inclusion directive.
     InclusionDirective = 503,
+    /// A module import declaration.
     ModuleImportDecl = 600,
+    /// A single overload in a set of overloads.
     OverloadCandidate = 700,
 }
 
@@ -617,7 +649,9 @@ pub enum OffsetofError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum RefQualifier {
+    /// The function or method has an l-value ref qualifier (`&`).
     LValue = 1,
+    /// The function or method has an r-value ref qualifier (`&&`).
     RValue = 2,
 }
 
@@ -683,12 +717,22 @@ pub enum SourceError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum StorageClass {
+    /// The declaration does not specifiy a storage duration and therefore has an automatic storage
+    /// duration.
     None = 1,
+    /// The declaration specifies a static storage duration and external linkage.
     Extern = 2,
+    /// The declaration specifies a static storage duration and internal linkage.
     Static = 3,
+    /// The declaration specifies a static storage duration and external linkage but is not
+    /// accessible outside the containing translation unit.
     PrivateExtern = 4,
+    /// The declaration specifies a storage duration related to an OpenCL work group.
     OpenClWorkGroupLocal = 5,
+    /// The declaration specifies an automatic storage duration.
     Auto = 6,
+    /// The declaration specifies that it should be stored in a CPU register and have an automatic
+    /// storage duration.
     Register = 7,
 }
 
@@ -697,14 +741,23 @@ pub enum StorageClass {
 /// An argument to a template function specialization.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TemplateArgument<'tu> {
+    /// An empty template argument (e.g., one that has not yet been deduced).
     Null,
+    /// A type.
     Type(Type<'tu>),
+    /// A declaration for a pointer, reference, or member pointer non-type template parameter.
     Declaration,
+    /// A null pointer or null member pointer provided for a non-type template parameter.
     Nullptr,
+    /// An integer.
     Integral(i64, u64),
+    /// A name for a template provided for a template template parameter.
     Template,
+    /// A pack expansion of a name for a template provided for a template template parameter.
     TemplateExpansion,
+    /// An expression that has not yet been resolved
     Expression,
+    /// A parameter pack.
     Pack,
 }
 
@@ -716,56 +769,98 @@ pub enum TemplateArgument<'tu> {
 pub enum TypeKind {
     /// A type whose specific kind is not exposed via this interface.
     Unexposed = 1,
+    /// `void`
     Void = 2,
+    /// `bool` (C++) or `_Bool` (C99)
     Bool = 3,
     /// The `char` type when it is signed by default.
     CharS = 13,
     /// The `char` type when it is unsigned by default.
     CharU = 4,
-    /// The `signed char` type.
+    /// `signed char`
     SChar = 14,
-    /// The `unsigned char` type.
+    /// `unsigned char`
     UChar = 5,
+    /// `wchar_t`
     WChar = 15,
+    /// `char16_t`
     Char16 = 6,
+    /// `char32_t`
     Char32 = 7,
+    /// `short`
     Short = 16,
+    /// `unsigned short`
     UShort = 8,
+    /// `int`
     Int = 17,
+    /// `unsigned int`
     UInt = 9,
+    /// `long`
     Long = 18,
+    /// `unsigned long`
     ULong = 10,
+    /// `long long`
     LongLong = 19,
+    /// `unsigned long long`
     ULongLong = 11,
+    /// `__int128_t`
     Int128 = 20,
+    /// `__uint128_t`
     UInt128 = 12,
+    /// `float`
     Float = 21,
+    /// `double`
     Double = 22,
+    /// `long double`
     LongDouble = 23,
+    /// `nullptr_t` (C++11)
     Nullptr = 24,
-    Overload = 25,
-    Dependent = 26,
-    ObjCId = 27,
-    ObjCClass = 28,
-    ObjCSel = 29,
+    /// A C99 complex type (e.g., `_Complex float`).
     Complex = 100,
-    Pointer = 101,
-    BlockPointer = 102,
-    LValueReference = 103,
-    RValueReference = 104,
-    Record = 105,
-    Enum = 106,
-    Typedef = 107,
+    /// The type of an unresolved overload set.
+    Overload = 25,
+    /// An unknown dependent type.
+    Dependent = 26,
+    /// `id` (Objective-C)
+    ObjCId = 27,
+    /// `Class` (Objective-C)
+    ObjCClass = 28,
+    /// `SEL` (Objective-C)
+    ObjCSel = 29,
+    /// An Objective-C interface type.
     ObjCInterface = 108,
+    /// An Objective-C pointer to object type.
     ObjCObjectPointer = 109,
-    FunctionNoPrototype = 110,
-    FunctionPrototype = 111,
-    ConstantArray = 112,
-    Vector = 113,
-    IncompleteArray = 114,
-    VariableArray = 115,
-    DependentSizedArray = 116,
+    /// A pointer type.
+    Pointer = 101,
+    /// A block pointer type (e.g., `void (^)(int)`).
+    BlockPointer = 102,
+    /// A pointer to a record member type.
     MemberPointer = 117,
+    /// An l-value reference (e.g. `int&`).
+    LValueReference = 103,
+    /// An r-value reference (e.g. `int&&`).
+    RValueReference = 104,
+    /// A record type such as a struct or a class.
+    Record = 105,
+    /// An enum type.
+    Enum = 106,
+    /// A typedef.
+    Typedef = 107,
+    /// A function prototype with parameter type information (e.g., `void foo(int)`).
+    FunctionPrototype = 111,
+    /// A function prototype without parameter type information (e.g., `void foo()`).
+    FunctionNoPrototype = 110,
+    /// An array type with a specified size that is an integer constant expression.
+    ConstantArray = 112,
+    /// An array type with a specified size that is a dependent value.
+    DependentSizedArray = 116,
+    /// An array type without a specified size.
+    IncompleteArray = 114,
+    /// An array type with a specified size that is not an integer constant expression.
+    VariableArray = 115,
+    /// A GCC generic vector type.
+    Vector = 113,
 }
 
 //================================================
@@ -1671,9 +1766,13 @@ macro_rules! location {
 /// The file, line, column, and character offset of a source location.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Location<'tu> {
+    /// The file of the source location.
     pub file: File<'tu>,
+    /// The line of the source location.
     pub line: u32,
+    /// The column of the source location.
     pub column: u32,
+    /// The character offset of the source location.
     pub offset: u32,
 }
 
