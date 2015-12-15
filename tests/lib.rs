@@ -98,8 +98,26 @@ fn test() {
     with_file(&clang, "int a = 322;", |p, f| {
         with_file(&clang, "int a = 322;", |_, g| assert!(f.get_id() != g.get_id()));
         assert_eq!(f.get_path(), p.to_path_buf());
+        assert_eq!(f.get_skipped_ranges(), &[]);
         assert!(f.get_time() != 0);
         assert!(!f.is_include_guarded());
+    });
+
+    let source = "
+        #if 0
+        int skipped = 32;
+        #endif
+        int unskipped = 32;
+    ";
+
+    with_temporary_file("test.cpp", source, |_, f| {
+        let mut index = Index::new(&clang, false, false);
+        let mut options = ParseOptions::default();
+        options.detailed_preprocessing_record = true;
+        let tu = TranslationUnit::from_source(&mut index, f, &[], &[], options).unwrap();
+
+        let file = tu.get_file(f).unwrap();
+        assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
     });
 
     with_file(&clang, "#ifndef _TEST_H_\n#define _TEST_H_\nint a = 322;\n#endif", |_, f| {

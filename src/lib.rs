@@ -1565,6 +1565,20 @@ impl<'tu> File<'tu> {
         Path::new(&to_string(path)).into()
     }
 
+    /// Returns the source ranges in this file that were skipped by the preprocessor.
+    ///
+    /// This will always return an empty `Vec` if the translation unit that contains this file was
+    /// not constructed with a detailed preprocessing record.
+    pub fn get_skipped_ranges(&self) -> Vec<SourceRange<'tu>> {
+        unsafe {
+            let raw = ffi::clang_getSkippedRanges(self.tu.ptr, self.ptr);
+            let raws = slice::from_raw_parts((*raw).ranges, (*raw).count as usize);
+            let ranges = raws.iter().map(|r| SourceRange::from_raw(*r, self.tu)).collect();
+            ffi::clang_disposeSourceRangeList(raw);
+            ranges
+        }
+    }
+
     /// Returns the last modification time for this file.
     pub fn get_time(&self) -> time_t {
         unsafe { ffi::clang_getFileTime(self.ptr) }
