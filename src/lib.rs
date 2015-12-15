@@ -562,6 +562,19 @@ pub enum EntityVisitResult {
     Recurse = 2,
 }
 
+// FixIt _________________________________________
+
+/// A suggested fix for an issue with a source file.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum FixIt<'tu> {
+    /// Delete a segment of the source file.
+    Deletion(SourceRange<'tu>),
+    /// Insert a string into the source file.
+    Insertion(SourceLocation<'tu>, String),
+    /// Replace a segment of the source file with a string.
+    Replacement(SourceRange<'tu>, String),
+}
+
 // Language ______________________________________
 
 /// Indicates the language used by a declaration.
@@ -925,17 +938,6 @@ impl Drop for Clang {
 }
 
 // Diagnostic ____________________________________
-
-/// A suggested fix for an issue with a source file.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum FixIt<'tu> {
-    /// Delete a segment of the source file.
-    Deletion(SourceRange<'tu>),
-    /// Insert a string into the source file.
-    Insertion(SourceLocation<'tu>, String),
-    /// Replace a segment of the source file with a string.
-    Replacement(SourceRange<'tu>, String),
-}
 
 /// A message from the compiler about an issue with a source file.
 #[derive(Copy, Clone)]
@@ -1682,6 +1684,21 @@ impl<'c> Drop for Index<'c> {
     }
 }
 
+// Location ______________________________________
+
+/// The file, line, column, and character offset of a source location.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Location<'tu> {
+    /// The file of the source location.
+    pub file: File<'tu>,
+    /// The line of the source location.
+    pub line: u32,
+    /// The column of the source location.
+    pub column: u32,
+    /// The character offset of the source location.
+    pub offset: u32,
+}
+
 // Module ________________________________________
 
 /// A collection of headers.
@@ -1797,19 +1814,6 @@ macro_rules! location {
             offset: offset as u32,
         }
     });
-}
-
-/// The file, line, column, and character offset of a source location.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Location<'tu> {
-    /// The file of the source location.
-    pub file: File<'tu>,
-    /// The line of the source location.
-    pub line: u32,
-    /// The column of the source location.
-    pub column: u32,
-    /// The character offset of the source location.
-    pub offset: u32,
 }
 
 /// A location in a source file.
