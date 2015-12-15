@@ -761,6 +761,24 @@ pub enum TemplateArgument<'tu> {
     Pack,
 }
 
+// TokenKind _____________________________________
+
+/// Indicates the categorization of a token.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum TokenKind {
+    /// A puncuation token.
+    Punctuation = 0,
+    /// A keyword token.
+    Keyword = 1,
+    /// An identifier token.
+    Identifier = 2,
+    /// A literal token.
+    Literal = 3,
+    /// A comment token.
+    Comment = 4,
+}
+
 // TypeKind ______________________________________
 
 /// Indicates the categorization of a type.
@@ -1176,6 +1194,7 @@ impl<'tu> Entity<'tu> {
     /// Returns the source ranges of the name of this AST entity.
     pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
         use std::ptr;
+
         unsafe {
             (0..).map(|i| ffi::clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
                 if ffi::clang_Range_isNull(*r) != 0 {
@@ -1215,15 +1234,13 @@ impl<'tu> Entity<'tu> {
     /// Returns the methods that were overridden by this method, if applicable.
     pub fn get_overridden_methods(&self) -> Option<Vec<Entity<'tu>>> {
         unsafe {
-            let (mut raws, mut count) = mem::uninitialized();
-            ffi::clang_getOverriddenCursors(self.raw, &mut raws, &mut count);
+            let (mut raw, mut count) = mem::uninitialized();
+            ffi::clang_getOverriddenCursors(self.raw, &mut raw, &mut count);
 
-            if !raws.is_null() {
-                let methods = slice::from_raw_parts(raws, count as usize).iter().map(|e| {
-                    Entity::from_raw(*e, self.tu)
-                }).collect();
-
-                ffi::clang_disposeOverriddenCursors(raws);
+            if !raw.is_null() {
+                let raws = slice::from_raw_parts(raw, count as usize);
+                let methods = raws.iter().map(|e| Entity::from_raw(*e, self.tu)).collect();
+                ffi::clang_disposeOverriddenCursors(raw);
                 Some(methods)
             } else {
                 None
@@ -1906,6 +1923,18 @@ impl<'tu> SourceRange<'tu> {
         let start = unsafe { ffi::clang_getRangeStart(self.raw) };
         SourceLocation::from_raw(start, self.tu)
     }
+
+    /// Tokenizes the source code covered by this source range and returns the resulting tokens.
+    pub fn tokenize(&self) -> Vec<Token<'tu>> {
+        unsafe {
+            let (mut raw, mut count) = mem::uninitialized();
+            ffi::clang_tokenize(self.tu.ptr, self.raw, &mut raw, &mut count);
+            let raws = slice::from_raw_parts(raw, count as usize);
+            let tokens = raws.iter().map(|t| Token::from_raw(*t, self.tu)).collect();
+            ffi::clang_disposeTokens(self.tu.ptr, raw, count);
+            tokens
+        }
+    }
 }
 
 impl<'tu> cmp::Eq for SourceRange<'tu> { }
@@ -1942,6 +1971,58 @@ options! {
         pub editing: CXGlobalOpt_ThreadBackgroundPriorityForEditing,
         /// Indicates whether threads creating for indexing purposes should use background priority.
         pub indexing: CXGlobalOpt_ThreadBackgroundPriorityForIndexing,
+    }
+}
+
+// Token _________________________________________
+
+/// A lexed piece of a source file.
+#[derive(Copy, Clone)]
+pub struct Token<'tu> {
+    raw: ffi::CXToken,
+    tu: &'tu TranslationUnit<'tu>,
+}
+
+impl<'tu> Token<'tu> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXToken, tu: &'tu TranslationUnit<'tu>) -> Token<'tu> {
+        Token{ raw: raw, tu: tu }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the categorization of this token.
+    pub fn get_kind(&self) -> TokenKind {
+        unsafe { mem::transmute(ffi::clang_getTokenKind(self.raw)) }
+    }
+
+    /// Returns the source location of this token.
+    pub fn get_location(&self) -> SourceLocation<'tu> {
+        unsafe {
+            let raw = ffi::clang_getTokenLocation(self.tu.ptr, self.raw);
+            SourceLocation::from_raw(raw, self.tu)
+        }
+    }
+
+    /// Returns the source range of this token.
+    pub fn get_range(&self) -> SourceRange<'tu> {
+        unsafe { SourceRange::from_raw(ffi::clang_getTokenExtent(self.tu.ptr, self.raw), self.tu) }
+    }
+
+    /// Returns the textual representation of this token.
+    pub fn get_spelling(&self) -> String {
+        unsafe { to_string(ffi::clang_getTokenSpelling(self.tu.ptr, self.raw)) }
+    }
+}
+
+impl<'tu> fmt::Debug for Token<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Token")
+            .field("range", &self.get_range())
+            .field("kind", &self.get_kind())
+            .field("spelling", &self.get_spelling())
+            .finish()
     }
 }
 
@@ -2025,7 +2106,7 @@ impl<'i> TranslationUnit<'i> {
     //- Accessors --------------------------------
 
     /// Returns the diagnostics for this translation unit.
-    pub fn get_diagnostics<>(&'i self) -> Vec<Diagnostic<'i>> {
+    pub fn get_diagnostics(&'i self) -> Vec<Diagnostic<'i>> {
         iter!(clang_getNumDiagnostics(self.ptr), clang_getDiagnostic(self.ptr),).map(|d| {
             Diagnostic::from_ptr(d, self)
         }).collect()

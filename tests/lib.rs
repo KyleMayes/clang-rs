@@ -583,6 +583,28 @@ fn test() {
         assert_location_eq!(range.get_start().get_spelling_location(), f, 1, 5, 4);
     });
 
+    // Tokens ____________________________________
+
+    with_file(&clang, "int a; ", |_, f| {
+        let tokens = range!(f, 1, 1, 1, 7).tokenize();
+        assert_eq!(tokens.len(), 3);
+
+        assert_eq!(tokens[0].get_kind(), TokenKind::Keyword);
+        assert_location_eq!(tokens[0].get_location().get_spelling_location(), f, 1, 1, 0);
+        assert_eq!(tokens[0].get_range(), range!(f, 1, 1, 1, 4));
+        assert_eq!(tokens[0].get_spelling(), "int");
+
+        assert_eq!(tokens[1].get_kind(), TokenKind::Identifier);
+        assert_location_eq!(tokens[1].get_location().get_spelling_location(), f, 1, 5, 4);
+        assert_eq!(tokens[1].get_range(), range!(f, 1, 5, 1, 6));
+        assert_eq!(tokens[1].get_spelling(), "a");
+
+        assert_eq!(tokens[2].get_kind(), TokenKind::Punctuation);
+        assert_location_eq!(tokens[2].get_location().get_spelling_location(), f, 1, 6, 5);
+        assert_eq!(tokens[2].get_range(), range!(f, 1, 6, 1, 7));
+        assert_eq!(tokens[2].get_spelling(), ";");
+    });
+
     // TranslationUnit ___________________________
 
     //- from_ast ---------------------------------
