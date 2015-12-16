@@ -771,7 +771,7 @@ pub struct CXCodeCompleteResults {
 #[repr(C)]
 pub struct CXCompletionResult {
     pub CursorKind: CXCursorKind,
-    pub CompletionString: *mut c_void,
+    pub CompletionString: CXCompletionString,
 }
 
 #[derive(Copy, Clone)]
@@ -893,8 +893,8 @@ pub struct CXIdxIBOutletCollectionAttrInfo {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct CXIdxImportedASTFileInfo {
-    pub file: *mut c_void,
-    pub module: *mut c_void,
+    pub file: CXFile,
+    pub module: CXModule,
     pub loc: CXIdxLoc,
     pub isImplicit: c_int,
 }
@@ -904,7 +904,7 @@ pub struct CXIdxImportedASTFileInfo {
 pub struct CXIdxIncludedFileInfo {
     pub hashLoc: CXIdxLoc,
     pub filename: *const c_char,
-    pub file: *mut c_void,
+    pub file: CXFile,
     pub isImport: c_int,
     pub isAngled: c_int,
     pub isModuleImport: c_int,
