@@ -93,6 +93,111 @@ fn with_types<'c, F: FnOnce(Vec<Type>)>(clang: &'c Clang, contents: &str, f: F) 
 fn test() {
     let clang = Clang::new().unwrap();
 
+    // CompletionString __________________________
+
+    let source = "
+        struct A {
+            /// \\brief An integer field.
+            int a;
+            int b;
+            int c;
+        };
+        void b() { A a; a. }
+    ";
+
+    with_translation_unit(&clang, "test.cpp", source, &[], |_, f, tu| {
+        let mut options = CompletionOptions::default();
+        options.briefs = true;
+        let results = tu.complete(f, 8, 27, &[], options);
+        assert_eq!(results.get_container_kind(), Some((EntityKind::StructDecl, false)));
+
+        let mut results = results.get_results();
+        assert_eq!(results.len(), 6);
+        results.sort();
+
+        assert_eq!(results[0].get_kind(), EntityKind::Method);
+        let string = results[0].get_string();
+        assert_eq!(string.get_annotations(), &[] as &[&str]);
+        assert_eq!(string.get_availability(), Availability::Available);
+        assert_eq!(string.get_comment_brief(), None);
+        assert_eq!(string.get_chunks(), &[
+            CompletionChunk::ResultType("A &".into()),
+            CompletionChunk::TypedText("operator=".into()),
+            CompletionChunk::LeftParenthesis("(".into()),
+            CompletionChunk::Placeholder("const A &".into()),
+            CompletionChunk::RightParenthesis(")".into()),
+        ]);
+        assert_eq!(string.get_parent_name(), Some("A".into()));
+        assert_eq!(string.get_priority(), 34);
+        assert_eq!(string.get_typed_text(), Some("operator=".into()));
+
+        assert_eq!(results[1].get_kind(), EntityKind::Destructor);
+        let string = results[1].get_string();
+        assert_eq!(string.get_annotations(), &[] as &[&str]);
+        assert_eq!(string.get_availability(), Availability::Available);
+        assert_eq!(string.get_chunks(), &[
+            CompletionChunk::ResultType("void".into()),
+            CompletionChunk::TypedText("~A".into()),
+            CompletionChunk::LeftParenthesis("(".into()),
+            CompletionChunk::RightParenthesis(")".into()),
+        ]);
+        assert_eq!(string.get_parent_name(), Some("A".into()));
+        assert_eq!(string.get_priority(), 34);
+        assert_eq!(string.get_typed_text(), Some("~A".into()));
+
+        assert_eq!(results[2].get_kind(), EntityKind::FieldDecl);
+        let string = results[2].get_string();
+        assert_eq!(string.get_annotations(), &[] as &[&str]);
+        assert_eq!(string.get_availability(), Availability::Available);
+        assert_eq!(string.get_comment_brief(), Some("An integer field.".into()));
+        assert_eq!(string.get_chunks(), &[
+            CompletionChunk::ResultType("int".into()),
+            CompletionChunk::TypedText("a".into()),
+        ]);
+        assert_eq!(string.get_parent_name(), Some("A".into()));
+        assert_eq!(string.get_priority(), 35);
+        assert_eq!(string.get_typed_text(), Some("a".into()));
+
+        assert_eq!(results[3].get_kind(), EntityKind::FieldDecl);
+        let string = results[3].get_string();
+        assert_eq!(string.get_annotations(), &[] as &[&str]);
+        assert_eq!(string.get_availability(), Availability::Available);
+        assert_eq!(string.get_comment_brief(), None);
+        assert_eq!(string.get_chunks(), &[
+            CompletionChunk::ResultType("int".into()),
+            CompletionChunk::TypedText("b".into()),
+        ]);
+        assert_eq!(string.get_parent_name(), Some("A".into()));
+        assert_eq!(string.get_priority(), 35);
+        assert_eq!(string.get_typed_text(), Some("b".into()));
+
+        assert_eq!(results[4].get_kind(), EntityKind::FieldDecl);
+        let string = results[4].get_string();
+        assert_eq!(string.get_annotations(), &[] as &[&str]);
+        assert_eq!(string.get_availability(), Availability::Available);
+        assert_eq!(string.get_comment_brief(), None);
+        assert_eq!(string.get_chunks(), &[
+            CompletionChunk::ResultType("int".into()),
+            CompletionChunk::TypedText("c".into()),
+        ]);
+        assert_eq!(string.get_parent_name(), Some("A".into()));
+        assert_eq!(string.get_priority(), 35);
+        assert_eq!(string.get_typed_text(), Some("c".into()));
+
+        assert_eq!(results[5].get_kind(), EntityKind::StructDecl);
+        let string = results[5].get_string();
+        assert_eq!(string.get_annotations(), &[] as &[&str]);
+        assert_eq!(string.get_availability(), Availability::Available);
+        assert_eq!(string.get_comment_brief(), None);
+        assert_eq!(string.get_chunks(), &[
+            CompletionChunk::TypedText("A".into()),
+            CompletionChunk::Text("::".into()),
+        ]);
+        assert_eq!(string.get_parent_name(), Some("A".into()));
+        assert_eq!(string.get_priority(), 75);
+        assert_eq!(string.get_typed_text(), Some("A".into()));
+    });
+
     // File ______________________________________
 
     with_file(&clang, "int a = 322;", |p, f| {

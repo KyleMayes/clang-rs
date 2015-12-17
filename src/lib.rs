@@ -13,15 +13,16 @@ extern crate lazy_static;
 
 extern crate libc;
 
-use std::cmp;
 use std::fmt;
 use std::hash;
 use std::mem;
+use std::ptr;
 use std::slice;
+use std::cmp::{self, Ordering};
 use std::collections::{HashMap};
 use std::marker::{PhantomData};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{self, AtomicBool};
 
 use libc::{c_int, c_uint, c_ulong, time_t};
 
@@ -178,6 +179,93 @@ pub enum CallingConvention {
     SysV64= 11,
     /// The function type uses a calling convention that is not exposed via this interface.
     Unexposed = 200,
+}
+
+// CompletionChunk _______________________________
+
+/// A piece of a code completion string.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompletionChunk<'r> {
+    /// An optional piece that could be part of the template but is not required.
+    Optional(CompletionString<'r>),
+    /// Text that describes the current parameter when code completion was run on a function call,
+    /// message send, or template specialization.
+    CurrentParameter(String),
+    /// Informative text that should be displayed but not inserted as part of the template.
+    Informative(String),
+    /// Text that should be replaced by the user.
+    Placeholder(String),
+    /// Text that specifies the result type of the containing result.
+    ResultType(String),
+    /// Text that the user would be expected to type to get the containing code completion result.
+    TypedText(String),
+    /// Text that should be inserted.
+    Text(String),
+    /// A colon (`':'`).
+    Colon(String),
+    /// A comma (`','`).
+    Comma(String),
+    /// An equals sign (`'='`).
+    Equals(String),
+    /// A semicolon (`';'`).
+    Semicolon(String),
+    /// A left angle bracket (`'<'`).
+    LeftAngleBracket(String),
+    /// A right angle bracket (`'>'`).
+    RightAngleBracket(String),
+    /// A left brace (`'{'`).
+    LeftBrace(String),
+    /// A right brace (`'}'`).
+    RightBrace(String),
+    /// A left parentesis (`'('`)).
+    LeftParenthesis(String),
+    /// A right parenthesis (`')'`).
+    RightParenthesis(String),
+    /// A left square bracket (`'['`).
+    LeftSquareBracket(String),
+    /// A right square bracket (`']'`).
+    RightSquareBracket(String),
+    /// Horizontal space (e.g., `' '`).
+    HorizontalSpace(String),
+    /// Vertical space (e.g., `'\n'`).
+    VerticalSpace(String),
+}
+
+impl<'r> CompletionChunk<'r> {
+    //- Accessors --------------------------------
+
+    /// Returns the text associated with this completion chunk.
+    ///
+    /// # Panics
+    ///
+    /// * this completion chunk is a `CompletionChunk::Optional`
+    pub fn get_text(&self) -> String {
+        match *self {
+            CompletionChunk::Optional(_) => {
+                panic!("this completion chunk is a `CompletionChunk::Optional`")
+            },
+            CompletionChunk::CurrentParameter(ref text) => text.clone(),
+            CompletionChunk::Informative(ref text) => text.clone(),
+            CompletionChunk::Placeholder(ref text) => text.clone(),
+            CompletionChunk::ResultType(ref text) => text.clone(),
+            CompletionChunk::TypedText(ref text) => text.clone(),
+            CompletionChunk::Text(ref text) => text.clone(),
+            CompletionChunk::Colon(ref text) => text.clone(),
+            CompletionChunk::Comma(ref text) => text.clone(),
+            CompletionChunk::Equals(ref text) => text.clone(),
+            CompletionChunk::Semicolon(ref text) => text.clone(),
+            CompletionChunk::LeftAngleBracket(ref text) => text.clone(),
+            CompletionChunk::RightAngleBracket(ref text) => text.clone(),
+            CompletionChunk::LeftBrace(ref text) => text.clone(),
+            CompletionChunk::RightBrace(ref text) => text.clone(),
+            CompletionChunk::LeftParenthesis(ref text) => text.clone(),
+            CompletionChunk::RightParenthesis(ref text) => text.clone(),
+            CompletionChunk::LeftSquareBracket(ref text) => text.clone(),
+            CompletionChunk::RightSquareBracket(ref text) => text.clone(),
+            CompletionChunk::HorizontalSpace(ref text) => text.clone(),
+            CompletionChunk::VerticalSpace(ref text) => text.clone(),
+        }
+    }
 }
 
 // EntityKind ____________________________________
@@ -916,7 +1004,7 @@ impl Clang {
     ///
     /// * an instance of `Clang` already exists
     pub fn new() -> Result<Clang, ()> {
-        if AVAILABLE.swap(false, Ordering::Relaxed) {
+        if AVAILABLE.swap(false, atomic::Ordering::Relaxed) {
             Ok(Clang)
         } else {
             Err(())
@@ -933,7 +1021,276 @@ impl Clang {
 
 impl Drop for Clang {
     fn drop(&mut self) {
-        AVAILABLE.store(true, Ordering::Relaxed);
+        AVAILABLE.store(true, atomic::Ordering::Relaxed);
+    }
+}
+
+// CompletionOptions _____________________________
+
+options! {
+    /// A set of options that determines how code completion is run.
+    options CompletionOptions: CXCodeComplete_Flags {
+        /// Indicates whether macros will be included in code completion results.
+        pub macros: CXCodeComplete_IncludeMacros,
+        /// Indicates whether code patterns (e.g., for loops) will be included in code completion
+        /// results.
+        pub code_patterns: CXCodeComplete_IncludeCodePatterns,
+        /// Indicates whether documentation comment briefs will be included in code completion
+        /// results.
+        pub briefs: CXCodeComplete_IncludeBriefComments,
+    }
+}
+
+impl Default for CompletionOptions {
+    fn default() -> CompletionOptions {
+        unsafe { CompletionOptions::from(ffi::clang_defaultCodeCompleteOptions()) }
+    }
+}
+
+// CompletionResult ______________________________
+
+/// A code completion result.
+#[derive(Copy, Clone)]
+pub struct CompletionResult<'r> {
+    raw: ffi::CXCompletionResult,
+    _marker: PhantomData<&'r CompletionResults>
+}
+
+impl<'r> CompletionResult<'r> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXCompletionResult) -> CompletionResult<'r> {
+        CompletionResult { raw: raw, _marker: PhantomData }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the categorization of the AST entity this code completion result produces.
+    pub fn get_kind(&self) -> EntityKind {
+        unsafe { mem::transmute(self.raw.CursorKind) }
+    }
+
+    /// Returns the completion string for this code completion result.
+    pub fn get_string(&self) -> CompletionString<'r> {
+        CompletionString::from_raw(self.raw.CompletionString)
+    }
+}
+
+impl<'r> cmp::Eq for CompletionResult<'r> { }
+
+impl<'r> cmp::Ord for CompletionResult<'r> {
+    fn cmp(&self, other: &CompletionResult<'r>) -> Ordering {
+        self.get_string().cmp(&other.get_string())
+    }
+}
+
+impl<'r> cmp::PartialEq for CompletionResult<'r> {
+    fn eq(&self, other: &CompletionResult<'r>) -> bool {
+        self.get_kind() == other.get_kind() && self.get_string() == other.get_string()
+    }
+}
+
+impl<'r> cmp::PartialOrd for CompletionResult<'r> {
+    fn partial_cmp(&self, other: &CompletionResult<'r>) -> Option<Ordering> {
+        self.get_string().partial_cmp(&other.get_string())
+    }
+}
+
+impl<'r> fmt::Debug for CompletionResult<'r> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("CompletionResult")
+            .field("kind", &self.get_kind())
+            .field("string", &self.get_string())
+            .finish()
+    }
+}
+
+// CompletionResults _____________________________
+
+/// A set of code completion results.
+pub struct CompletionResults {
+    ptr: *mut ffi::CXCodeCompleteResults,
+}
+
+impl CompletionResults {
+    //- Constructors -----------------------------
+
+    fn from_ptr(ptr: *mut ffi::CXCodeCompleteResults) -> CompletionResults {
+        CompletionResults { ptr: ptr }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the categorization of the entity that contains the code completion context for this
+    /// set of code completion results and whether that entity is incomplete, if applicable.
+    pub fn get_container_kind(&self) -> Option<(EntityKind, bool)> {
+        unsafe {
+            let mut incomplete = mem::uninitialized();
+
+            match ffi::clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
+                ffi::CXCursorKind::InvalidCode => None,
+                other => Some((mem::transmute(other), incomplete != 0)),
+            }
+        }
+    }
+
+    /// Returns the code completion results in this set of code completion results.
+    pub fn get_results(&self) -> Vec<CompletionResult> {
+        unsafe {
+            let raws = slice::from_raw_parts((*self.ptr).Results, (*self.ptr).NumResults as usize);
+            raws.iter().map(|r| CompletionResult::from_raw(*r)).collect()
+        }
+    }
+}
+
+impl Drop for CompletionResults {
+    fn drop(&mut self) {
+        unsafe { ffi::clang_disposeCodeCompleteResults(self.ptr); }
+    }
+}
+
+impl fmt::Debug for CompletionResults {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("CompletionResults")
+            .field("results", &self.get_results())
+            .finish()
+    }
+}
+
+// CompletionString ______________________________
+
+/// A semantic string that describes a code completion result.
+#[derive(Copy, Clone)]
+pub struct CompletionString<'r> {
+    raw: ffi::CXCompletionString,
+    _marker: PhantomData<&'r CompletionResults>
+}
+
+impl<'r> CompletionString<'r> {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXCompletionString) -> CompletionString<'r> {
+        CompletionString { raw: raw, _marker: PhantomData }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the annotations associated with this completion string.
+    pub fn get_annotations(&self) -> Vec<String> {
+        iter!(
+            clang_getCompletionNumAnnotations(self.raw),
+            clang_getCompletionAnnotation(self.raw),
+        ).map(to_string).collect()
+    }
+
+    /// Returns the availability of this completion string.
+    pub fn get_availability(&self) -> Availability {
+        unsafe { mem::transmute(ffi::clang_getCompletionAvailability(self.raw)) }
+    }
+
+    /// Returns the chunks of this completion string.
+    pub fn get_chunks(&self) -> Vec<CompletionChunk> {
+        iter!(
+            clang_getNumCompletionChunks(self.raw),
+            clang_getCompletionChunkKind(self.raw),
+        ).enumerate().map(|(i, k)| {
+            macro_rules! text {
+                ($variant:ident) => ({
+                    let text = unsafe { ffi::clang_getCompletionChunkText(self.raw, i as c_uint) };
+                    CompletionChunk::$variant(to_string(text))
+                });
+            }
+
+            match k {
+                ffi::CXCompletionChunkKind::Optional => {
+                    let raw = unsafe {
+                        ffi::clang_getCompletionChunkCompletionString(self.raw, i as c_uint)
+                    };
+
+                    CompletionChunk::Optional(CompletionString::from_raw(raw))
+                },
+                ffi::CXCompletionChunkKind::CurrentParameter => text!(CurrentParameter),
+                ffi::CXCompletionChunkKind::TypedText => text!(TypedText),
+                ffi::CXCompletionChunkKind::Text => text!(Text),
+                ffi::CXCompletionChunkKind::Placeholder => text!(Placeholder),
+                ffi::CXCompletionChunkKind::Informative => text!(Informative),
+                ffi::CXCompletionChunkKind::ResultType => text!(ResultType),
+                ffi::CXCompletionChunkKind::Colon => text!(Colon),
+                ffi::CXCompletionChunkKind::Comma => text!(Comma),
+                ffi::CXCompletionChunkKind::Equal => text!(Equals),
+                ffi::CXCompletionChunkKind::SemiColon => text!(Semicolon),
+                ffi::CXCompletionChunkKind::LeftAngle => text!(LeftAngleBracket),
+                ffi::CXCompletionChunkKind::RightAngle => text!(RightAngleBracket),
+                ffi::CXCompletionChunkKind::LeftBrace => text!(LeftBrace),
+                ffi::CXCompletionChunkKind::RightBrace => text!(RightBrace),
+                ffi::CXCompletionChunkKind::LeftParen => text!(LeftParenthesis),
+                ffi::CXCompletionChunkKind::RightParen => text!(RightParenthesis),
+                ffi::CXCompletionChunkKind::LeftBracket => text!(LeftSquareBracket),
+                ffi::CXCompletionChunkKind::RightBracket => text!(RightSquareBracket),
+                ffi::CXCompletionChunkKind::HorizontalSpace => text!(HorizontalSpace),
+                ffi::CXCompletionChunkKind::VerticalSpace => text!(VerticalSpace),
+            }
+        }).collect()
+    }
+
+    /// Returns the documentation comment brief associated with the declaration this completion
+    /// string refers to, if applicable.
+    pub fn get_comment_brief(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_getCompletionBriefComment(self.raw)) }
+    }
+
+    /// Returns the name of the semantic parent of the declaration this completion string refers to,
+    /// if applicable.
+    pub fn get_parent_name(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_getCompletionParent(self.raw, ptr::null_mut())) }
+    }
+
+    /// Returns an integer that represents how likely a user is to select this completion string as
+    /// determined by internal heuristics. Smaller values indicate higher priorities.
+    pub fn get_priority(&self) -> usize {
+        unsafe { ffi::clang_getCompletionPriority(self.raw) as usize }
+    }
+
+    /// Returns the text of the typed text chunk for this completion string, if any.
+    pub fn get_typed_text(&self) -> Option<String> {
+        for chunk in self.get_chunks() {
+            if let CompletionChunk::TypedText(text) = chunk {
+                return Some(text);
+            }
+        }
+
+        None
+    }
+}
+
+impl<'r> cmp::Eq for CompletionString<'r> { }
+
+impl<'r> cmp::Ord for CompletionString<'r> {
+    fn cmp(&self, other: &CompletionString<'r>) -> Ordering {
+        match self.get_priority().cmp(&other.get_priority()) {
+            Ordering::Equal => self.get_typed_text().cmp(&other.get_typed_text()),
+            other => other,
+        }
+    }
+}
+
+impl<'r> cmp::PartialEq for CompletionString<'r> {
+    fn eq(&self, other: &CompletionString<'r>) -> bool {
+        self.get_chunks() == other.get_chunks()
+    }
+}
+
+impl<'r> cmp::PartialOrd for CompletionString<'r> {
+    fn partial_cmp(&self, other: &CompletionString<'r>) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'r> fmt::Debug for CompletionString<'r> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("CompletionString")
+            .field("chunks", &self.get_chunks())
+            .finish()
     }
 }
 
@@ -2122,6 +2479,30 @@ impl<'i> TranslationUnit<'i> {
     }
 
     //- Accessors --------------------------------
+
+    /// Runs code completion at the supplied location.
+    pub fn complete<F: AsRef<Path>>(
+        &self,
+        file: F,
+        line: u32,
+        column: u32,
+        unsaved: &[Unsaved],
+        options: CompletionOptions,
+    ) -> CompletionResults {
+        unsafe {
+            let ptr = ffi::clang_codeCompleteAt(
+                self.ptr,
+                from_path(file).as_ptr(),
+                line as c_uint,
+                column as c_uint,
+                mem::transmute(unsaved.as_ptr()),
+                unsaved.len() as c_uint,
+                options.into(),
+            );
+
+            CompletionResults::from_ptr(ptr)
+        }
+    }
 
     /// Returns the diagnostics for this translation unit.
     pub fn get_diagnostics(&'i self) -> Vec<Diagnostic<'i>> {
