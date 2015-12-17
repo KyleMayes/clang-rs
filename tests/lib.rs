@@ -110,6 +110,7 @@ fn test() {
         options.briefs = true;
         let results = tu.complete(f, 8, 27, &[], options);
         assert_eq!(results.get_container_kind(), Some((EntityKind::StructDecl, false)));
+        assert!(results.get_diagnostics(&tu).is_empty());
 
         let context = results.get_context().unwrap();
         assert!(!context.all_types);

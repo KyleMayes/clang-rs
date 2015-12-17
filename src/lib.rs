@@ -1202,6 +1202,15 @@ impl CompletionResults {
         }
     }
 
+    /// Returns the diagnostics that were produced prior to the code completion context for this set
+    /// of code completion results.
+    pub fn get_diagnostics<'tu>(&self, tu: &'tu TranslationUnit<'tu>) -> Vec<Diagnostic<'tu>> {
+        iter!(
+            clang_codeCompleteGetNumDiagnostics(self.ptr),
+            clang_codeCompleteGetDiagnostic(self.ptr),
+        ).map(|d| Diagnostic::from_ptr(d, tu)).collect()
+    }
+
     /// Returns the code completion results in this set of code completion results.
     pub fn get_results(&self) -> Vec<CompletionResult> {
         unsafe {
