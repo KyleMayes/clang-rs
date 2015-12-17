@@ -1025,6 +1025,61 @@ impl Drop for Clang {
     }
 }
 
+// CompletionContext _____________________________
+
+options! {
+    /// Indicates which types of results were included in a set of code completion results.
+    options CompletionContext: CXCompletionContext {
+        /// Indicates whether all possible types were included.
+        pub all_types: CXCompletionContext_AnyType,
+        /// Indicates whether all possible values were included.
+        pub all_values: CXCompletionContext_AnyValue,
+        /// Indicates whether values that resolve to C++ class types were included.
+        pub class_type_values: CXCompletionContext_CXXClassTypeValue,
+        /// Indicates whether the members of a record that are accessed with the dot operator were
+        /// included.
+        pub dot_members: CXCompletionContext_DotMemberAccess,
+        /// Indicates whether the members of a record that are accessed with the arrow operator were
+        /// included.
+        pub arrow_members: CXCompletionContext_ArrowMemberAccess,
+        /// Indicates whether enum tags were included.
+        pub enum_tags: CXCompletionContext_EnumTag,
+        /// Indicates whether union tags were included.
+        pub union_tags: CXCompletionContext_UnionTag,
+        /// Indicates whether struct tags were included.
+        pub struct_tags: CXCompletionContext_StructTag,
+        /// Indicates whether C++ class names were included.
+        pub class_names: CXCompletionContext_ClassTag,
+        /// Indicates whether C++ namespaces and namespace aliases were included.
+        pub namespaces: CXCompletionContext_Namespace,
+        /// Indicates whether C++ nested name specifiers were included.
+        pub nested_name_specifiers: CXCompletionContext_NestedNameSpecifier,
+        /// Indicates whether macro names were included.
+        pub macro_names: CXCompletionContext_MacroName,
+        /// Indicates whether natural language results were included.
+        pub natural_language: CXCompletionContext_NaturalLanguage,
+        /// Indicates whether values that resolve to Objective-C objects were included.
+        pub objc_object_values: CXCompletionContext_ObjCObjectValue,
+        /// Indicates whether values that resolve to Objective-C selectors were included.
+        pub objc_selector_values: CXCompletionContext_ObjCSelectorValue,
+        /// Indicates whether the properties of an Objective-C object that are accessed with the dot
+        /// operator were included.
+        pub objc_property_members: CXCompletionContext_ObjCPropertyAccess,
+        /// Indicates whether Objective-C interfaces were included.
+        pub objc_interfaces: CXCompletionContext_ObjCInterface,
+        /// Indicates whether Objective-C protocols were included.
+        pub objc_protocols: CXCompletionContext_ObjCProtocol,
+        /// Indicates whether Objective-C categories were included.
+        pub objc_categories: CXCompletionContext_ObjCCategory,
+        /// Indicates whether Objective-C instance messages were included.
+        pub objc_instance_messages: CXCompletionContext_ObjCInstanceMessage,
+        /// Indicates whether Objective-C class messages were included.
+        pub objc_class_messages: CXCompletionContext_ObjCClassMessage,
+        /// Indicates whether Objective-C selector names were included.
+        pub objc_selector_names: CXCompletionContext_ObjCSelectorName,
+    }
+}
+
 // CompletionOptions _____________________________
 
 options! {
@@ -1130,6 +1185,19 @@ impl CompletionResults {
             match ffi::clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
                 ffi::CXCursorKind::InvalidCode => None,
                 other => Some((mem::transmute(other), incomplete != 0)),
+            }
+        }
+    }
+
+    /// Returns the code completion context for this set of code completion results, if any.
+    pub fn get_context(&self) -> Option<CompletionContext> {
+        unsafe {
+            let bits = ffi::clang_codeCompleteGetContexts(self.ptr) as c_uint;
+
+            if bits != 0 && bits != 4194303 {
+                Some(CompletionContext::from(ffi::CXCompletionContext::from_bits_truncate(bits)))
+            } else {
+                None
             }
         }
     }

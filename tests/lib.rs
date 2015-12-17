@@ -111,6 +111,30 @@ fn test() {
         let results = tu.complete(f, 8, 27, &[], options);
         assert_eq!(results.get_container_kind(), Some((EntityKind::StructDecl, false)));
 
+        let context = results.get_context().unwrap();
+        assert!(!context.all_types);
+        assert!(!context.all_values);
+        assert!(!context.class_type_values);
+        assert!(context.dot_members);
+        assert!(!context.arrow_members);
+        assert!(!context.enum_tags);
+        assert!(!context.union_tags);
+        assert!(!context.struct_tags);
+        assert!(!context.class_names);
+        assert!(!context.namespaces);
+        assert!(!context.nested_name_specifiers);
+        assert!(!context.macro_names);
+        assert!(!context.natural_language);
+        assert!(!context.objc_object_values);
+        assert!(!context.objc_selector_values);
+        assert!(!context.objc_property_members);
+        assert!(!context.objc_interfaces);
+        assert!(!context.objc_protocols);
+        assert!(!context.objc_categories);
+        assert!(!context.objc_instance_messages);
+        assert!(!context.objc_class_messages);
+        assert!(!context.objc_selector_names);
+
         let mut results = results.get_results();
         assert_eq!(results.len(), 6);
         results.sort();
