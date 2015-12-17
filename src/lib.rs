@@ -159,24 +159,24 @@ pub enum CallingConvention {
     Cdecl = 1,
     /// The function type uses the x86 `fastcall` calling convention.
     Fastcall = 3,
+    /// The function type uses the x86 `pascal` calling convention.
+    Pascal = 5,
     /// The function type uses the x86 `stdcall` calling convention.
     Stdcall = 2,
     /// The function type uses the x86 `thiscall` calling convention.
     Thiscall = 4,
     /// The function type uses the x86 `vectorcall` calling convention.
     Vectorcall = 12,
-    /// The function type uses the x86 `pascal` calling convention.
-    Pascal = 5,
     /// The function type uses the ARM AACPS calling convention.
     Aapcs = 6,
     /// The function type uses the ARM AACPS-VFP calling convention.
     AapcsVfp = 7,
     /// The function type uses the calling convention for Intel OpenCL built-ins.
     IntelOcl = 9,
+    /// The function type uses the x64 C calling convention as specified in the System V ABI.
+    SysV64 = 11,
     /// The function type uses the x64 C calling convention as implemented on Windows.
     Win64 = 10,
-    /// The function type uses the x64 C calling convention as specified in the System V ABI.
-    SysV64= 11,
     /// The function type uses a calling convention that is not exposed via this interface.
     Unexposed = 200,
 }
@@ -868,16 +868,16 @@ pub enum TemplateArgument<'tu> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum TokenKind {
-    /// A puncuation token.
-    Punctuation = 0,
-    /// A keyword token.
-    Keyword = 1,
-    /// An identifier token.
-    Identifier = 2,
-    /// A literal token.
-    Literal = 3,
     /// A comment token.
     Comment = 4,
+    /// An identifier token.
+    Identifier = 2,
+    /// A keyword token.
+    Keyword = 1,
+    /// A literal token.
+    Literal = 3,
+    /// A puncuation token.
+    Punctuation = 0,
 }
 
 // TypeKind ______________________________________
@@ -936,10 +936,10 @@ pub enum TypeKind {
     Nullptr = 24,
     /// A C99 complex type (e.g., `_Complex float`).
     Complex = 100,
-    /// The type of an unresolved overload set.
-    Overload = 25,
     /// An unknown dependent type.
     Dependent = 26,
+    /// The type of an unresolved overload set.
+    Overload = 25,
     /// `id` (Objective-C)
     ObjCId = 27,
     /// `Class` (Objective-C)
@@ -960,10 +960,10 @@ pub enum TypeKind {
     LValueReference = 103,
     /// An r-value reference (e.g. `int&&`).
     RValueReference = 104,
-    /// A record type such as a struct or a class.
-    Record = 105,
     /// An enum type.
     Enum = 106,
+    /// A record type such as a struct or a class.
+    Record = 105,
     /// A typedef.
     Typedef = 107,
     /// A function prototype with parameter type information (e.g., `void foo(int)`).
