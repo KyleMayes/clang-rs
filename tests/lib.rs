@@ -111,6 +111,7 @@ fn test() {
         let results = tu.complete(f, 8, 27, &[], options);
         assert_eq!(results.get_container_kind(), Some((EntityKind::StructDecl, false)));
         assert!(results.get_diagnostics(&tu).is_empty());
+        assert_eq!(results.get_usr(), Some("c:@S@A".into()));
 
         let context = results.get_context().unwrap();
         assert!(!context.all_types);
@@ -316,6 +317,7 @@ fn test() {
         assert_eq!(entity.get_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(entity.get_name_ranges(), &[]);
         assert_eq!(entity.get_translation_unit().get_file(f), tu.get_file(f));
+        assert_eq!(entity.get_usr(), None);
 
         let children = entity.get_children();
         assert_eq!(children.len(), 1);
@@ -328,6 +330,7 @@ fn test() {
         assert_eq!(children[0].get_name_ranges(), &[range!(file, 1, 5, 1, 6)]);
         assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
         assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
+        assert_eq!(children[0].get_usr(), Some("c:@a".into()));
     });
 
     let source = "

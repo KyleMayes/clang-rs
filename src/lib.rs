@@ -28,6 +28,12 @@ use libc::{c_int, c_uint, c_ulong, time_t};
 
 pub mod ffi;
 
+/// A Unified Symbol Resolution (USR).
+///
+/// A USR identifies an AST entity and can be used to compare AST entities from different
+/// translation units.
+pub type Usr = String;
+
 //================================================
 // Macros
 //================================================
@@ -1218,6 +1224,12 @@ impl CompletionResults {
             raws.iter().map(|r| CompletionResult::from_raw(*r)).collect()
         }
     }
+
+    /// Returns the USR for the entity that contains the code completion context for this set of
+    /// code completion results, if applicable.
+    pub fn get_usr(&self) -> Option<Usr> {
+        unsafe { to_string_option(ffi::clang_codeCompleteGetContainerUSR(self.ptr)) }
+    }
 }
 
 impl Drop for CompletionResults {
@@ -1781,6 +1793,11 @@ impl<'tu> Entity<'tu> {
             let type_ = ffi::clang_getTypedefDeclUnderlyingType(self.raw);
             type_.map(|t| Type::from_raw(t, self.tu))
         }
+    }
+
+    /// Returns the USR for this AST entity, if any.
+    pub fn get_usr(&self) -> Option<Usr> {
+        unsafe { to_string_option(ffi::clang_getCursorUSR(self.raw)) }
     }
 
     /// Returns whether this AST entity is an anonymous record declaration.
