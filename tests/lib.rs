@@ -72,9 +72,9 @@ fn with_translation_unit<'c, F>(
     clang: &'c Clang, name: &str, contents: &str, arguments: &[&str], f: F
 ) where F: FnOnce(&Path, &Path, TranslationUnit) {
     with_temporary_file(name, contents, |d, file| {
-        let mut index = Index::new(clang, false, false);
+        let index = Index::new(clang, false, false);
         let options = ParseOptions::default();
-        let tu = TranslationUnit::from_source(&mut index, file, arguments, &[], options).unwrap();
+        let tu = TranslationUnit::from_source(&index, file, arguments, &[], options).unwrap();
         f(d, &file, tu);
     });
 }
@@ -241,10 +241,10 @@ fn test() {
     ";
 
     with_temporary_file("test.cpp", source, |_, f| {
-        let mut index = Index::new(&clang, false, false);
+        let index = Index::new(&clang, false, false);
         let mut options = ParseOptions::default();
         options.detailed_preprocessing_record = true;
-        let tu = TranslationUnit::from_source(&mut index, f, &[], &[], options).unwrap();
+        let tu = TranslationUnit::from_source(&index, f, &[], &[], options).unwrap();
 
         let file = tu.get_file(f).unwrap();
         assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
@@ -684,10 +684,10 @@ fn test() {
     ];
 
     with_temporary_files(files, |_, fs| {
-        let mut index = Index::new(&clang, false, false);
+        let index = Index::new(&clang, false, false);
         let arguments = &["-fmodules"];
         let options = ParseOptions::default();
-        let tu = TranslationUnit::from_source(&mut index, &fs[2], arguments, &[], options).unwrap();
+        let tu = TranslationUnit::from_source(&index, &fs[2], arguments, &[], options).unwrap();
 
         let module = tu.get_file(&fs[1]).unwrap().get_module().unwrap();
         assert_eq!(module.get_file().get_path().extension(), Some(std::ffi::OsStr::new("pcm")));
@@ -761,17 +761,17 @@ fn test() {
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |d, _, tu| {
         let file = d.join("test.cpp.gch");
         tu.save(&file).unwrap();
-        let mut index = Index::new(&clang, false, false);
-        let _ = TranslationUnit::from_ast(&mut index, &file).unwrap();
+        let index = Index::new(&clang, false, false);
+        let _ = TranslationUnit::from_ast(&index, &file).unwrap();
     });
 
     //- from_source ------------------------------
 
     with_temporary_file("test.cpp", "int a = 322;", |_, f| {
-        let mut index = Index::new(&clang, false, false);
+        let index = Index::new(&clang, false, false);
         let unsaved = &[Unsaved::new(f, "int a = 644;")];
         let options = ParseOptions::default();
-        let _ = TranslationUnit::from_source(&mut index, f, &[], unsaved, options).unwrap();
+        let _ = TranslationUnit::from_source(&index, f, &[], unsaved, options).unwrap();
     });
 
     //- get_file ---------------------------------

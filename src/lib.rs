@@ -2499,7 +2499,7 @@ impl<'i> TranslationUnit<'i> {
     ///
     /// * an unknown error occurs
     pub fn from_ast<F: AsRef<Path>>(
-        index: &'i mut Index, file: F
+        index: &'i Index, file: F
     ) -> Result<TranslationUnit<'i>, ()> {
         let ptr = unsafe { ffi::clang_createTranslationUnit(index.ptr, from_path(file).as_ptr()) };
         ptr.map(TranslationUnit::from_ptr).ok_or(())
@@ -2521,7 +2521,7 @@ impl<'i> TranslationUnit<'i> {
     /// * `libclang` crashes
     /// * an unknown error occurs
     pub fn from_source<F: AsRef<Path>>(
-        index: &'i mut Index,
+        index: &'i Index,
         file: F,
         arguments: &[&str],
         unsaved: &[Unsaved],
