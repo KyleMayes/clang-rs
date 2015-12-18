@@ -22,6 +22,7 @@ use std::cmp::{self, Ordering};
 use std::collections::{HashMap};
 use std::marker::{PhantomData};
 use std::path::{Path, PathBuf};
+use std::rc::{Rc};
 use std::sync::atomic::{self, AtomicBool};
 
 use libc::{c_int, c_uint, c_ulong, time_t};
@@ -48,6 +49,11 @@ macro_rules! iter {
 
     ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
         iter!($num($($num_argument), *), $get($($get_argument), *))
+    });
+
+    ($num:ident($($num_argument:expr), *), $($get:ident($($get_argument:expr), *)), *,) => ({
+        let count = unsafe { ffi::$num($($num_argument), *) };
+        (0..count).map(|i| unsafe { ($(ffi::$get($($get_argument), *, i)), *) })
     });
 }
 
@@ -1028,6 +1034,128 @@ impl Clang {
 impl Drop for Clang {
     fn drop(&mut self) {
         AVAILABLE.store(true, atomic::Ordering::Relaxed);
+    }
+}
+
+// CompilationDatabase ___________________________
+
+/// The information used to compile the source files in a project.
+pub struct CompilationDatabase {
+    ptr: ffi::CXCompilationDatabase,
+}
+
+impl CompilationDatabase {
+    //- Constructors -----------------------------
+
+    /// Constructs a new `CompilationDatabase` from a directory containing source files.
+    pub fn from_directory<D: AsRef<Path>>(directory: D) -> Result<CompilationDatabase, ()> {
+        unsafe {
+            let mut code = mem::uninitialized();
+
+            let ptr = ffi::clang_CompilationDatabase_fromDirectory(
+                from_path(directory).as_ptr(), &mut code
+            );
+
+            if code == ffi::CXCompilationDatabase_Error::NoError {
+                Ok(CompilationDatabase { ptr: ptr })
+            } else {
+                Err(())
+            }
+        }
+    }
+
+    //- Accessors --------------------------------
+
+    fn get_commands_(&self, ptr: ffi::CXCompileCommands) -> Vec<CompileCommand> {
+        if !ptr.0.is_null() {
+            let commands = CompileCommands::from_ptr(ptr);
+
+            iter!(
+                clang_CompileCommands_getSize(commands.ptr),
+                clang_CompileCommands_getCommand(commands.ptr),
+            ).map(|c| CompileCommand::from_ptr(c, commands.clone())).collect()
+        } else {
+            vec![]
+        }
+    }
+
+    /// Returns all the compilation commands in this compilation database.
+    pub fn get_all_commands(&self) -> Vec<CompileCommand> {
+        unsafe {
+            let ptr = ffi::clang_CompilationDatabase_getAllCompileCommands(self.ptr);
+            self.get_commands_(ptr)
+        }
+    }
+
+    /// Returns all the compilation commands for the supplied file in this compilation database.
+    pub fn get_commands<F: AsRef<Path>>(&self, file: F) -> Vec<CompileCommand> {
+        unsafe {
+            let ptr = ffi::clang_CompilationDatabase_getCompileCommands(
+                self.ptr, from_path(file).as_ptr()
+            );
+
+            self.get_commands_(ptr)
+        }
+    }
+}
+
+impl Drop for CompilationDatabase {
+    fn drop(&mut self) {
+        unsafe { ffi::clang_CompilationDatabase_dispose(self.ptr); }
+    }
+}
+
+// CompileCommand ________________________________
+
+/// The information used to compile a source file in a project.
+#[derive(Clone)]
+pub struct CompileCommand<'d> {
+    ptr: ffi::CXCompileCommand,
+    parent: Rc<CompileCommands>,
+    _marker: PhantomData<&'d CompilationDatabase>,
+}
+
+impl<'d> CompileCommand<'d> {
+    //- Constructors -----------------------------
+
+    fn from_ptr(ptr: ffi::CXCompileCommand, parent: Rc<CompileCommands>) -> CompileCommand<'d> {
+        CompileCommand { ptr: ptr, parent: parent, _marker: PhantomData }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the arguments in the compiler invocation for this compile command.
+    pub fn get_arguments(&self) -> Vec<String> {
+        iter!(
+            clang_CompileCommand_getNumArgs(self.ptr),
+            clang_CompileCommand_getArg(self.ptr),
+        ).map(to_string).collect()
+    }
+
+    /// Returns the working directory of this compile command.
+    pub fn get_working_directory(&self) -> PathBuf {
+        unsafe { to_string(ffi::clang_CompileCommand_getDirectory(self.ptr)).into() }
+    }
+}
+
+// CompileCommands _______________________________
+
+#[derive(Clone)]
+struct CompileCommands {
+    ptr: ffi::CXCompileCommands,
+}
+
+impl CompileCommands {
+    //- Constructors -----------------------------
+
+    fn from_ptr(ptr: ffi::CXCompileCommands) -> Rc<CompileCommands> {
+        Rc::new(CompileCommands { ptr: ptr })
+    }
+}
+
+impl Drop for CompileCommands {
+    fn drop(&mut self) {
+        unsafe { ffi::clang_CompileCommands_dispose(self.ptr); }
     }
 }
 

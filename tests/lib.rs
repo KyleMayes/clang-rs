@@ -93,6 +93,37 @@ fn with_types<'c, F: FnOnce(Vec<Type>)>(clang: &'c Clang, contents: &str, f: F) 
 fn test() {
     let clang = Clang::new().unwrap();
 
+    // CompilationDatabase _______________________
+
+    let source = r#"[
+        {
+          "directory": "/tmp",
+          "command": "cc div0.c",
+          "file": "/tmp/div0.c"
+        },
+        {
+          "directory": "/tmp",
+          "command": "cc -DFOO div1.c",
+          "file": "/tmp/div1.c"
+        }
+    ]"#;
+
+    with_temporary_file("compile_commands.json", source, |d, _| {
+        let cd = CompilationDatabase::from_directory(d).unwrap();
+
+        assert_eq!(cd.get_all_commands().len(), 2);
+
+        let commands = cd.get_commands("/tmp/div0.c");
+        assert_eq!(commands.len(), 1);
+
+        assert_eq!(commands[0].get_arguments(), &["cc", "div0.c"]);
+
+        let commands = cd.get_commands("/tmp/div1.c");
+        assert_eq!(commands.len(), 1);
+
+        assert_eq!(commands[0].get_arguments(), &["cc", "-DFOO", "div1.c"]);
+    });
+
     // CompletionString __________________________
 
     let source = "
