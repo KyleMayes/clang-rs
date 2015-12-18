@@ -306,6 +306,7 @@ fn test() {
 
         let text = "implicit conversion turns floating-point number into integer: 'float' to 'int'";
         assert_eq!(diagnostics[0].format(options), format!("warning: {}", text));
+        assert!(diagnostics[0].get_children().is_empty());
         assert_eq!(diagnostics[0].get_fix_its(), &[]);
         assert_eq!(diagnostics[0].get_location(), file.get_location(2, 46));
         assert_eq!(diagnostics[0].get_ranges(), &[
@@ -317,6 +318,7 @@ fn test() {
 
         let text = "missing 'typename' prior to dependent type name 'T::U'";
         assert_eq!(diagnostics[1].format(options), format!("error: {}", text));
+        assert!(diagnostics[1].get_children().is_empty());
         assert_eq!(diagnostics[1].get_fix_its(), &[
             FixIt::Insertion(file.get_location(3, 50), "typename ".into())
         ]);
@@ -328,6 +330,7 @@ fn test() {
         let text = "use of GNU old-style field designator extension";
         assert_eq!(diagnostics[2].format(options), format!("warning: {}", text));
         let range = range!(file, 4, 50, 4, 52);
+        assert!(diagnostics[2].get_children().is_empty());
         assert_eq!(diagnostics[2].get_fix_its(), &[FixIt::Replacement(range, ".i = ".into())]);
         assert_eq!(diagnostics[2].get_location(), range.get_start());
         assert_eq!(diagnostics[2].get_ranges(), &[]);
@@ -341,6 +344,7 @@ fn test() {
         let file = tu.get_file(f).unwrap();
 
         let entity = tu.get_entity();
+        assert_eq!(entity.get_completion_string(), None);
         assert_eq!(entity.get_display_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(entity.get_kind(), EntityKind::TranslationUnit);
         assert_eq!(entity.get_location(), None);
@@ -362,6 +366,12 @@ fn test() {
         assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
         assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
         assert_eq!(children[0].get_usr(), Some("c:@a".into()));
+
+        let string = children[0].get_completion_string().unwrap();
+        assert_eq!(string.get_chunks(), &[
+            CompletionChunk::ResultType("int".into()),
+            CompletionChunk::TypedText("a".into()),
+        ]);
     });
 
     let source = "
@@ -487,6 +497,24 @@ fn test() {
 
         assert_eq!(children[0].get_enum_constant_value(), Some((322, 322)));
         assert_eq!(children[1].get_enum_constant_value(), Some((644, 644)));
+    });
+
+    let files = &[
+        ("test.hpp", ""),
+        ("test.cpp", "#include \"test.hpp\""),
+    ];
+
+    with_temporary_files(files, |_, fs| {
+        let index = Index::new(&clang, false, false);
+        let mut options = ParseOptions::default();
+        options.detailed_preprocessing_record = true;
+        let tu = TranslationUnit::from_source(&index, &fs[1], &[], &[], options).unwrap();
+
+        let last = tu.get_entity().get_children().iter().last().unwrap().clone();
+        assert_eq!(last.get_kind(), EntityKind::InclusionDirective);
+        assert_eq!(last.get_file(), tu.get_file(&fs[0]));
+
+        assert_eq!(tu.get_file(&fs[1]).unwrap().get_includes(), &[last]);
     });
 
     let source = "
@@ -921,6 +949,15 @@ fn test() {
 
         assert_eq!(ts[1].get_element_type(), Some(ts[0]));
         assert_eq!(ts[1].get_size(), Some(3));
+    });
+
+    let source = "
+        struct A { int a, b, c; };
+    ";
+
+    with_entity(&clang, source, |e| {
+        let record = e.get_children()[0];
+        assert_eq!(record.get_type().unwrap().get_fields(), Some(record.get_children()));
     });
 
     let source = "

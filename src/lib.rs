@@ -1047,7 +1047,8 @@ pub struct CompilationDatabase {
 impl CompilationDatabase {
     //- Constructors -----------------------------
 
-    /// Constructs a new `CompilationDatabase` from a directory containing source files.
+    /// Constructs a new `CompilationDatabase` from a directory containing a `compile_commands.json`
+    /// file.
     pub fn from_directory<D: AsRef<Path>>(directory: D) -> Result<CompilationDatabase, ()> {
         unsafe {
             let mut code = mem::uninitialized();
@@ -1087,7 +1088,8 @@ impl CompilationDatabase {
         }
     }
 
-    /// Returns all the compilation commands for the supplied file in this compilation database.
+    /// Returns all the compilation commands for the supplied source file in this compilation
+    /// database.
     pub fn get_commands<F: AsRef<Path>>(&self, file: F) -> Vec<CompileCommand> {
         unsafe {
             let ptr = ffi::clang_CompilationDatabase_getCompileCommands(
@@ -1130,6 +1132,15 @@ impl<'d> CompileCommand<'d> {
             clang_CompileCommand_getNumArgs(self.ptr),
             clang_CompileCommand_getArg(self.ptr),
         ).map(to_string).collect()
+    }
+
+    /// Returns the path to and contents of the source files mapped by this compile command.
+    pub fn get_mapped_source_files(&self) -> Vec<(PathBuf, String)> {
+        iter!(
+            clang_CompileCommand_getNumMappedSources(self.ptr),
+            clang_CompileCommand_getMappedSourcePath(self.ptr),
+            clang_CompileCommand_getMappedSourceContent(self.ptr),
+        ).map(|(p, c)| (to_string(p).into(), to_string(c))).collect()
     }
 
     /// Returns the working directory of this compile command.
@@ -1534,6 +1545,16 @@ impl<'tu> Diagnostic<'tu> {
         unsafe { to_string(ffi::clang_formatDiagnostic(self.ptr, options.into())) }
     }
 
+    /// Returns the child diagnostics of this diagnostic.
+    pub fn get_children(&self) -> Vec<Diagnostic> {
+        let raw = unsafe { ffi::clang_getChildDiagnostics(self.ptr) };
+
+        iter!(
+            clang_getNumDiagnosticsInSet(raw),
+            clang_getDiagnosticInSet(raw),
+        ).map(|d| Diagnostic::from_ptr(d, self.tu)).collect()
+    }
+
     /// Returns the fix-its for this diagnostic.
     pub fn get_fix_its(&self) -> Vec<FixIt<'tu>> {
         unsafe {
@@ -1670,6 +1691,11 @@ impl<'tu> Entity<'tu> {
         range.map(|r| SourceRange::from_raw(r, self.tu))
     }
 
+    /// Returns a completion string for this declaration or macro definition, if applicable.
+    pub fn get_completion_string(&self) -> Option<CompletionString> {
+        unsafe { ffi::clang_getCursorCompletionString(self.raw).map(CompletionString::from_raw) }
+    }
+
     /// Returns the children of this AST entity.
     pub fn get_children(&self) -> Vec<Entity<'tu>> {
         let mut children = vec![];
@@ -1711,6 +1737,11 @@ impl<'tu> Entity<'tu> {
     /// Returns the underlying type of this enum declaration, if applicable.
     pub fn get_enum_underlying_type(&self) -> Option<Type<'tu>> {
         unsafe { ffi::clang_getEnumDeclIntegerType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the file included by this inclusion directive, if applicable.
+    pub fn get_file(&self) -> Option<File<'tu>> {
+        unsafe { ffi::clang_getIncludedFile(self.raw).map(|f| File::from_ptr(f, self.tu)) }
     }
 
     /// Returns the categorization of this AST entity.
@@ -2112,6 +2143,18 @@ impl<'tu> File<'tu> {
         }
     }
 
+    /// Returns the inclusion directives in this file.
+    pub fn get_includes(&self) -> Vec<Entity<'tu>> {
+        let mut includes = vec![];
+
+        self.visit_includes(|e, _| {
+            includes.push(e);
+            true
+        });
+
+        includes
+    }
+
     /// Returns the source location at the supplied line and column in this file.
     ///
     /// # Panics
@@ -2146,6 +2189,18 @@ impl<'tu> File<'tu> {
         Path::new(&to_string(path)).into()
     }
 
+    /// Returns the references to the supplied entity in this file.
+    pub fn get_references(&self, entity: Entity<'tu>) -> Vec<Entity<'tu>> {
+        let mut references = vec![];
+
+        self.visit_references(entity, |e, _| {
+            references.push(e);
+            true
+        });
+
+        references
+    }
+
     /// Returns the source ranges in this file that were skipped by the preprocessor.
     ///
     /// This will always return an empty `Vec` if the translation unit that contains this file was
@@ -2168,6 +2223,20 @@ impl<'tu> File<'tu> {
     /// Returns whether this file is guarded against multiple inclusions.
     pub fn is_include_guarded(&self) -> bool {
         unsafe { ffi::clang_isFileMultipleIncludeGuarded(self.tu.ptr, self.ptr) != 0 }
+    }
+
+    /// Visits the inclusion directives in this file and returns whether visitation was ended by the
+    /// callback returning `false`.
+    pub fn visit_includes<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(&self, f: F) -> bool {
+        visit(self.tu, f, |v| unsafe { ffi::clang_findIncludesInFile(self.tu.ptr, self.ptr, v) })
+    }
+
+    /// Visits the references to the supplied entity in this file and returns whether visitation was
+    /// ended by the callback returning `false`.
+    pub fn visit_references<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(
+        &self, entity: Entity<'tu>, f: F
+    ) -> bool {
+        visit(self.tu, f, |v| unsafe { ffi::clang_findReferencesInFile(entity.raw, self.ptr, v) })
     }
 }
 
@@ -2900,6 +2969,22 @@ impl<'tu> Type<'tu> {
         unsafe { ffi::clang_getElementType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
+    /// Returns the fields in this record type, if applicable.
+    pub fn get_fields(&self) -> Option<Vec<Entity<'tu>>> {
+        if self.get_kind() == TypeKind::Record {
+            let mut fields = vec![];
+
+            self.visit_fields(|e| {
+                fields.push(e);
+                true
+            });
+
+            Some(fields)
+        } else {
+            None
+        }
+    }
+
     /// Returns the offset of the field with the supplied name in this record type in bits.
     ///
     /// # Failures
@@ -3006,6 +3091,46 @@ impl<'tu> Type<'tu> {
     pub fn is_volatile_qualified(&self) -> bool {
         unsafe { ffi::clang_isVolatileQualifiedType(self.raw) != 0 }
     }
+
+    /// Visits the fields in this record type, returning `None` if this type is not a record type
+    /// and returning `Some(b)` otherwise where `b` indicates whether visitation was ended by the
+    /// callback returning `false`.
+    pub fn visit_fields<F: FnMut(Entity<'tu>) -> bool>(&self, f: F) -> Option<bool> {
+        if self.get_kind() != TypeKind::Record {
+            return None;
+        }
+
+        trait Callback<'tu> {
+            fn call(&mut self, field: Entity<'tu>) -> bool;
+        }
+
+        impl<'tu, F: FnMut(Entity<'tu>) -> bool> Callback<'tu> for F {
+            fn call(&mut self, field: Entity<'tu>) -> bool {
+                self(field)
+            }
+        }
+
+        extern fn visit(cursor: ffi::CXCursor, data: ffi::CXClientData) -> ffi::CXVisitorResult {
+            unsafe {
+                let &mut (tu, ref mut callback):
+                    &mut (&TranslationUnit, Box<Callback>) =
+                        mem::transmute(data);
+
+                if callback.call(Entity::from_raw(cursor, tu)) {
+                    ffi::CXVisitorResult::Continue
+                } else {
+                    ffi::CXVisitorResult::Break
+                }
+            }
+        }
+
+        let mut data = (self.tu, Box::new(f) as Box<Callback>);
+
+        unsafe {
+            let data = mem::transmute(&mut data);
+            Some(ffi::clang_Type_visitFields(self.raw, visit, data) == ffi::CXVisitorResult::Break)
+        }
+    }
 }
 
 impl<'tu> cmp::Eq for Type<'tu> { }
@@ -3082,4 +3207,43 @@ fn to_string_option(clang: ffi::CXString) -> Option<String> {
             None
         }
     })
+}
+
+fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
+    where F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
+          G: Fn(ffi::CXCursorAndRangeVisitor) -> ffi::CXResult
+{
+    trait Callback<'tu> {
+        fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool;
+    }
+
+    impl<'tu, F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool> Callback<'tu> for F {
+        fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool {
+            self(entity, range)
+        }
+    }
+
+    extern fn visit(
+        data: ffi::CXClientData, cursor: ffi::CXCursor, range: ffi::CXSourceRange
+    ) -> ffi::CXVisitorResult {
+        unsafe {
+            let &mut (tu, ref mut callback):
+                &mut (&TranslationUnit, Box<Callback>) =
+                    mem::transmute(data);
+
+            if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
+                ffi::CXVisitorResult::Continue
+            } else {
+                ffi::CXVisitorResult::Break
+            }
+        }
+    }
+
+    let mut data = (tu, Box::new(f) as Box<Callback>);
+
+    let visitor = ffi::CXCursorAndRangeVisitor {
+        context: unsafe { mem::transmute(&mut data) }, visit: visit
+    };
+
+    g(visitor) == ffi::CXResult::VisitBreak
 }
