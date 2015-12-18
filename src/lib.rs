@@ -1855,6 +1855,30 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns the availability of this declaration on the platforms where it is known, if
+    /// applicable.
+    pub fn get_platform_availability(&self) -> Option<Vec<PlatformAvailability>> {
+        if !self.is_declaration() {
+            return None;
+        }
+
+        unsafe {
+            let mut buffer: [ffi::CXPlatformAvailability; 32] = mem::uninitialized();
+
+            let count = ffi::clang_getCursorPlatformAvailability(
+                self.raw,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                (&mut buffer).as_mut_ptr(),
+                buffer.len() as c_int,
+            );
+
+            Some((0..count as usize).map(|i| PlatformAvailability::from_raw(buffer[i])).collect())
+        }
+    }
+
     /// Returns the source range of this AST entity, if any.
     pub fn get_range(&self) -> Option<SourceRange<'tu>> {
         unsafe {
@@ -2448,6 +2472,43 @@ options! {
     }
 }
 
+// PlatformAvailability __________________________
+
+/// The availability of an AST entity on a particular platform.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PlatformAvailability {
+    /// The name of the platform.
+    pub platform: String,
+    /// Whether the AST entity is unavailable on the platform.
+    pub unavailable: bool,
+    /// The version of the platform in which this AST entity was introduced, if any.
+    pub introduced: Option<Version>,
+    /// The version of the platform in which this AST entity was deprecated, if any.
+    pub deprecated: Option<Version>,
+    /// The version of the platform in which this AST entity was obsoleted, if any.
+    pub obsoleted: Option<Version>,
+    /// A message to display to users (e.g., replacement API suggestions).
+    pub message: Option<String>,
+}
+
+impl PlatformAvailability {
+    //- Constructors -----------------------------
+
+    fn from_raw(mut raw: ffi::CXPlatformAvailability) -> PlatformAvailability {
+        let availability = PlatformAvailability {
+            platform: to_string(raw.Platform),
+            unavailable: raw.Unavailable != 0,
+            introduced: raw.Introduced.map(Version::from_raw),
+            deprecated: raw.Deprecated.map(Version::from_raw),
+            obsoleted: raw.Obsoleted.map(Version::from_raw),
+            message: to_string_option(raw.Message),
+        };
+
+        unsafe { ffi::clang_disposeCXPlatformAvailability(&mut raw); }
+        availability
+    }
+}
+
 // SourceLocation ________________________________
 
 macro_rules! location {
@@ -2770,6 +2831,19 @@ impl<'i> TranslationUnit<'i> {
     }
 
     //- Accessors --------------------------------
+
+    /// Returns the AST entities which correspond to the supplied tokens, if any.
+    pub fn annotate(&'i self, tokens: &[Token<'i>]) -> Vec<Option<Entity<'i>>> {
+        unsafe {
+            let mut raws = vec![mem::uninitialized(); tokens.len()];
+
+            ffi::clang_annotateTokens(
+                self.ptr, mem::transmute(tokens.as_ptr()), tokens.len() as c_uint, raws.as_mut_ptr()
+            );
+
+            raws.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
+        }
+    }
 
     /// Runs code completion at the supplied location.
     pub fn complete<F: AsRef<Path>>(
@@ -3175,6 +3249,27 @@ impl Unsaved {
             Contents: self.contents.as_ptr(),
             Length: self.contents.as_bytes().len() as c_ulong,
         }
+    }
+}
+
+// Version _______________________________________
+
+/// A version number in the form `x.y.z`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Version {
+    /// The `x` component of the version number.
+    pub x: i32,
+    /// The `y` component of the version number.
+    pub y: i32,
+    /// The `z` component of the version number.
+    pub z: i32,
+}
+
+impl Version {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: ffi::CXVersion) -> Version {
+        Version { x: raw.Major as i32, y: raw.Minor as i32, z: raw.Subminor as i32 }
     }
 }
 

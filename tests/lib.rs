@@ -351,6 +351,7 @@ fn test() {
         assert_eq!(entity.get_mangled_name(), None);
         assert_eq!(entity.get_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(entity.get_name_ranges(), &[]);
+        assert_eq!(entity.get_platform_availability(), None);
         assert_eq!(entity.get_translation_unit().get_file(f), tu.get_file(f));
         assert_eq!(entity.get_usr(), None);
 
@@ -365,6 +366,7 @@ fn test() {
         assert_eq!(children[0].get_name_ranges(), &[range!(file, 1, 5, 1, 6)]);
         assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
         assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
+        assert_eq!(children[0].get_platform_availability(), Some(vec![]));
         assert_eq!(children[0].get_usr(), Some("c:@a".into()));
 
         let string = children[0].get_completion_string().unwrap();
@@ -795,24 +797,42 @@ fn test() {
 
     // Tokens ____________________________________
 
-    with_file(&clang, "int a; ", |_, f| {
-        let tokens = range!(f, 1, 1, 1, 7).tokenize();
-        assert_eq!(tokens.len(), 3);
+    with_translation_unit(&clang, "test.cpp", "int a = 322; ", &[], |_, f, tu| {
+        let file = tu.get_file(f).unwrap();
+
+        let tokens = range!(file, 1, 1, 1, 13).tokenize();
+        assert_eq!(tokens.len(), 5);
 
         assert_eq!(tokens[0].get_kind(), TokenKind::Keyword);
-        assert_location_eq!(tokens[0].get_location().get_spelling_location(), f, 1, 1, 0);
-        assert_eq!(tokens[0].get_range(), range!(f, 1, 1, 1, 4));
+        assert_location_eq!(tokens[0].get_location().get_spelling_location(), file, 1, 1, 0);
+        assert_eq!(tokens[0].get_range(), range!(file, 1, 1, 1, 4));
         assert_eq!(tokens[0].get_spelling(), "int");
 
         assert_eq!(tokens[1].get_kind(), TokenKind::Identifier);
-        assert_location_eq!(tokens[1].get_location().get_spelling_location(), f, 1, 5, 4);
-        assert_eq!(tokens[1].get_range(), range!(f, 1, 5, 1, 6));
+        assert_location_eq!(tokens[1].get_location().get_spelling_location(), file, 1, 5, 4);
+        assert_eq!(tokens[1].get_range(), range!(file, 1, 5, 1, 6));
         assert_eq!(tokens[1].get_spelling(), "a");
 
         assert_eq!(tokens[2].get_kind(), TokenKind::Punctuation);
-        assert_location_eq!(tokens[2].get_location().get_spelling_location(), f, 1, 6, 5);
-        assert_eq!(tokens[2].get_range(), range!(f, 1, 6, 1, 7));
-        assert_eq!(tokens[2].get_spelling(), ";");
+        assert_location_eq!(tokens[2].get_location().get_spelling_location(), file, 1, 7, 6);
+        assert_eq!(tokens[2].get_range(), range!(file, 1, 7, 1, 8));
+        assert_eq!(tokens[2].get_spelling(), "=");
+
+        assert_eq!(tokens[3].get_kind(), TokenKind::Literal);
+        assert_location_eq!(tokens[3].get_location().get_spelling_location(), file, 1, 9, 8);
+        assert_eq!(tokens[3].get_range(), range!(file, 1, 9, 1, 12));
+        assert_eq!(tokens[3].get_spelling(), "322");
+
+        assert_eq!(tokens[4].get_kind(), TokenKind::Punctuation);
+        assert_location_eq!(tokens[4].get_location().get_spelling_location(), file, 1, 12, 11);
+        assert_eq!(tokens[4].get_range(), range!(file, 1, 12, 1, 13));
+        assert_eq!(tokens[4].get_spelling(), ";");
+
+        let entity = tu.get_entity().get_children()[0];
+
+        assert_eq!(tu.annotate(&tokens), &[
+            Some(entity), Some(entity), None, None, Some(entity.get_children()[0])
+        ]);
     });
 
     // TranslationUnit ___________________________

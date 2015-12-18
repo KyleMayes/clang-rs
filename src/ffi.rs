@@ -968,12 +968,12 @@ pub struct CXIdxObjCProtocolRefListInfo {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct CXPlatformAvailability {
-    pub Platform: c_int,
+    pub Platform: CXString,
     pub Introduced: CXVersion,
     pub Deprecated: CXVersion,
     pub Obsoleted: CXVersion,
     pub Unavailable: c_int,
-    pub Message: c_int,
+    pub Message: CXString,
 }
 
 #[derive(Copy, Clone)]
@@ -1092,6 +1092,16 @@ pub struct CXVersion {
     pub Major: c_int,
     pub Minor: c_int,
     pub Subminor: c_int,
+}
+
+impl Nullable<CXVersion> for CXVersion {
+    fn map<U, F: FnOnce(CXVersion) -> U>(self, f: F) -> Option<U> {
+        if self.Major != -1 && self.Minor != -1 && self.Subminor != -1 {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
