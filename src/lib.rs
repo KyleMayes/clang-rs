@@ -29,12 +29,6 @@ use libc::{c_int, c_uint, c_ulong, time_t};
 
 pub mod ffi;
 
-/// A Unified Symbol Resolution (USR).
-///
-/// A USR identifies an AST entity and can be used to compare AST entities from different
-/// translation units.
-pub type Usr = String;
-
 //================================================
 // Macros
 //================================================
@@ -42,13 +36,9 @@ pub type Usr = String;
 // iter! _________________________________________
 
 macro_rules! iter {
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *)) => ({
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
         let count = unsafe { ffi::$num($($num_argument), *) };
         (0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i) })
-    });
-
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
-        iter!($num($($num_argument), *), $get($($get_argument), *))
     });
 
     ($num:ident($($num_argument:expr), *), $($get:ident($($get_argument:expr), *)), *,) => ({
@@ -60,7 +50,7 @@ macro_rules! iter {
 // iter_option! __________________________________
 
 macro_rules! iter_option {
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *)) => ({
+    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
         let count = unsafe { ffi::$num($($num_argument), *) };
 
         if count >= 0 {
@@ -68,10 +58,6 @@ macro_rules! iter_option {
         } else {
             None
         }
-    });
-
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
-        iter_option!($num($($num_argument), *), $get($($get_argument), *))
     });
 }
 
@@ -109,7 +95,7 @@ macro_rules! options {
 
 // Nullable ______________________________________
 
-/// A type which may be null.
+/// A type which may be null or otherwise invalid.
 pub trait Nullable<T> {
     /// Transforms this value into an `Option<U>`, mapping a null value to `None` and a non-null
     /// value to `Some(v)` where `v` is the result of applying the supplied function to this value.
@@ -155,10 +141,10 @@ pub enum Availability {
     Available = 0,
     /// The entity is available but has been deprecated and any usage of it will be a warning.
     Deprecated = 1,
-    /// The entity is not available and any usage of it will be an error.
-    Unavailable = 2,
     /// The entity is available but is not accessible and any usage of it will be an error.
     Inaccessible = 3,
+    /// The entity is not available and any usage of it will be an error.
+    Unavailable = 2,
 }
 
 // CallingConvention _____________________________
@@ -167,6 +153,8 @@ pub enum Availability {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum CallingConvention {
+    /// The function type uses a calling convention that is not exposed via this interface.
+    Unexposed = 200,
     /// The function type uses the x86 `cdecl` calling convention.
     Cdecl = 1,
     /// The function type uses the x86 `fastcall` calling convention.
@@ -189,8 +177,6 @@ pub enum CallingConvention {
     SysV64 = 11,
     /// The function type uses the x64 C calling convention as implemented on Windows.
     Win64 = 10,
-    /// The function type uses a calling convention that is not exposed via this interface.
-    Unexposed = 200,
 }
 
 // CompletionChunk _______________________________
@@ -209,10 +195,10 @@ pub enum CompletionChunk<'r> {
     Placeholder(String),
     /// Text that specifies the result type of the containing result.
     ResultType(String),
-    /// Text that the user would be expected to type to get the containing code completion result.
-    TypedText(String),
     /// Text that should be inserted.
     Text(String),
+    /// Text that the user would be expected to type to get the containing code completion result.
+    TypedText(String),
     /// A colon (`':'`).
     Colon(String),
     /// A comma (`','`).
@@ -256,25 +242,25 @@ impl<'r> CompletionChunk<'r> {
             CompletionChunk::Optional(_) => {
                 panic!("this completion chunk is a `CompletionChunk::Optional`")
             },
-            CompletionChunk::CurrentParameter(ref text) => text.clone(),
-            CompletionChunk::Informative(ref text) => text.clone(),
-            CompletionChunk::Placeholder(ref text) => text.clone(),
-            CompletionChunk::ResultType(ref text) => text.clone(),
-            CompletionChunk::TypedText(ref text) => text.clone(),
-            CompletionChunk::Text(ref text) => text.clone(),
-            CompletionChunk::Colon(ref text) => text.clone(),
-            CompletionChunk::Comma(ref text) => text.clone(),
-            CompletionChunk::Equals(ref text) => text.clone(),
-            CompletionChunk::Semicolon(ref text) => text.clone(),
-            CompletionChunk::LeftAngleBracket(ref text) => text.clone(),
-            CompletionChunk::RightAngleBracket(ref text) => text.clone(),
-            CompletionChunk::LeftBrace(ref text) => text.clone(),
-            CompletionChunk::RightBrace(ref text) => text.clone(),
-            CompletionChunk::LeftParenthesis(ref text) => text.clone(),
-            CompletionChunk::RightParenthesis(ref text) => text.clone(),
-            CompletionChunk::LeftSquareBracket(ref text) => text.clone(),
-            CompletionChunk::RightSquareBracket(ref text) => text.clone(),
-            CompletionChunk::HorizontalSpace(ref text) => text.clone(),
+            CompletionChunk::CurrentParameter(ref text) |
+            CompletionChunk::Informative(ref text) |
+            CompletionChunk::Placeholder(ref text) |
+            CompletionChunk::ResultType(ref text) |
+            CompletionChunk::TypedText(ref text) |
+            CompletionChunk::Text(ref text) |
+            CompletionChunk::Colon(ref text) |
+            CompletionChunk::Comma(ref text) |
+            CompletionChunk::Equals(ref text) |
+            CompletionChunk::Semicolon(ref text) |
+            CompletionChunk::LeftAngleBracket(ref text) |
+            CompletionChunk::RightAngleBracket(ref text) |
+            CompletionChunk::LeftBrace(ref text) |
+            CompletionChunk::RightBrace(ref text) |
+            CompletionChunk::LeftParenthesis(ref text) |
+            CompletionChunk::RightParenthesis(ref text) |
+            CompletionChunk::LeftSquareBracket(ref text) |
+            CompletionChunk::RightSquareBracket(ref text) |
+            CompletionChunk::HorizontalSpace(ref text) |
             CompletionChunk::VerticalSpace(ref text) => text.clone(),
         }
     }
@@ -833,20 +819,20 @@ pub enum StorageClass {
     /// The declaration does not specifiy a storage duration and therefore has an automatic storage
     /// duration.
     None = 1,
-    /// The declaration specifies a static storage duration and external linkage.
-    Extern = 2,
+    /// The declaration specifies an automatic storage duration.
+    Auto = 6,
+    /// The declaration specifies an automatic storage duration and that it should be stored in a
+    /// CPU register
+    Register = 7,
     /// The declaration specifies a static storage duration and internal linkage.
     Static = 3,
+    /// The declaration specifies a static storage duration and external linkage.
+    Extern = 2,
     /// The declaration specifies a static storage duration and external linkage but is not
     /// accessible outside the containing translation unit.
     PrivateExtern = 4,
     /// The declaration specifies a storage duration related to an OpenCL work group.
     OpenClWorkGroupLocal = 5,
-    /// The declaration specifies an automatic storage duration.
-    Auto = 6,
-    /// The declaration specifies that it should be stored in a CPU register and have an automatic
-    /// storage duration.
-    Register = 7,
 }
 
 // TemplateArgument ______________________________
@@ -854,24 +840,24 @@ pub enum StorageClass {
 /// An argument to a template function specialization.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TemplateArgument<'tu> {
-    /// An empty template argument (e.g., one that has not yet been deduced).
-    Null,
-    /// A type.
-    Type(Type<'tu>),
     /// A declaration for a pointer, reference, or member pointer non-type template parameter.
     Declaration,
+    /// An expression that has not yet been resolved
+    Expression,
+    /// An empty template argument (e.g., one that has not yet been deduced).
+    Null,
     /// A null pointer or null member pointer provided for a non-type template parameter.
     Nullptr,
-    /// An integer.
-    Integral(i64, u64),
+    /// A parameter pack.
+    Pack,
     /// A name for a template provided for a template template parameter.
     Template,
     /// A pack expansion of a name for a template provided for a template template parameter.
     TemplateExpansion,
-    /// An expression that has not yet been resolved
-    Expression,
-    /// A parameter pack.
-    Pack,
+    /// An integer.
+    Integral(i64, u64),
+    /// A type.
+    Type(Type<'tu>),
 }
 
 // TokenKind _____________________________________
@@ -1356,6 +1342,12 @@ impl CompletionResults {
         ).map(|d| Diagnostic::from_ptr(d, tu)).collect()
     }
 
+    /// Returns the selector or partial selector that has been entered this far for the Objective-C
+    /// message send context for this set of code completion results.
+    pub fn get_objc_selector(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_codeCompleteGetObjCSelector(self.ptr)) }
+    }
+
     /// Returns the code completion results in this set of code completion results.
     pub fn get_results(&self) -> Vec<CompletionResult> {
         unsafe {
@@ -1367,7 +1359,7 @@ impl CompletionResults {
     /// Returns the USR for the entity that contains the code completion context for this set of
     /// code completion results, if applicable.
     pub fn get_usr(&self) -> Option<Usr> {
-        unsafe { to_string_option(ffi::clang_codeCompleteGetContainerUSR(self.ptr)) }
+        unsafe { to_string_option(ffi::clang_codeCompleteGetContainerUSR(self.ptr)).map(Usr) }
     }
 }
 
@@ -1581,7 +1573,10 @@ impl<'tu> Diagnostic<'tu> {
 
     /// Returns the source ranges of this diagnostic.
     pub fn get_ranges(&self) -> Vec<SourceRange<'tu>> {
-        iter!(clang_getDiagnosticNumRanges(self.ptr), clang_getDiagnosticRange(self.ptr)).map(|r| {
+        iter!(
+            clang_getDiagnosticNumRanges(self.ptr),
+            clang_getDiagnosticRange(self.ptr),
+        ).map(|r| {
             SourceRange::from_raw(r, self.tu)
         }).collect()
     }
@@ -1823,6 +1818,63 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns which attributes were applied to this Objective-C property, if applicable.
+    pub fn get_objc_attributes(&self) -> Option<ObjCAttributes> {
+        unsafe {
+            let attributes = ffi::clang_Cursor_getObjCPropertyAttributes(self.raw, 0);
+
+            if attributes.bits() != 0 {
+                Some(ObjCAttributes::from(attributes))
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Returns the element type for this Objective-C `iboutletcollection` attribute, if applicable.
+    pub fn get_objc_ib_outlet_collection_type(&self) -> Option<Type<'tu>> {
+        unsafe {
+            ffi::clang_getIBOutletCollectionType(self.raw).map(|t| Type::from_raw(t, self.tu))
+        }
+    }
+
+    /// Returns the type of the receiver of this Objective-C message, if applicable.
+    pub fn get_objc_receiver_type(&self) -> Option<Type<'tu>> {
+        unsafe { ffi::clang_Cursor_getReceiverType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the selector index for this Objective-C selector identifier, if applicable.
+    pub fn get_objc_selector_index(&self) -> Option<usize> {
+        unsafe {
+            let index = ffi::clang_Cursor_getObjCSelectorIndex(self.raw);
+
+            if index >= 0 {
+                Some(index as usize)
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Returns the type encoding for this Objective-C declaration, if applicable.
+    pub fn get_objc_type_encoding(&self) -> Option<String> {
+        unsafe { to_string_option(ffi::clang_getDeclObjCTypeEncoding(self.raw)) }
+    }
+
+    /// Returns which qualifiers were applied to this Objective-C method return or parameter type,
+    /// if applicable.
+    pub fn get_objc_qualifiers(&self) -> Option<ObjCQualifiers> {
+        unsafe {
+            let qualifiers = ffi::clang_Cursor_getObjCDeclQualifiers(self.raw);
+
+            if qualifiers.bits() != 0 {
+                Some(ObjCQualifiers::from(qualifiers))
+            } else {
+                None
+            }
+        }
+    }
+
     /// Returns the overloaded declarations referenced by this overloaded declaration reference, if
     /// applicable.
     pub fn get_overloaded_declarations(&self) -> Option<Vec<Entity<'tu>>> {
@@ -1980,7 +2032,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the USR for this AST entity, if any.
     pub fn get_usr(&self) -> Option<Usr> {
-        unsafe { to_string_option(ffi::clang_getCursorUSR(self.raw)) }
+        unsafe { to_string_option(ffi::clang_getCursorUSR(self.raw)).map(Usr) }
     }
 
     /// Returns whether this AST entity is an anonymous record declaration.
@@ -2010,6 +2062,12 @@ impl<'tu> Entity<'tu> {
     /// receiver is an object instance, not `super` or a specific class.
     pub fn is_dynamic_call(&self) -> bool {
         unsafe { ffi::clang_Cursor_isDynamicCall(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an Objective-C method or property declaration with the
+    /// `@optional` attribute applied to it.
+    pub fn is_objc_optional(&self) -> bool {
+        unsafe { ffi::clang_Cursor_isObjCOptional(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a pure virtual method.
@@ -2441,6 +2499,58 @@ impl<'tu> fmt::Debug for Module<'tu> {
             .field("file", &self.get_file())
             .field("full_name", &self.get_full_name())
             .finish()
+    }
+}
+
+// ObjCAttributes ________________________________
+
+options! {
+    /// Indicates which attributes were applied to an Objective-C property.
+    options ObjCAttributes: CXObjCPropertyAttrKind {
+        /// Indicates use of the `readonly` attribute.
+        pub readonly: CXObjCPropertyAttr_readonly,
+        /// Indicates use of the `getter` attribute.
+        pub getter: CXObjCPropertyAttr_getter,
+        /// Indicates use of the `assign` attribute.
+        pub assign: CXObjCPropertyAttr_assign,
+        /// Indicates use of the `readwrite` attribute.
+        pub readwrite: CXObjCPropertyAttr_readwrite,
+        /// Indicates use of the `retain` attribute.
+        pub retain: CXObjCPropertyAttr_retain,
+        /// Indicates use of the `copy` attribute.
+        pub copy: CXObjCPropertyAttr_copy,
+        /// Indicates use of the `nonatomic` attribute.
+        pub nonatomic: CXObjCPropertyAttr_nonatomic,
+        /// Indicates use of the `setter` attribute.
+        pub setter: CXObjCPropertyAttr_setter,
+        /// Indicates use of the `atomic` attribute.
+        pub atomic: CXObjCPropertyAttr_atomic,
+        /// Indicates use of the `weak` attribute.
+        pub weak: CXObjCPropertyAttr_weak,
+        /// Indicates use of the `strong` attribute.
+        pub strong: CXObjCPropertyAttr_strong,
+        /// Indicates use of the `unsafe_retained` attribute.
+        pub unsafe_retained: CXObjCPropertyAttr_unsafe_unretained,
+    }
+}
+
+// ObjCQualifiers ________________________________
+
+options! {
+    /// Indicates which qualifiers were applied to an Objective-C method return or parameter type.
+    options ObjCQualifiers: CXObjCDeclQualifierKind {
+        /// Indicates use of the `in` qualifier.
+        pub in_: CXObjCDeclQualifier_In,
+        /// Indicates use of the `inout` qualifier.
+        pub inout: CXObjCDeclQualifier_Inout,
+        /// Indicates use of the `out` qualifier.
+        pub out: CXObjCDeclQualifier_Out,
+        /// Indicates use of the `bycopy` qualifier.
+        pub bycopy: CXObjCDeclQualifier_Bycopy,
+        /// Indicates use of the `byref` qualifier.
+        pub byref: CXObjCDeclQualifier_Byref,
+        /// Indicates use of the `oneway` qualifier.
+        pub oneway: CXObjCDeclQualifier_Oneway,
     }
 }
 
@@ -3252,6 +3362,74 @@ impl Unsaved {
     }
 }
 
+// Usr ___________________________________________
+
+/// A Unified Symbol Resolution (USR).
+///
+/// A USR identifies an AST entity and can be used to compare AST entities from different
+/// translation units.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Usr(pub String);
+
+impl Usr {
+    //- Constructors -----------------------------
+
+    /// Constructs a new `Usr` from an Objective-C category.
+    pub fn from_objc_category<C1: AsRef<str>, C2: AsRef<str>>(class: C1, category: C2) -> Usr {
+        let raw = unsafe {
+            ffi::clang_constructUSR_ObjCCategory(
+                from_string(class).as_ptr(), from_string(category).as_ptr()
+            )
+        };
+
+        Usr(to_string(raw))
+    }
+
+    /// Constructs a new `Usr` from an Objective-C class.
+    pub fn from_objc_class<C: AsRef<str>>(class: C) -> Usr {
+        unsafe { Usr(to_string(ffi::clang_constructUSR_ObjCClass(from_string(class).as_ptr()))) }
+    }
+
+    /// Constructs a new `Usr` from an Objective-C instance variable.
+    pub fn from_objc_ivar<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
+        with_string(&class.0, |s| {
+            let raw = unsafe { ffi::clang_constructUSR_ObjCIvar(from_string(name).as_ptr(), s) };
+            Usr(to_string(raw))
+        })
+    }
+
+    /// Constructs a new `Usr` from an Objective-C method.
+    pub fn from_objc_method<N: AsRef<str>>(class: &Usr, name: N, instance: bool) -> Usr {
+        with_string(&class.0, |s| {
+            let raw = unsafe {
+                ffi::clang_constructUSR_ObjCMethod(
+                    from_string(name).as_ptr(), instance as c_uint, s
+                )
+            };
+
+            Usr(to_string(raw))
+        })
+    }
+
+    /// Constructs a new `Usr` from an Objective-C property.
+    pub fn from_objc_property<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
+        with_string(&class.0, |s| {
+            let raw = unsafe {
+                ffi::clang_constructUSR_ObjCProperty(from_string(name).as_ptr(), s)
+            };
+
+            Usr(to_string(raw))
+        })
+    }
+
+    /// Constructs a new `Usr` from an Objective-C protocol.
+    pub fn from_objc_protocol<P: AsRef<str>>(protocol: P) -> Usr {
+        unsafe {
+            Usr(to_string(ffi::clang_constructUSR_ObjCProtocol(from_string(protocol).as_ptr())))
+        }
+    }
+}
+
 // Version _______________________________________
 
 /// A version number in the form `x.y.z`.
@@ -3341,4 +3519,14 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     };
 
     g(visitor) == ffi::CXResult::VisitBreak
+}
+
+fn with_string<S: AsRef<str>, T, F: FnOnce(ffi::CXString) -> T>(string: S, f: F) -> T {
+    let string = from_string(string);
+
+    let cxstring = unsafe {
+        ffi::CXString { data: mem::transmute(string.as_ptr()), private_flags: 0 }
+    };
+
+    f(cxstring)
 }

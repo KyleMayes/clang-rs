@@ -142,7 +142,7 @@ fn test() {
         let results = tu.complete(f, 8, 27, &[], options);
         assert_eq!(results.get_container_kind(), Some((EntityKind::StructDecl, false)));
         assert!(results.get_diagnostics(&tu).is_empty());
-        assert_eq!(results.get_usr(), Some("c:@S@A".into()));
+        assert_eq!(results.get_usr(), Some(Usr("c:@S@A".into())));
 
         let context = results.get_context().unwrap();
         assert!(!context.all_types);
@@ -367,7 +367,7 @@ fn test() {
         assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
         assert_eq!(children[0].get_translation_unit().get_file(f), tu.get_file(f));
         assert_eq!(children[0].get_platform_availability(), Some(vec![]));
-        assert_eq!(children[0].get_usr(), Some("c:@a".into()));
+        assert_eq!(children[0].get_usr(), Some(Usr("c:@a".into())));
 
         let string = children[0].get_completion_string().unwrap();
         assert_eq!(string.get_chunks(), &[
@@ -1060,4 +1060,16 @@ fn test() {
         assert!(!ts[0].is_variadic());
         assert!(ts[1].is_variadic());
     });
+
+    // Usr _______________________________________
+
+    let class = Usr::from_objc_class("A");
+    assert_eq!(class, Usr("c:objc(cs)A".into()));
+
+    assert_eq!(Usr::from_objc_category("A", "B"), Usr("c:objc(cy)A@B".into()));
+    assert_eq!(Usr::from_objc_ivar(&class, "B"), Usr("c:objc(cs)A@B".into()));
+    assert_eq!(Usr::from_objc_method(&class, "B", true), Usr("c:objc(cs)A(im)B".into()));
+    assert_eq!(Usr::from_objc_method(&class, "B", false), Usr("c:objc(cs)A(cm)B".into()));
+    assert_eq!(Usr::from_objc_property(&class, "B"), Usr("c:objc(cs)A(py)B".into()));
+    assert_eq!(Usr::from_objc_protocol("A"), Usr("c:objc(pl)A".into()));
 }
