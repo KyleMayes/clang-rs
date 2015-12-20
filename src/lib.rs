@@ -1026,16 +1026,19 @@ impl Drop for Clang {
 // CompilationDatabase ___________________________
 
 /// The information used to compile the source files in a project.
-pub struct CompilationDatabase {
+pub struct CompilationDatabase<'c> {
     ptr: ffi::CXCompilationDatabase,
+    _marker: PhantomData<&'c Clang>,
 }
 
-impl CompilationDatabase {
+impl<'c> CompilationDatabase<'c> {
     //- Constructors -----------------------------
 
     /// Constructs a new `CompilationDatabase` from a directory containing a `compile_commands.json`
     /// file.
-    pub fn from_directory<D: AsRef<Path>>(directory: D) -> Result<CompilationDatabase, ()> {
+    pub fn from_directory<D: AsRef<Path>>(
+        _: &'c Clang, directory: D
+    ) -> Result<CompilationDatabase<'c>, ()> {
         unsafe {
             let mut code = mem::uninitialized();
 
@@ -1044,7 +1047,7 @@ impl CompilationDatabase {
             );
 
             if code == ffi::CXCompilationDatabase_Error::NoError {
-                Ok(CompilationDatabase { ptr: ptr })
+                Ok(CompilationDatabase { ptr: ptr, _marker: PhantomData })
             } else {
                 Err(())
             }
@@ -1087,7 +1090,7 @@ impl CompilationDatabase {
     }
 }
 
-impl Drop for CompilationDatabase {
+impl<'c> Drop for CompilationDatabase<'c> {
     fn drop(&mut self) {
         unsafe { ffi::clang_CompilationDatabase_dispose(self.ptr); }
     }
@@ -1100,7 +1103,7 @@ impl Drop for CompilationDatabase {
 pub struct CompileCommand<'d> {
     ptr: ffi::CXCompileCommand,
     parent: Rc<CompileCommands>,
-    _marker: PhantomData<&'d CompilationDatabase>,
+    _marker: PhantomData<&'d CompilationDatabase<'d>>,
 }
 
 impl<'d> CompileCommand<'d> {

@@ -109,7 +109,7 @@ fn test() {
     ]"#;
 
     with_temporary_file("compile_commands.json", source, |d, _| {
-        let cd = CompilationDatabase::from_directory(d).unwrap();
+        let cd = CompilationDatabase::from_directory(&clang, d).unwrap();
 
         assert_eq!(cd.get_all_commands().len(), 2);
 
