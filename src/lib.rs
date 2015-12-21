@@ -813,6 +813,7 @@ pub enum SourceError {
 // StorageClass __________________________________
 
 /// Indicates the storage class of a declaration.
+#[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum StorageClass {
@@ -838,6 +839,7 @@ pub enum StorageClass {
 // TemplateArgument ______________________________
 
 /// An argument to a template function specialization.
+#[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TemplateArgument<'tu> {
     /// A declaration for a pointer, reference, or member pointer non-type template parameter.
@@ -1805,6 +1807,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the mangled name of this AST entity, if any.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     pub fn get_mangled_name(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
     }
@@ -1977,6 +1980,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the storage class of this declaration, if applicable.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     pub fn get_storage_class(&self) -> Option<StorageClass> {
         unsafe {
             match ffi::clang_Cursor_getStorageClass(self.raw) {
@@ -1994,6 +1998,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the template arguments for this template function specialization, if applicable.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     pub fn get_template_arguments(&self) -> Option<Vec<TemplateArgument<'tu>>> {
         let get_type = &ffi::clang_Cursor_getTemplateArgumentType;
         let get_signed = &ffi::clang_Cursor_getTemplateArgumentValue;
@@ -2062,6 +2067,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns whether this AST entity is an anonymous record declaration.
+    #[cfg(feature="clang_3_7")]
     pub fn is_anonymous(&self) -> bool {
         unsafe { ffi::clang_Cursor_isAnonymous(self.raw) != 0 }
     }
@@ -2352,7 +2358,7 @@ impl<'tu> cmp::Eq for File<'tu> { }
 
 impl<'tu> cmp::PartialEq for File<'tu> {
     fn eq(&self, other: &File<'tu>) -> bool {
-        unsafe { ffi::clang_File_isEqual(self.ptr, other.ptr) != 0 }
+        self.get_id() == other.get_id()
     }
 }
 
@@ -3186,6 +3192,7 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns the fields in this record type, if applicable.
+    #[cfg(feature="clang_3_7")]
     pub fn get_fields(&self) -> Option<Vec<Entity<'tu>>> {
         if self.get_kind() == TypeKind::Record {
             let mut fields = vec![];
@@ -3311,6 +3318,7 @@ impl<'tu> Type<'tu> {
     /// Visits the fields in this record type, returning `None` if this type is not a record type
     /// and returning `Some(b)` otherwise where `b` indicates whether visitation was ended by the
     /// callback returning `false`.
+    #[cfg(feature="clang_3_7")]
     pub fn visit_fields<F: FnMut(Entity<'tu>) -> bool>(&self, f: F) -> Option<bool> {
         if self.get_kind() != TypeKind::Record {
             return None;

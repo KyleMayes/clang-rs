@@ -341,6 +341,17 @@ fn test() {
     // Entity ____________________________________
 
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
+        #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+        fn test_get_mangled_name<'tu>(entity: Entity<'tu>) {
+            assert_eq!(entity.get_mangled_name(), None);
+
+            let children = entity.get_children();
+            assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
+        }
+
+        #[cfg(not(any(feature="clang_3_6", feature="clang_3_7")))]
+        fn test_get_mangled_name<'tu>(_: Entity<'tu>) { }
+
         let file = tu.get_file(f).unwrap();
 
         let entity = tu.get_entity();
@@ -348,7 +359,6 @@ fn test() {
         assert_eq!(entity.get_display_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(entity.get_kind(), EntityKind::TranslationUnit);
         assert_eq!(entity.get_location(), None);
-        assert_eq!(entity.get_mangled_name(), None);
         assert_eq!(entity.get_name(), Some(f.to_str().unwrap().into()));
         assert_eq!(entity.get_name_ranges(), &[]);
         assert_eq!(entity.get_platform_availability(), None);
@@ -361,7 +371,6 @@ fn test() {
         assert_eq!(children[0].get_display_name(), Some("a".into()));
         assert_eq!(children[0].get_kind(), EntityKind::VarDecl);
         assert_eq!(children[0].get_location(), Some(file.get_location(1, 5)));
-        assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
         assert_eq!(children[0].get_name(), Some("a".into()));
         assert_eq!(children[0].get_name_ranges(), &[range!(file, 1, 5, 1, 6)]);
         assert_eq!(children[0].get_range(), Some(range!(file, 1, 1, 1, 12)));
@@ -374,6 +383,8 @@ fn test() {
             CompletionChunk::ResultType("int".into()),
             CompletionChunk::TypedText("a".into()),
         ]);
+
+        test_get_mangled_name(entity);
     });
 
     let source = "
@@ -431,10 +442,22 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_3_7")]
+        fn test_is_anonymous<'tu>(children: &[Entity<'tu>]) {
+            assert!(!children[0].is_anonymous());
+
+            let children = children[0].get_children();
+            assert!(children[0].is_anonymous());
+            assert!(!children[1].is_anonymous());
+        }
+
+        #[cfg(not(feature="clang_3_7"))]
+        fn test_is_anonymous<'tu>(_: &[Entity<'tu>]) { }
+
         let children = e.get_children();
         assert_eq!(children.len(), 1);
 
-        assert!(!children[0].is_anonymous());
+        test_is_anonymous(&children);
 
         let children = children[0].get_children();
         assert_eq!(children.len(), 2);
@@ -442,13 +465,11 @@ fn test() {
         assert_eq!(children[0].get_bit_field_width(), None);
         assert_eq!(children[0].get_name(), None);
         assert_eq!(children[0].get_display_name(), None);
-        assert!(children[0].is_anonymous());
         assert!(!children[0].is_bit_field());
 
         assert_eq!(children[1].get_bit_field_width(), Some(322));
         assert_eq!(children[1].get_name(), Some("i".into()));
         assert_eq!(children[1].get_display_name(), Some("i".into()));
-        assert!(!children[1].is_anonymous());
         assert!(children[1].is_bit_field());
     });
 
@@ -559,17 +580,27 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
+        #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+        fn test_get_storage_class<'tu>(entity: Entity<'tu>) {
+            assert_eq!(entity.get_storage_class(), None);
+
+            let children = entity.get_children();
+            assert_eq!(children[0].get_storage_class(), Some(StorageClass::None));
+            assert_eq!(children[1].get_storage_class(), Some(StorageClass::Static));
+        }
+
+        #[cfg(not(any(feature="clang_3_6", feature="clang_3_7")))]
+        fn test_get_storage_class<'tu>(_: Entity<'tu>) { }
+
         assert_eq!(e.get_linkage(), None);
-        assert_eq!(e.get_storage_class(), None);
 
         let children = e.get_children();
         assert_eq!(children.len(), 2);
 
         assert_eq!(children[0].get_linkage(), Some(Linkage::External));
-        assert_eq!(children[0].get_storage_class(), Some(StorageClass::None));
-
         assert_eq!(children[1].get_linkage(), Some(Linkage::Internal));
-        assert_eq!(children[1].get_storage_class(), Some(StorageClass::Static));
+
+        test_get_storage_class(e);
     });
 
     let source = "
@@ -620,23 +651,32 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
+        #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+        fn test_get_template_arguments<'tu>(children: &[Entity<'tu>]) {
+            assert_eq!(children[0].get_template_arguments(), None);
+            assert_eq!(children[1].get_template_arguments(), None);
+            assert_eq!(children[2].get_template_arguments(), Some(vec![
+                TemplateArgument::Type(children[0].get_type().unwrap()),
+                TemplateArgument::Integral(322, 322),
+            ]));
+        }
+
+        #[cfg(not(any(feature="clang_3_6", feature="clang_3_7")))]
+        fn test_get_template_arguments<'tu>(_: &[Entity<'tu>]) { }
+
         let children = e.get_children();
         assert_eq!(children.len(), 3);
 
         assert_eq!(children[0].get_template(), None);
-        assert_eq!(children[0].get_template_arguments(), None);
         assert_eq!(children[0].get_template_kind(), None);
 
         assert_eq!(children[1].get_template(), None);
-        assert_eq!(children[1].get_template_arguments(), None);
         assert_eq!(children[1].get_template_kind(), Some(EntityKind::FunctionDecl));
 
         assert_eq!(children[2].get_template(), Some(children[1]));
-        assert_eq!(children[2].get_template_arguments(), Some(vec![
-            TemplateArgument::Type(children[0].get_type().unwrap()),
-            TemplateArgument::Integral(322, 322),
-        ]));
         assert_eq!(children[2].get_template_kind(), None);
+
+        test_get_template_arguments(&children);
     });
 
     let source = "
@@ -976,8 +1016,15 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
-        let record = e.get_children()[0];
-        assert_eq!(record.get_type().unwrap().get_fields(), Some(record.get_children()));
+        #[cfg(feature="clang_3_7")]
+        fn test_get_fields<'tu>(entity: Entity<'tu>) {
+            assert_eq!(entity.get_type().unwrap().get_fields(), Some(entity.get_children()));
+        }
+
+        #[cfg(not(feature="clang_3_7"))]
+        fn test_get_fields<'tu>(_: Entity<'tu>) { }
+
+        test_get_fields(e.get_children()[0]);
     });
 
     let source = "

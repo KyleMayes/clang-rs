@@ -13,6 +13,12 @@ description = "Rust bindings and idiomatic wrapper for libclang."
 documentation = "https://kylemayes.github.io/clang-rs/clang"
 repository = "https://github.com/KyleMayes/clang-rs"
 
+[features]
+
+clang_3_5 = []
+clang_3_6 = []
+clang_3_7 = []
+
 [dependencies]
 
 bitflags = "0.3.3"
