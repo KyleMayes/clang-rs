@@ -2,6 +2,8 @@
 
 #![allow(missing_debug_implementations, missing_docs, non_upper_case_globals, non_snake_case)]
 
+#![cfg_attr(rustc_1_5, allow(raw_pointer_derive))]
+
 use libc::{c_char, c_int, c_longlong, c_uint, c_ulong, c_ulonglong, c_void, time_t};
 
 use super::{Nullable};

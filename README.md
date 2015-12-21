@@ -3,6 +3,8 @@ clang-rs
 
 Rust bindings and idiomatic wrapper for libclang.
 
+Supported on the stable, beta, and nightly Rust channels.
+
 ### Supported Versions
 
 * 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
