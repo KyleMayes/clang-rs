@@ -1,6 +1,6 @@
 //! Bindings and idiomatic wrapper for `libclang`.
 
-#![warn(missing_docs)]
+#![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
@@ -1023,6 +1023,12 @@ impl Drop for Clang {
     }
 }
 
+impl fmt::Debug for Clang {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Clang").finish()
+    }
+}
+
 // CompilationDatabase ___________________________
 
 /// The information used to compile the source files in a project.
@@ -1096,6 +1102,14 @@ impl<'c> Drop for CompilationDatabase<'c> {
     }
 }
 
+impl<'c> fmt::Debug for CompilationDatabase<'c> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("CompilationDatabase")
+            .field("commands", &self.get_all_commands())
+            .finish()
+    }
+}
+
 // CompileCommand ________________________________
 
 /// The information used to compile a source file in a project.
@@ -1135,6 +1149,15 @@ impl<'d> CompileCommand<'d> {
     /// Returns the working directory of this compile command.
     pub fn get_working_directory(&self) -> PathBuf {
         unsafe { to_string(ffi::clang_CompileCommand_getDirectory(self.ptr)).into() }
+    }
+}
+
+impl<'c> fmt::Debug for CompileCommand<'c> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("CompileCommand")
+            .field("working_directory", &self.get_working_directory())
+            .field("arguments", &self.get_arguments())
+            .finish()
     }
 }
 
@@ -2414,6 +2437,12 @@ impl<'c> Index<'c> {
 impl<'c> Drop for Index<'c> {
     fn drop(&mut self) {
         unsafe { ffi::clang_disposeIndex(self.ptr); }
+    }
+}
+
+impl<'c> fmt::Debug for Index<'c> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Index").finish()
     }
 }
 

@@ -1,6 +1,6 @@
 //! The raw bindings to `libclang`.
 
-#![allow(missing_docs, non_upper_case_globals, non_snake_case)]
+#![allow(missing_debug_implementations, missing_docs, non_upper_case_globals, non_snake_case)]
 
 use libc::{c_char, c_int, c_longlong, c_uint, c_ulong, c_ulonglong, c_void, time_t};
 
