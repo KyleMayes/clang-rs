@@ -5,3 +5,8 @@
 
 ### Changed
 - Moved FFI bindings into separate crate (`clang-sys`)
+
+## [0.2.1] - UNRELEASED
+
+### Fixed
+- Fixed passing of version features to `clang-sys`
