@@ -14,3 +14,4 @@ before_script:
 
 script:
   - cargo build --verbose --features clang_3_7
+  - cargo test
