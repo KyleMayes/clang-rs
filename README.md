@@ -12,6 +12,12 @@ Supported on the stable, beta, and nightly Rust channels.
 
 Released under the MIT license.
 
+### Dependencies
+
+This crate depends on `libclang.dll` (Windows), `libclang.so` (Linux), or `libclang.dylib` (OS X).
+These binaries can be downloaded [here](http://llvm.org/releases/download.html). Place the
+appropriate binary on your system's path so that `rustc` can find `libclang`.
+
 ### Supported Versions
 
 * 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
