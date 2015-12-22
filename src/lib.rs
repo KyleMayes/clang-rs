@@ -1,4 +1,4 @@
-//! Bindings and idiomatic wrapper for `libclang`.
+//! An idiomatic Rust wrapper for libclang.
 //!
 //! ## Version Specific Documentation
 //!
@@ -16,10 +16,9 @@
 #![cfg_attr(feature="clippy", warn(clippy))]
 
 #[macro_use]
-extern crate bitflags;
-#[macro_use]
 extern crate lazy_static;
 
+extern crate clang_sys;
 extern crate libc;
 
 use std::fmt;
@@ -34,9 +33,9 @@ use std::path::{Path, PathBuf};
 use std::rc::{Rc};
 use std::sync::atomic::{self, AtomicBool};
 
-use libc::{c_int, c_uint, c_ulong, time_t};
+use clang_sys as ffi;
 
-pub mod ffi;
+use libc::{c_int, c_uint, c_ulong, time_t};
 
 //================================================
 // Macros
@@ -109,6 +108,108 @@ pub trait Nullable<T> {
     /// Transforms this value into an `Option<U>`, mapping a null value to `None` and a non-null
     /// value to `Some(v)` where `v` is the result of applying the supplied function to this value.
     fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Option<U>;
+}
+
+macro_rules! nullable {
+    ($name:ident) => (
+        impl Nullable<ffi::$name> for ffi::$name {
+            fn map<U, F: FnOnce(ffi::$name) -> U>(self, f: F) -> Option<U> {
+                if !self.0.is_null() {
+                    Some(f(self))
+                } else {
+                    None
+                }
+            }
+        }
+    );
+}
+
+nullable!(CXCompilationDatabase);
+nullable!(CXCompileCommand);
+nullable!(CXCompileCommands);
+nullable!(CXCompletionString);
+nullable!(CXCursorSet);
+nullable!(CXDiagnostic);
+nullable!(CXDiagnosticSet);
+nullable!(CXFile);
+nullable!(CXIdxClientASTFile);
+nullable!(CXIdxClientContainer);
+nullable!(CXIdxClientEntity);
+nullable!(CXIdxClientFile);
+nullable!(CXIndex);
+nullable!(CXIndexAction);
+nullable!(CXModule);
+nullable!(CXModuleMapDescriptor);
+nullable!(CXRemapping);
+nullable!(CXTranslationUnit);
+nullable!(CXVirtualFileOverlay);
+
+impl Nullable<ffi::CXCursor> for ffi::CXCursor {
+    fn map<U, F: FnOnce(ffi::CXCursor) -> U>(self, f: F) -> Option<U> {
+        unsafe {
+            let null = ffi::clang_equalCursors(self, ffi::clang_getNullCursor()) != 0;
+
+            if !null && ffi::clang_isInvalid(self.kind) == 0 {
+                Some(f(self))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+impl Nullable<ffi::CXSourceLocation> for ffi::CXSourceLocation {
+    fn map<U, F: FnOnce(ffi::CXSourceLocation) -> U>(self, f: F) -> Option<U> {
+        unsafe {
+            if ffi::clang_equalLocations(self, ffi::clang_getNullLocation()) == 0 {
+                Some(f(self))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+impl Nullable<ffi::CXSourceRange> for ffi::CXSourceRange {
+    fn map<U, F: FnOnce(ffi::CXSourceRange) -> U>(self, f: F) -> Option<U> {
+        unsafe {
+            if ffi::clang_Range_isNull(self) == 0 {
+                Some(f(self))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+impl Nullable<ffi::CXString> for ffi::CXString {
+    fn map<U, F: FnOnce(ffi::CXString) -> U>(self, f: F) -> Option<U> {
+        if !self.data.is_null() {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
+}
+
+impl Nullable<ffi::CXType> for ffi::CXType {
+    fn map<U, F: FnOnce(ffi::CXType) -> U>(self, f: F) -> Option<U> {
+        if self.kind != ffi::CXTypeKind::Invalid {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
+}
+
+impl Nullable<ffi::CXVersion> for ffi::CXVersion {
+    fn map<U, F: FnOnce(ffi::CXVersion) -> U>(self, f: F) -> Option<U> {
+        if self.Major != -1 && self.Minor != -1 && self.Subminor != -1 {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
 }
 
 //================================================

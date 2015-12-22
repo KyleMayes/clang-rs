@@ -3,7 +3,7 @@ clang-rs
 
 [![crates.io](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
 
-Rust bindings and idiomatic wrapper for libclang.
+An idiomatic Rust wrapper for libclang.
 
 Supported on the stable, beta, and nightly Rust channels.
 
@@ -14,8 +14,13 @@ Released under the MIT license.
 ### Dependencies
 
 This crate depends on `libclang.dll` (Windows), `libclang.so` (Linux), or `libclang.dylib` (OS X).
-These binaries can be downloaded [here](http://llvm.org/releases/download.html). Place the
-appropriate binary on your system's path so that `rustc` can find `libclang`.
+These binaries can be either be installed as a part of clang or downloaded
+[here](http://llvm.org/releases/download.html).
+
+#### Windows
+
+On Windows, `libclang.dll` should be placed in `<rust>\lib\rustlib\*-pc-windows-*\lib` where
+`<rust>` is your Rust installation directory.
 
 ### Supported Versions
 

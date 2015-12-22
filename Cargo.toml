@@ -8,12 +8,10 @@ version = "0.1.0"
 readme = "README.md"
 license = "MIT"
 
-description = "Rust bindings and idiomatic wrapper for libclang."
+description = "An idiomatic Rust wrapper for libclang."
 
 documentation = "https://kylemayes.github.io/clang-rs/all/clang"
 repository = "https://github.com/KyleMayes/clang-rs"
-
-build = "build.rs"
 
 [features]
 
@@ -23,7 +21,7 @@ clang_3_7 = []
 
 [dependencies]
 
-bitflags = "0.3.3"
+clang-sys = "0.1.0"
 lazy_static = "0.1.15"
 libc = "0.2.2"
 
@@ -31,10 +29,6 @@ libc = "0.2.2"
 
 version = "0.0.30"
 optional = true
-
-[build-dependencies]
-
-rustc_version = "0.1.4"
 
 [dev-dependencies]
 
