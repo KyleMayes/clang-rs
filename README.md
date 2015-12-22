@@ -2,7 +2,6 @@ clang-rs
 ========
 
 [![crates.io](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
-[![Travis CI](https://travis-ci.org/KyleMayes/clang-rs.svg?branch=master)](https://travis-ci.org/KyleMayes/clang-rs)
 
 Rust bindings and idiomatic wrapper for libclang.
 
