@@ -1,6 +1,8 @@
 clang-rs
 ========
 
+[![Travis CI](https://travis-ci.org/KyleMayes/clang-rs.svg?branch=master)](https://travis-ci.org/KyleMayes/clang-rs)
+
 Rust bindings and idiomatic wrapper for libclang.
 
 Supported on the stable, beta, and nightly Rust channels.
