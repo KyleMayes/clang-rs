@@ -10,7 +10,7 @@ rust:
 addons:
   apt:
     packages:
-      - libclang-3.7-dev
+      - libclang1-3.7
 
 script:
   - cargo build --verbose --features clang_3_7
