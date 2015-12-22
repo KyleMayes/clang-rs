@@ -6,7 +6,7 @@
 ### Changed
 - Moved FFI bindings into separate crate (`clang-sys`)
 
-## [0.2.1] - UNRELEASED
+## [0.2.1] - 2015-12-22
 
 ### Fixed
 - Fixed passing of version features to `clang-sys`
