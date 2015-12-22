@@ -10,7 +10,7 @@ rust:
 before_script:
   - wget http://llvm.org/releases/3.7.0/clang+llvm-3.7.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
   - tar -xf clang+llvm-3.7.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-  - export PATH=$PATH:$PWD/clang+llvm-3.7.0-x86_64-linux-gnu-ubuntu-14.04/lib
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/clang+llvm-3.7.0-x86_64-linux-gnu-ubuntu-14.04/lib
 
 script:
   - cargo build --verbose --features clang_3_7
