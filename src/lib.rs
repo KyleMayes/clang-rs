@@ -1,10 +1,13 @@
 //! Bindings and idiomatic wrapper for `libclang`.
 //!
-//! ## Version Specific documentation
+//! ## Version Specific Documentation
 //!
 //! * 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
 //! * 3.6.x - [Documentation](https://kylemayes.github.io/clang-rs/3_6/clang)
 //! * 3.7.x - [Documentation](https://kylemayes.github.io/clang-rs/3_7/clang)
+//!
+//! The documentation for the non-version specific API is
+//! [here](https://kylemayes.github.io/clang-rs/all/clang).
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
