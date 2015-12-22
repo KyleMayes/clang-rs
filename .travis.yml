@@ -1,4 +1,4 @@
-sudo: required
+sudo: false
 
 language: rust
 
@@ -8,9 +8,11 @@ rust:
   - nightly
 
 before_script:
-  - sudo apt-get update -qq
-  - sudo apt-get install -y clang-3.7
+  - wget http://llvm.org/releases/3.7.0/clang+llvm-3.7.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+  - tar -xf clang+llvm-3.7.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+  - export LIBCLANG=$PWD/clang+llvm-3.7.0-x86_64-linux-gnu-ubuntu-14.04/lib/libclang.so
 
 script:
   - cargo build --verbose --features clang_3_7
+  - cp $LIBCLANG target/debug/libclang.so
   - cargo test --verbose
