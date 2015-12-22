@@ -14,5 +14,5 @@ before_script:
 
 script:
   - cargo build --verbose --features clang_3_7
-  - cp $LIBCLANG target/debug/libclang.so
+  - cp $LIBCLANG target/debug/deps/libclang.so
   - cargo test --verbose
