@@ -7,6 +7,10 @@ Rust bindings and idiomatic wrapper for libclang.
 
 Supported on the stable, beta, and nightly Rust channels.
 
+**Warning:** the API of this library is subject to change.
+
+Released under the MIT license.
+
 ### Supported Versions
 
 * 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
@@ -15,5 +19,3 @@ Supported on the stable, beta, and nightly Rust channels.
 
 If you do not select a specific version, a common subset API will be availabile. The documentation
 for this API is [here](https://kylemayes.github.io/clang-rs/all/clang).
-
-Released under the MIT license.
