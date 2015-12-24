@@ -1,10 +1,9 @@
 clang-rs
 ========
 
-[![Join the chat at https://gitter.im/KyleMayes/clang-rs](https://badges.gitter.im/KyleMayes/clang-rs.svg)](https://gitter.im/KyleMayes/clang-rs?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
 [![crates.io](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
 [![Travis CI](https://travis-ci.org/KyleMayes/clang-rs.svg?branch=master)](https://travis-ci.org/KyleMayes/clang-rs)
+[![Gitter](https://badges.gitter.im/KyleMayes/clang-rs.svg)](https://gitter.im/KyleMayes/clang-rs?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 An idiomatic Rust wrapper for libclang.
 
