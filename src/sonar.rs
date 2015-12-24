@@ -15,7 +15,7 @@ use super::{Entity, EntityKind, TranslationUnit, TypeKind};
 pub struct Enum<'tu> {
     name: String,
     entity: Entity<'tu>,
-    constants: Vec<(String, (i64, u64))>,
+    constants: Vec<(String, i64, u64)>,
 }
 
 impl<'tu> Enum<'tu> {
@@ -24,7 +24,8 @@ impl<'tu> Enum<'tu> {
     fn new(name: String, entity: Entity<'tu>) -> Enum<'tu> {
         let constants = entity.get_children().into_iter().filter_map(|e| {
             if e.get_kind() == EntityKind::EnumConstantDecl {
-                Some((e.get_name().unwrap(), e.get_enum_constant_value().unwrap()))
+                let (signed, unsigned) = e.get_enum_constant_value().unwrap();
+                Some((e.get_name().unwrap(), signed, unsigned))
             } else {
                 None
             }
@@ -36,7 +37,7 @@ impl<'tu> Enum<'tu> {
     //- Accessors --------------------------------
 
     /// Returns the enum constants in this enum.
-    pub fn get_constants(&self) -> &Vec<(String, (i64, u64))> {
+    pub fn get_constants(&self) -> &Vec<(String, i64, u64)> {
         &self.constants
     }
 

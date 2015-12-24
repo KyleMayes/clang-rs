@@ -1155,17 +1155,17 @@ fn test() {
 
         assert_eq!(enums[0].get_name(), "A");
         assert_eq!(enums[0].get_constants(), &[
-            ("AA".into(), (0, 0)), ("AB".into(), (1, 1)), ("AC".into(), (2, 2))
+            ("AA".into(), 0, 0), ("AB".into(), 1, 1), ("AC".into(), 2, 2)
         ]);
 
         assert_eq!(enums[1].get_name(), "B");
         assert_eq!(enums[1].get_constants(), &[
-            ("BA".into(), (0, 0)), ("BB".into(), (1, 1)), ("BC".into(), (2, 2))
+            ("BA".into(), 0, 0), ("BB".into(), 1, 1), ("BC".into(), 2, 2)
         ]);
 
         assert_eq!(enums[2].get_name(), "C");
         assert_eq!(enums[2].get_constants(), &[
-            ("CA".into(), (0, 0)), ("CB".into(), (1, 1)), ("CC".into(), (2, 2))
+            ("CA".into(), 0, 0), ("CB".into(), 1, 1), ("CC".into(), 2, 2)
         ]);
     });
 
