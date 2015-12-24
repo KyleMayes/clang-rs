@@ -15,3 +15,8 @@
 
 ### Added
 - Added `sonar` module for finding declarations in C translation units
+
+## [0.2.3] - UNRELEASED
+
+### Added
+- Added implementations of `From` to `String` for error enums

@@ -243,6 +243,15 @@ pub enum AlignofError {
     Incomplete,
 }
 
+impl From<AlignofError> for String {
+    fn from(error: AlignofError) -> String {
+        match error {
+            AlignofError::Dependent => "the type is a dependent type".into(),
+            AlignofError::Incomplete => "the type is an incomplete type".into(),
+        }
+    }
+}
+
 // Availability __________________________________
 
 /// Indicates the availability of an AST entity.
@@ -854,6 +863,19 @@ pub enum OffsetofError {
     Parent,
 }
 
+impl From<OffsetofError> for String {
+    fn from(error: OffsetofError) -> String {
+        match error {
+            OffsetofError::Dependent => "the record type is a dependent type".into(),
+            OffsetofError::Incomplete => "the record type is an incomplete type".into(),
+            OffsetofError::Name => {
+                "the record type does not contain a field with the supplied name".into()
+            },
+            OffsetofError::Parent => "the record type has an invalid parent declaration".into(),
+        }
+    }
+}
+
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
@@ -875,6 +897,15 @@ pub enum SaveError {
     Errors,
     /// An unknown error occurred.
     Unknown,
+}
+
+impl From<SaveError> for String {
+    fn from(error: SaveError) -> String {
+        match error {
+            SaveError::Errors => "errors in the translation unit prevented saving".into(),
+            SaveError::Unknown => "an unknown error occurred".into(),
+        }
+    }
 }
 
 // Severity ______________________________________
@@ -909,6 +940,16 @@ pub enum SizeofError {
     VariableSize,
 }
 
+impl From<SizeofError> for String {
+    fn from(error: SizeofError) -> String {
+        match error {
+            SizeofError::Dependent => "the type is a dependent type".into(),
+            SizeofError::Incomplete => "the type is an incomplete type".into(),
+            SizeofError::VariableSize => "the type is a variable size type".into(),
+        }
+    }
+}
+
 // SourceError ___________________________________
 
 /// Indicates the type of error that prevented the loading of a translation unit from a source file.
@@ -920,6 +961,18 @@ pub enum SourceError {
     Crash,
     /// An unknown error occurred.
     Unknown,
+}
+
+impl From<SourceError> for String {
+    fn from(error: SourceError) -> String {
+        match error {
+            SourceError::AstDeserialization => {
+                "an error occurred while deserializing an AST file".into()
+            },
+            SourceError::Crash => "`libclang` crashed".into(),
+            SourceError::Unknown => "an unknown error occurred".into(),
+        }
+    }
 }
 
 // StorageClass __________________________________
