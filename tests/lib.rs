@@ -1140,4 +1140,58 @@ fn test() {
     assert_eq!(Usr::from_objc_method(&class, "B", false), Usr("c:objc(cs)A(cm)B".into()));
     assert_eq!(Usr::from_objc_property(&class, "B"), Usr("c:objc(cs)A(py)B".into()));
     assert_eq!(Usr::from_objc_protocol("A"), Usr("c:objc(pl)A".into()));
+
+    // sonar _____________________________________
+
+    let source = "
+        enum A { AA, AB, AC };
+        typedef enum { BA, BB, BC } B;
+        typedef enum C { CA, CB, CC } C;
+    ";
+
+    with_translation_unit(&clang, "test.c", source, &[], |_, _, tu| {
+        let enums = sonar::find_enums(&tu);
+        assert_eq!(enums.len(), 3);
+
+        assert_eq!(enums[0].get_name(), "A");
+        assert_eq!(enums[0].get_constants(), &[
+            ("AA".into(), (0, 0)), ("AB".into(), (1, 1)), ("AC".into(), (2, 2))
+        ]);
+
+        assert_eq!(enums[1].get_name(), "B");
+        assert_eq!(enums[1].get_constants(), &[
+            ("BA".into(), (0, 0)), ("BB".into(), (1, 1)), ("BC".into(), (2, 2))
+        ]);
+
+        assert_eq!(enums[2].get_name(), "C");
+        assert_eq!(enums[2].get_constants(), &[
+            ("CA".into(), (0, 0)), ("CB".into(), (1, 1)), ("CC".into(), (2, 2))
+        ]);
+    });
+
+    let source = "
+        struct A { int a; };
+        typedef struct { int b; } B;
+        typedef struct C { int c; } C;
+    ";
+
+    with_translation_unit(&clang, "test.c", source, &[], |_, _, tu| {
+        let structs = sonar::find_structs(&tu);
+        assert_eq!(structs.len(), 3);
+
+        assert_eq!(structs[0].get_name(), "A");
+
+        assert_eq!(structs[0].get_fields().len(), 1);
+        assert_eq!(structs[0].get_fields()[0].get_name(), Some("a".into()));
+
+        assert_eq!(structs[1].get_name(), "B");
+
+        assert_eq!(structs[1].get_fields().len(), 1);
+        assert_eq!(structs[1].get_fields()[0].get_name(), Some("b".into()));
+
+        assert_eq!(structs[2].get_name(), "C");
+
+        assert_eq!(structs[2].get_fields().len(), 1);
+        assert_eq!(structs[2].get_fields()[0].get_name(), Some("c".into()));
+    });
 }
