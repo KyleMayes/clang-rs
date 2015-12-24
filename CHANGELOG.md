@@ -11,7 +11,7 @@
 ### Fixed
 - Fixed passing of version features to `clang-sys`
 
-## [0.2.2] - UNRELEASED
+## [0.2.2] - 2015-12-23
 
 ### Added
 - Added `sonar` module for finding declarations in C translation units
