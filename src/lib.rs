@@ -1304,15 +1304,6 @@ impl<'d> CompileCommand<'d> {
         ).map(to_string).collect()
     }
 
-    /// Returns the path to and contents of the source files mapped by this compile command.
-    pub fn get_mapped_source_files(&self) -> Vec<(PathBuf, String)> {
-        iter!(
-            clang_CompileCommand_getNumMappedSources(self.ptr),
-            clang_CompileCommand_getMappedSourcePath(self.ptr),
-            clang_CompileCommand_getMappedSourceContent(self.ptr),
-        ).map(|(p, c)| (to_string(p).into(), to_string(c))).collect()
-    }
-
     /// Returns the working directory of this compile command.
     pub fn get_working_directory(&self) -> PathBuf {
         unsafe { to_string(ffi::clang_CompileCommand_getDirectory(self.ptr)).into() }

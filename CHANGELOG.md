@@ -24,3 +24,6 @@
 ### Added
 - Added implementations of `From` to `String` for error enums
 - Added integer categorization methods to `Type` struct
+
+### Removed
+- Removed `get_mapped_source_files` method in `CompileCommand` struct
