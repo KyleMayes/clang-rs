@@ -3520,6 +3520,23 @@ impl<'tu> Type<'tu> {
             Some(ffi::clang_Type_visitFields(self.raw, visit, data) == ffi::CXVisitorResult::Break)
         }
     }
+
+    //- Categorization ---------------------------
+
+    /// Returns whether this type is an integer type.
+    pub fn is_integer(&self) -> bool {
+        self.raw.kind >= ffi::CXTypeKind::Bool && self.raw.kind <= ffi::CXTypeKind::Int128
+    }
+
+    /// Returns whether this type is a signed integer type.
+    pub fn is_signed_integer(&self) -> bool {
+        self.raw.kind >= ffi::CXTypeKind::Char_S && self.raw.kind <= ffi::CXTypeKind::Int128
+    }
+
+    /// Returns whether this type is an unsigned integer type.
+    pub fn is_unsigned_integer(&self) -> bool {
+        self.raw.kind >= ffi::CXTypeKind::Bool && self.raw.kind <= ffi::CXTypeKind::UInt128
+    }
 }
 
 impl<'tu> cmp::Eq for Type<'tu> { }
