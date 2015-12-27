@@ -18,13 +18,9 @@
 
 ## [0.3.0] - UNRELEASED
 
-### Changed
-- Replaced `sonar::Enum::get_constants` method
-
 ### Added
 - Added implementations of `From` to `String` for error enums
 - Added integer categorization methods to `Type` struct
-- Added union finding to `sonar` module
 
 ### Removed
-- Removed `get_mapped_source_files` method in `CompileCommand` struct
+- Moved `sonar` module functionality into separate crate (`sonar`)
