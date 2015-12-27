@@ -24,6 +24,7 @@
 ### Added
 - Added implementations of `From` to `String` for error enums
 - Added integer categorization methods to `Type` struct
+- Added union finding to `sonar` module
 
 ### Removed
 - Removed `get_mapped_source_files` method in `CompileCommand` struct
