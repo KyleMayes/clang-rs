@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use clang::*;
 
-use libc::{c_int};
+use libc::{c_double, c_int};
 
 use uuid::{Uuid};
 
@@ -1147,6 +1147,12 @@ fn test() {
         enum A { AA, AB, AC };
         typedef enum { BA, BB, BC } B;
         typedef enum C { CA, CB, CC } C;
+        struct D { int d; };
+        typedef struct { int e; } E;
+        typedef struct F { int f; } F;
+        union G { int a; float b; double c; };
+        typedef union { int a; float b; double c; } H;
+        typedef union I { int a; float b; double c; } I;
     ";
 
     with_translation_unit(&clang, "test.c", source, &[], |_, _, tu| {
@@ -1167,31 +1173,50 @@ fn test() {
         assert_eq!(enums[2].get_constants(), &[
             ("CA".into(), 0, 0), ("CB".into(), 1, 1), ("CC".into(), 2, 2)
         ]);
-    });
 
-    let source = "
-        struct A { int a; };
-        typedef struct { int b; } B;
-        typedef struct C { int c; } C;
-    ";
-
-    with_translation_unit(&clang, "test.c", source, &[], |_, _, tu| {
         let structs = sonar::find_structs(&tu);
         assert_eq!(structs.len(), 3);
 
-        assert_eq!(structs[0].get_name(), "A");
+        assert_eq!(structs[0].get_name(), "D");
 
         assert_eq!(structs[0].get_fields().len(), 1);
-        assert_eq!(structs[0].get_fields()[0].get_name(), Some("a".into()));
+        assert_eq!(structs[0].get_fields()[0].get_name(), Some("d".into()));
 
-        assert_eq!(structs[1].get_name(), "B");
+        assert_eq!(structs[1].get_name(), "E");
 
         assert_eq!(structs[1].get_fields().len(), 1);
-        assert_eq!(structs[1].get_fields()[0].get_name(), Some("b".into()));
+        assert_eq!(structs[1].get_fields()[0].get_name(), Some("e".into()));
 
-        assert_eq!(structs[2].get_name(), "C");
+        assert_eq!(structs[2].get_name(), "F");
 
         assert_eq!(structs[2].get_fields().len(), 1);
-        assert_eq!(structs[2].get_fields()[0].get_name(), Some("c".into()));
+        assert_eq!(structs[2].get_fields()[0].get_name(), Some("f".into()));
+
+        let unions = sonar::find_unions(&tu);
+        assert_eq!(unions.len(), 3);
+
+        assert_eq!(unions[0].get_name(), "G");
+        assert_eq!(unions[0].get_size(), mem::size_of::<c_double>());
+
+        assert_eq!(unions[0].get_fields().len(), 3);
+        assert_eq!(unions[0].get_fields()[0].get_name(), Some("a".into()));
+        assert_eq!(unions[0].get_fields()[1].get_name(), Some("b".into()));
+        assert_eq!(unions[0].get_fields()[2].get_name(), Some("c".into()));
+
+        assert_eq!(unions[1].get_name(), "H");
+        assert_eq!(unions[1].get_size(), mem::size_of::<c_double>());
+
+        assert_eq!(unions[1].get_fields().len(), 3);
+        assert_eq!(unions[1].get_fields()[0].get_name(), Some("a".into()));
+        assert_eq!(unions[1].get_fields()[1].get_name(), Some("b".into()));
+        assert_eq!(unions[1].get_fields()[2].get_name(), Some("c".into()));
+
+        assert_eq!(unions[2].get_name(), "I");
+        assert_eq!(unions[2].get_size(), mem::size_of::<c_double>());
+
+        assert_eq!(unions[2].get_fields().len(), 3);
+        assert_eq!(unions[2].get_fields()[0].get_name(), Some("a".into()));
+        assert_eq!(unions[2].get_fields()[1].get_name(), Some("b".into()));
+        assert_eq!(unions[2].get_fields()[2].get_name(), Some("c".into()));
     });
 }

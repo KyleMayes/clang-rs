@@ -16,7 +16,7 @@
 ### Added
 - Added `sonar` module for finding declarations in C translation units
 
-## [0.2.3] - UNRELEASED
+## [0.3.0] - UNRELEASED
 
 ### Changed
 - Changed `sonar::Enum::get_constants` method return type

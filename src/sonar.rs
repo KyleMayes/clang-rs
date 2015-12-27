@@ -95,6 +95,54 @@ impl<'tu> Struct<'tu> {
     }
 }
 
+// Union _________________________________________
+
+/// A union declaration.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Union<'tu> {
+    name: String,
+    entity: Entity<'tu>,
+    fields: Vec<Entity<'tu>>,
+}
+
+impl<'tu> Union<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(name: String, entity: Entity<'tu>) -> Union<'tu> {
+        let fields = entity.get_children().into_iter().filter_map(|e| {
+            if e.get_kind() == EntityKind::FieldDecl {
+                Some(e)
+            } else {
+                None
+            }
+        }).collect();
+
+        Union { name: name, entity: entity, fields: fields }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Returns the AST entity for this union.
+    pub fn get_entity(&self) -> Entity<'tu> {
+        self.entity
+    }
+
+    /// Returns the fields in this union.
+    pub fn get_fields(&self) -> &Vec<Entity<'tu>> {
+        &self.fields
+    }
+
+    /// Returns the name of this union.
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    /// Returns the size of this union in bytes.
+    pub fn get_size(&self) -> usize {
+        self.entity.get_type().unwrap().get_sizeof().unwrap()
+    }
+}
+
 //================================================
 // Functions
 //================================================
@@ -138,7 +186,6 @@ pub fn find_functions<'tu>(tu: &'tu TranslationUnit<'tu>) -> Vec<Entity<'tu>> {
     }).collect()
 }
 
-
 /// Returns the structs in the supplied C translation unit.
 pub fn find_structs<'tu>(tu: &'tu TranslationUnit<'tu>) -> Vec<Struct<'tu>> {
     let mut seen = HashSet::new();
@@ -157,9 +204,9 @@ pub fn find_structs<'tu>(tu: &'tu TranslationUnit<'tu>) -> Vec<Struct<'tu>> {
             },
             EntityKind::TypedefDecl => {
                 let name = e.get_name().unwrap();
-                let type_ = e.get_typedef_underlying_type().unwrap().get_canonical_type();
+                let type_ = e.get_typedef_underlying_type().unwrap();
 
-                if type_.get_kind() == TypeKind::Record && !seen.contains(&name) {
+                if type_.get_display_name().contains("struct ") && !seen.contains(&name) {
                     seen.insert(name.clone());
                     Some(Struct::new(name, type_.get_declaration().unwrap()))
                 } else {
@@ -175,5 +222,37 @@ pub fn find_structs<'tu>(tu: &'tu TranslationUnit<'tu>) -> Vec<Struct<'tu>> {
 pub fn find_typedefs<'tu>(tu: &'tu TranslationUnit<'tu>) -> Vec<Entity<'tu>> {
     tu.get_entity().get_children().into_iter().filter(|e| {
         e.get_kind() == EntityKind::TypedefDecl
+    }).collect()
+}
+
+/// Returns the unions in the supplied C translation unit.
+pub fn find_unions<'tu>(tu: &'tu TranslationUnit<'tu>) -> Vec<Union<'tu>> {
+    let mut seen = HashSet::new();
+
+    tu.get_entity().get_children().into_iter().filter_map(|e| {
+        match e.get_kind() {
+            EntityKind::UnionDecl => {
+                e.get_name().and_then(|n| {
+                    if !seen.contains(&n) {
+                        seen.insert(n.clone());
+                        Some(Union::new(n, e))
+                    } else {
+                        None
+                    }
+                })
+            },
+            EntityKind::TypedefDecl => {
+                let name = e.get_name().unwrap();
+                let type_ = e.get_typedef_underlying_type().unwrap();
+
+                if type_.get_display_name().contains("union ") && !seen.contains(&name) {
+                    seen.insert(name.clone());
+                    Some(Union::new(name, type_.get_declaration().unwrap()))
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        }
     }).collect()
 }
