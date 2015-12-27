@@ -1145,8 +1145,8 @@ fn test() {
 
     let source = "
         enum A { AA, AB, AC };
-        typedef enum { BA, BB, BC } B;
-        typedef enum C { CA, CB, CC } C;
+        typedef enum { BA = -1, BB = -2, BC = -3 } B;
+        typedef enum C { CA = 1, CB = 2, CC = 3 } C;
         struct D { int d; };
         typedef struct { int e; } E;
         typedef struct F { int f; } F;
@@ -1160,18 +1160,21 @@ fn test() {
         assert_eq!(enums.len(), 3);
 
         assert_eq!(enums[0].get_name(), "A");
-        assert_eq!(enums[0].get_constants(), &[
-            ("AA".into(), 0, 0), ("AB".into(), 1, 1), ("AC".into(), 2, 2)
+        assert!(!enums[0].is_signed());
+        assert_eq!(enums[0].get_unsigned_constants(), &[
+            ("AA".into(), 0), ("AB".into(), 1), ("AC".into(), 2)
         ]);
 
         assert_eq!(enums[1].get_name(), "B");
-        assert_eq!(enums[1].get_constants(), &[
-            ("BA".into(), 0, 0), ("BB".into(), 1, 1), ("BC".into(), 2, 2)
+        assert!(enums[1].is_signed());
+        assert_eq!(enums[1].get_signed_constants(), &[
+            ("BA".into(), -1), ("BB".into(), -2), ("BC".into(), -3)
         ]);
 
         assert_eq!(enums[2].get_name(), "C");
-        assert_eq!(enums[2].get_constants(), &[
-            ("CA".into(), 0, 0), ("CB".into(), 1, 1), ("CC".into(), 2, 2)
+        assert!(!enums[2].is_signed());
+        assert_eq!(enums[2].get_unsigned_constants(), &[
+            ("CA".into(), 1), ("CB".into(), 2), ("CC".into(), 3)
         ]);
 
         let structs = sonar::find_structs(&tu);

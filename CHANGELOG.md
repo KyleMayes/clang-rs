@@ -19,7 +19,7 @@
 ## [0.3.0] - UNRELEASED
 
 ### Changed
-- Changed `sonar::Enum::get_constants` method return type
+- Replaced `sonar::Enum::get_constants` method
 
 ### Added
 - Added implementations of `From` to `String` for error enums

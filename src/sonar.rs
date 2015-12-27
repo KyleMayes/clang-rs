@@ -36,11 +36,6 @@ impl<'tu> Enum<'tu> {
 
     //- Accessors --------------------------------
 
-    /// Returns the enum constants in this enum.
-    pub fn get_constants(&self) -> &Vec<(String, i64, u64)> {
-        &self.constants
-    }
-
     /// Returns the AST entity for this enum.
     pub fn get_entity(&self) -> Entity<'tu> {
         self.entity
@@ -49,6 +44,21 @@ impl<'tu> Enum<'tu> {
     /// Returns the name of this enum.
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    /// Returns the enum constants in this enum as signed integers .
+    pub fn get_signed_constants(&self) -> Vec<(String, i64)> {
+        self.constants.iter().map(|&(ref n, s, _)| (n.clone(), s)).collect()
+    }
+
+    /// Returns the enum constants in this enum as unsigned integers .
+    pub fn get_unsigned_constants(&self) -> Vec<(String, u64)> {
+        self.constants.iter().map(|&(ref n, _, u)| (n.clone(), u)).collect()
+    }
+
+    /// Returns whether the underlying type of this enum is signed.
+    pub fn is_signed(&self) -> bool {
+        self.entity.get_enum_underlying_type().unwrap().is_signed_integer()
     }
 }
 
