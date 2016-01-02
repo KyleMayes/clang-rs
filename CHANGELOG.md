@@ -23,4 +23,4 @@
 - Added integer categorization methods to `Type` struct
 
 ### Removed
-- Moved `sonar` module functionality into separate crate (`sonar`)
+- Removed `sonar` module
