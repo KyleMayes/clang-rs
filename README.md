@@ -8,8 +8,6 @@ An idiomatic Rust wrapper for libclang.
 
 Supported on the stable, beta, and nightly Rust channels.
 
-**Warning:** the API of this library is subject to change.
-
 Released under the MIT license.
 
 ### Dependencies
