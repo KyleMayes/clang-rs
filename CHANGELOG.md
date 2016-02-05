@@ -25,7 +25,7 @@
 ### Removed
 - Removed `sonar` module
 
-## [0.3.1] - UNRELEASED
+## [0.3.1] - 2016-2-5
 
 ### Changed
 - Bumped `clang-sys` version
