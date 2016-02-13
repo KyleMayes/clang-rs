@@ -979,13 +979,11 @@ fn test() {
     let source = "
         int integer = 322;
         void a() { }
-        __attribute__((vectorcall)) void b() { }
     ";
 
     with_types(&clang, source, |ts| {
         assert_eq!(ts[0].get_calling_convention(), None);
         assert_eq!(ts[1].get_calling_convention(), Some(CallingConvention::Cdecl));
-        assert_eq!(ts[2].get_calling_convention(), Some(CallingConvention::Vectorcall));
     });
 
     let source = "

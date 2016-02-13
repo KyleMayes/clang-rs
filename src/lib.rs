@@ -285,6 +285,7 @@ pub enum CallingConvention {
     /// The function type uses the x86 `thiscall` calling convention.
     Thiscall = 4,
     /// The function type uses the x86 `vectorcall` calling convention.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     Vectorcall = 12,
     /// The function type uses the ARM AACPS calling convention.
     Aapcs = 6,
@@ -685,22 +686,31 @@ pub enum EntityKind {
     /// An OpenMP flush directive.
     OmpFlushDirective = 246,
     /// An OpenMP ordered directive.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     OmpOrderedDirective = 248,
     /// An OpenMP atomic directive.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     OmpAtomicDirective = 249,
     /// An OpenMP for SIMD directive.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     OmpForSimdDirective = 250,
     /// An OpenMP parallel for SIMD directive.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     OmpParallelForSimdDirective = 251,
     /// An OpenMP target directive.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     OmpTargetDirective = 252,
     /// An OpenMP teams directive.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     OmpTeamsDirective = 253,
     /// An OpenMP taskgroup directive.
+    #[cfg(feature="clang_3_7")]
     OmpTaskgroupDirective = 254,
     /// An OpenMP cancellation point directive.
+    #[cfg(feature="clang_3_7")]
     OmpCancellationPointDirective = 255,
     /// An OpenMP cancel directive.
+    #[cfg(feature="clang_3_7")]
     OmpCancelDirective = 256,
     /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
@@ -738,6 +748,7 @@ pub enum EntityKind {
     /// A CUDA host attribute.
     CudaHostAttr = 415,
     /// A CUDA shared attribute.
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
     CudaSharedAttr = 416,
     /// A preprocessing directive.
     PreprocessingDirective = 500,
@@ -750,6 +761,7 @@ pub enum EntityKind {
     /// A module import declaration.
     ModuleImportDecl = 600,
     /// A single overload in a set of overloads.
+    #[cfg(feature="clang_3_7")]
     OverloadCandidate = 700,
 }
 
