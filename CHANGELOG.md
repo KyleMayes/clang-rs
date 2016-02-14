@@ -34,3 +34,6 @@
 
 ### Fixed
 - Added missing `cfg`s on enum variants
+
+### Added
+- Added support for `clang` 3.8.x

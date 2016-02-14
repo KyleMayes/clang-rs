@@ -112,17 +112,27 @@ fn test() {
     with_temporary_file("compile_commands.json", source, |d, _| {
         #[cfg(not(target_os="windows"))]
         fn test_compilation_database(cd: CompilationDatabase) {
+            #[cfg(version="clang_3_8")]
+            fn test_get_file<F: AsRef<Path>>(cc: &CompileCommand, file: F) {
+                //assert_eq!(cc.get_file(), file);
+            }
+
+            #[cfg(not(version="clang_3_8"))]
+            fn test_get_file<F: AsRef<Path>>(_: &CompileCommand, _: F) { }
+
             assert_eq!(cd.get_all_commands().len(), 2);
 
             let commands = cd.get_commands("/tmp/div0.c");
             assert_eq!(commands.len(), 1);
 
             assert_eq!(commands[0].get_arguments(), &["cc", "div0.c"]);
+            test_get_file(&commands[0], "div0.c");
 
             let commands = cd.get_commands("/tmp/div1.c");
             assert_eq!(commands.len(), 1);
 
             assert_eq!(commands[0].get_arguments(), &["cc", "-DFOO", "div1.c"]);
+            test_get_file(&commands[0], "div1.c");
         }
 
         #[cfg(target_os="windows")]
@@ -358,7 +368,7 @@ fn test() {
             assert_eq!(entity.get_mangled_name(), None);
 
             let children = entity.get_children();
-            assert_eq!(children[0].get_mangled_name(), Some("_Z1a".into()));
+            assert_eq!(children[0].get_mangled_name(), Some("a".into()));
         }
 
         #[cfg(not(any(feature="clang_3_6", feature="clang_3_7")))]
@@ -587,6 +597,35 @@ fn test() {
     });
 
     let source = "
+        class A {
+            A() { }
+            ~A() { }
+            void a() { }
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_3_8")]
+        fn test_get_mangled_names<'tu>(children: &[Entity<'tu>]) {
+            assert_eq!(children[0].get_mangled_names(), Some(vec![
+                "_ZN1AC2Ev".into(), "_ZN1AC1Ev".into()
+            ]));
+            assert_eq!(children[1].get_mangled_names(), Some(vec![
+                "_ZN1AD2Ev".into(), "_ZN1AD1Ev".into()
+            ]));
+            assert_eq!(children[2].get_mangled_names(), None);
+        }
+
+        #[cfg(not(feature="clang_3_8"))]
+        fn test_get_mangled_names<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 3);
+
+        test_get_mangled_names(&children);
+    });
+
+    let source = "
         void a() { }
         static void b() { }
     ";
@@ -704,6 +743,27 @@ fn test() {
         assert_eq!(children[1].get_typedef_underlying_type(), Some(children[0].get_type().unwrap()));
     });
 
+    let source = r#"
+        class A { };
+        class __attribute__((visibility("hidden"))) B { };
+    "#;
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_3_8")]
+        fn test_get_visibility<'tu>(children: &[Entity<'tu>]) {
+            assert_eq!(children[0].get_visibility(), Some(Visibility::Default));
+            assert_eq!(children[1].get_visibility(), Some(Visibility::Hidden));
+        }
+
+        #[cfg(not(feature="clang_3_8"))]
+        fn test_get_visibility<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        test_get_visibility(&children);
+    });
+
     let source = "
         class Class {
             void a() const { }
@@ -751,6 +811,29 @@ fn test() {
 
         assert!(!children[1].is_dynamic_call());
         assert!(children[2].is_dynamic_call());
+    });
+
+    let source = "
+        class A {
+            int a;
+            mutable int b;
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_3_8")]
+        fn test_is_mutable<'tu>(children: &[Entity<'tu>]) {
+            assert!(!children[0].is_mutable());
+            assert!(children[1].is_mutable());
+        }
+
+        #[cfg(not(feature="clang_3_8"))]
+        fn test_is_mutable<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 2);
+
+        test_is_mutable(&children);
     });
 
     let source = "

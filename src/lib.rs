@@ -5,6 +5,7 @@
 //! * 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
 //! * 3.6.x - [Documentation](https://kylemayes.github.io/clang-rs/3_6/clang)
 //! * 3.7.x - [Documentation](https://kylemayes.github.io/clang-rs/3_7/clang)
+//! * 3.8.x - [Documentation](https://kylemayes.github.io/clang-rs/3_8/clang)
 //!
 //! The documentation for the non-version specific API is
 //! [here](https://kylemayes.github.io/clang-rs/all/clang).
@@ -36,6 +37,8 @@ use std::sync::atomic::{self, AtomicBool};
 use clang_sys as ffi;
 
 use libc::{c_int, c_uint, c_ulong, time_t};
+
+pub use detail::*;
 
 //================================================
 // Macros
@@ -81,17 +84,43 @@ macro_rules! options {
             $($(#[$fattribute])* pub $option: bool), +,
         }
 
-        impl From<ffi::$underlying> for $name {
-            fn from(flags: ffi::$underlying) -> $name {
-                $name { $($option: flags.contains(ffi::$flag)), + }
+        impl From<::clang_sys::$underlying> for $name {
+            fn from(flags: ::clang_sys::$underlying) -> $name {
+                $name { $($option: flags.contains(::clang_sys::$flag)), + }
             }
         }
 
-        impl Into<ffi::$underlying> for $name {
-            fn into(self) -> ffi::$underlying {
-                let mut flags = ffi::$underlying::empty();
-                $(if self.$option { flags.insert(ffi::$flag); })+
+        impl Into<::clang_sys::$underlying> for $name {
+            fn into(self) -> ::clang_sys::$underlying {
+                let mut flags = ::clang_sys::$underlying::empty();
+                $(if self.$option { flags.insert(::clang_sys::$flag); })+
                 flags
+            }
+        }
+    );
+
+    ($(#[$attribute:meta])* options $name:ident: $underlying:ident {
+        $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
+        CONDITIONAL: #[$condition:meta] $($(#[$cfattribute:meta])* pub $coption:ident: $cflag:ident), +,
+    }) => (
+        #[cfg(not($condition))]
+        mod detail {
+            options! {
+                $(#[$attribute])*
+                options $name: $underlying {
+                    $($(#[$fattribute])* pub $option: $flag), +,
+                }
+            }
+        }
+
+        #[cfg($condition)]
+        mod detail {
+            options! {
+                $(#[$attribute])*
+                options $name: $underlying {
+                    $($(#[$fattribute])* pub $option: $flag), +,
+                    $($(#[$cfattribute])* pub $coption: $cflag), +,
+                }
             }
         }
     );
@@ -285,7 +314,7 @@ pub enum CallingConvention {
     /// The function type uses the x86 `thiscall` calling convention.
     Thiscall = 4,
     /// The function type uses the x86 `vectorcall` calling convention.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     Vectorcall = 12,
     /// The function type uses the ARM AACPS calling convention.
     Aapcs = 6,
@@ -589,6 +618,9 @@ pub enum EntityKind {
     ObjCBoolLiteralExpr = 145,
     /// An Objective-C `self` expression.
     ObjCSelfExpr = 146,
+    /// An OpenMP array section expression.
+    #[cfg(feature="clang_3_8")]
+    OMPArraySectionExpr = 147,
     /// A statement whose specific kind is not exposed via this interface.
     UnexposedStmt = 200,
     /// A labelled statement in a function.
@@ -686,32 +718,44 @@ pub enum EntityKind {
     /// An OpenMP flush directive.
     OmpFlushDirective = 246,
     /// An OpenMP ordered directive.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     OmpOrderedDirective = 248,
     /// An OpenMP atomic directive.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     OmpAtomicDirective = 249,
     /// An OpenMP for SIMD directive.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     OmpForSimdDirective = 250,
     /// An OpenMP parallel for SIMD directive.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     OmpParallelForSimdDirective = 251,
     /// An OpenMP target directive.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     OmpTargetDirective = 252,
     /// An OpenMP teams directive.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     OmpTeamsDirective = 253,
     /// An OpenMP taskgroup directive.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(any(feature="clang_3_7", feature="clang_3_8"))]
     OmpTaskgroupDirective = 254,
     /// An OpenMP cancellation point directive.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(any(feature="clang_3_7", feature="clang_3_8"))]
     OmpCancellationPointDirective = 255,
     /// An OpenMP cancel directive.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(any(feature="clang_3_7", feature="clang_3_8"))]
     OmpCancelDirective = 256,
+    /// An OpenMP target data directive.
+    #[cfg(feature="clang_3_8")]
+    OmpTargetDataDirective = 257,
+    /// An OpenMP task loop directive.
+    #[cfg(feature="clang_3_8")]
+    OmpTaskLoopDirective = 258,
+    /// An OpenMP task loop SIMD directive.
+    #[cfg(feature="clang_3_8")]
+    OmpTaskLoopSimdDirective = 259,
+    /// An OpenMP distribute directive.
+    #[cfg(feature="clang_3_8")]
+    OmpDistributeDirective = 260,
     /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
     /// An attribute whose specific kind is not exposed via this interface.
@@ -748,8 +792,17 @@ pub enum EntityKind {
     /// A CUDA host attribute.
     CudaHostAttr = 415,
     /// A CUDA shared attribute.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     CudaSharedAttr = 416,
+    /// A linker visibility attribute.
+    #[cfg(feature="clang_3_8")]
+    VisibilityAttr = 417,
+    /// A MSVC DLL export attribute.
+    #[cfg(feature="clang_3_8")]
+    DllExport = 418,
+    /// A MSVC DLL import attribute.
+    #[cfg(feature="clang_3_8")]
+    DllImport = 419,
     /// A preprocessing directive.
     PreprocessingDirective = 500,
     /// A macro definition.
@@ -760,8 +813,11 @@ pub enum EntityKind {
     InclusionDirective = 503,
     /// A module import declaration.
     ModuleImportDecl = 600,
+    /// A C++11 alias template declaration (e.g., `template <typename T> using M = std::map<T, T>`).
+    #[cfg(feature="clang_3_8")]
+    TypeAliasTemplateDecl = 601,
     /// A single overload in a set of overloads.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(any(feature="clang_3_7", feature="clang_3_8"))]
     OverloadCandidate = 700,
 }
 
@@ -798,11 +854,11 @@ pub enum FixIt<'tu> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Language {
-    /// The entity uses the C programming language.
+    /// The declaration uses the C programming language.
     C = 1,
-    /// The entity uses the C++ programming language.
+    /// The declaration uses the C++ programming language.
     Cpp = 3,
-    /// The entity uses the Objective-C programming language.
+    /// The declaration uses the Objective-C programming language.
     ObjectiveC = 2,
 }
 
@@ -988,7 +1044,7 @@ impl From<SourceError> for String {
 // StorageClass __________________________________
 
 /// Indicates the storage class of a declaration.
-#[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+#[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum StorageClass {
@@ -1014,7 +1070,7 @@ pub enum StorageClass {
 // TemplateArgument ______________________________
 
 /// An argument to a template function specialization.
-#[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+#[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TemplateArgument<'tu> {
     /// A declaration for a pointer, reference, or member pointer non-type template parameter.
@@ -1155,6 +1211,24 @@ pub enum TypeKind {
     VariableArray = 115,
     /// A GCC generic vector type.
     Vector = 113,
+    /// A C++11 `decltype(auto)` type.
+    #[cfg(feature="clang_3_8")]
+    Auto = 118,
+}
+
+// Visibility ____________________________________
+
+/// Indicates the linker visibility of an AST element.
+#[cfg(feature="clang_3_8")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum Visibility {
+    /// The AST element can be seen by the linker.
+    Default = 3,
+    /// The AST element cannot be seen by the linker.
+    Hidden = 1,
+    /// The AST element can be seen by the linker but resolves to a symbol inside this object.
+    Protected = 2,
 }
 
 //================================================
@@ -1314,6 +1388,12 @@ impl<'d> CompileCommand<'d> {
         ).map(to_string).collect()
     }
 
+    /// Returns the file of this compile command.
+    #[cfg(feature="clang_3_8")]
+    pub fn get_file(&self) -> PathBuf {
+        unsafe { to_string(ffi::clang_CompileCommand_getFilename(self.ptr)).into() }
+    }
+
     /// Returns the working directory of this compile command.
     pub fn get_working_directory(&self) -> PathBuf {
         unsafe { to_string(ffi::clang_CompileCommand_getDirectory(self.ptr)).into() }
@@ -1325,6 +1405,7 @@ impl<'c> fmt::Debug for CompileCommand<'c> {
         formatter.debug_struct("CompileCommand")
             .field("working_directory", &self.get_working_directory())
             .field("arguments", &self.get_arguments())
+            //.field("file", &self.get_file())
             .finish()
     }
 }
@@ -1973,9 +2054,23 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the mangled name of this AST entity, if any.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     pub fn get_mangled_name(&self) -> Option<String> {
         unsafe { to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
+    }
+
+    /// Returns the mangled names of this C++ constructor or destructor, if applicable.
+    #[cfg(feature="clang_3_8")]
+    pub fn get_mangled_names(&self) -> Option<Vec<String>> {
+        unsafe {
+            let set = ffi::clang_Cursor_getCXXManglings(self.raw);
+
+            if !set.is_null() && (*set).Count != 0 {
+                Some(to_string_set(set))
+            } else {
+                None
+            }
+        }
     }
 
     /// Returns the module imported by this module import declaration, if applicable.
@@ -2146,7 +2241,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the storage class of this declaration, if applicable.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     pub fn get_storage_class(&self) -> Option<StorageClass> {
         unsafe {
             match ffi::clang_Cursor_getStorageClass(self.raw) {
@@ -2164,7 +2259,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the template arguments for this template function specialization, if applicable.
-    #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+    #[cfg(any(feature="clang_3_6", feature="clang_3_7", feature="clang_3_8"))]
     pub fn get_template_arguments(&self) -> Option<Vec<TemplateArgument<'tu>>> {
         let get_type = &ffi::clang_Cursor_getTemplateArgumentType;
         let get_signed = &ffi::clang_Cursor_getTemplateArgumentValue;
@@ -2232,8 +2327,19 @@ impl<'tu> Entity<'tu> {
         unsafe { to_string_option(ffi::clang_getCursorUSR(self.raw)).map(Usr) }
     }
 
+    /// Returns the linker visibility for this AST entity, if any.
+    #[cfg(feature="clang_3_8")]
+    pub fn get_visibility(&self) -> Option<Visibility> {
+        unsafe {
+            match ffi::clang_getCursorVisibility(self.raw) {
+                ffi::CXVisibilityKind::Invalid => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
     /// Returns whether this AST entity is an anonymous record declaration.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(any(feature="clang_3_7", feature="clang_3_8"))]
     pub fn is_anonymous(&self) -> bool {
         unsafe { ffi::clang_Cursor_isAnonymous(self.raw) != 0 }
     }
@@ -2260,6 +2366,12 @@ impl<'tu> Entity<'tu> {
     /// receiver is an object instance, not `super` or a specific class.
     pub fn is_dynamic_call(&self) -> bool {
         unsafe { ffi::clang_Cursor_isDynamicCall(self.raw) != 0 }
+    }
+
+    #[cfg(feature="clang_3_8")]
+    /// Returns whether this AST entity is a mutable field in a C++ struct or class.
+    pub fn is_mutable(&self) -> bool {
+        unsafe { ffi::clang_CXXField_isMutable(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an Objective-C method or property declaration with the
@@ -2783,6 +2895,13 @@ options! {
         pub incomplete: CXTranslationUnit_Incomplete,
         /// Indicates whether function and method bodies will be skipped.
         pub skipped_function_bodies: CXTranslationUnit_SkipFunctionBodies,
+    CONDITIONAL: #[feature="clang_3_8"]
+        /// Indicates whether the precompiled preamble should be created on the first parse.
+        ///
+        /// By default, the precompiled preamble is created on the first reparse, so this option
+        /// increases the time it takes to parse code the first time but decreases the time it takes
+        /// to reparse that code for the first time.
+        pub preamble_on_first_parse: CXTranslationUnit_CreatePreambleOnFirstParse,
     }
 }
 
@@ -3358,7 +3477,7 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns the fields in this record type, if applicable.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(any(feature="clang_3_7", feature="clang_3_8"))]
     pub fn get_fields(&self) -> Option<Vec<Entity<'tu>>> {
         if self.get_kind() == TypeKind::Record {
             let mut fields = vec![];
@@ -3484,7 +3603,7 @@ impl<'tu> Type<'tu> {
     /// Visits the fields in this record type, returning `None` if this type is not a record type
     /// and returning `Some(b)` otherwise where `b` indicates whether visitation was ended by the
     /// callback returning `false`.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(any(feature="clang_3_7", feature="clang_3_8"))]
     pub fn visit_fields<F: FnMut(Entity<'tu>) -> bool>(&self, f: F) -> Option<bool> {
         if self.get_kind() != TypeKind::Record {
             return None;
@@ -3691,6 +3810,21 @@ fn to_string(clang: ffi::CXString) -> String {
         let c = std::ffi::CStr::from_ptr(ffi::clang_getCString(clang));
         let rust = c.to_str().expect("invalid Rust string").into();
         ffi::clang_disposeString(clang);
+        rust
+    }
+}
+
+#[cfg(feature="clang_3_8")]
+fn to_string_set(clang: *mut ffi::CXStringSet) -> Vec<String> {
+    unsafe {
+        let c = slice::from_raw_parts((*clang).Strings, (*clang).Count as usize);
+
+        let rust = c.iter().map(|c| {
+            let c = std::ffi::CStr::from_ptr(ffi::clang_getCString(*c));
+            c.to_str().expect("invalid Rust string").into()
+        }).collect();
+
+        ffi::clang_disposeStringSet(clang);
         rust
     }
 }

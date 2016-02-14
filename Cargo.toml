@@ -18,6 +18,7 @@ repository = "https://github.com/KyleMayes/clang-rs"
 clang_3_5 = ["clang-sys/clang_3_5"]
 clang_3_6 = ["clang-sys/clang_3_6"]
 clang_3_7 = ["clang-sys/clang_3_7"]
+clang_3_8 = ["clang-sys/clang_3_8"]
 
 [dependencies]
 
