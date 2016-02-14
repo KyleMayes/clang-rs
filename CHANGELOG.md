@@ -37,3 +37,6 @@
 
 ### Added
 - Added support for `clang` 3.8.x
+
+### Changed
+- Bumped `clang-sys` version
