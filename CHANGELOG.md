@@ -30,7 +30,7 @@
 ### Changed
 - Bumped `clang-sys` version
 
-## [0.4.0] - UNRELEASED
+## [0.4.0] - 2016-2-13
 
 ### Fixed
 - Added missing `cfg`s on enum variants
