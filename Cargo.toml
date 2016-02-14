@@ -24,7 +24,7 @@ clang_3_8 = ["clang-sys/clang_3_8"]
 
 clang-sys = "0.2.1"
 lazy_static = "0.1.15"
-libc = "0.2.4"
+libc = "0.2.7"
 
 [dependencies.clippy]
 

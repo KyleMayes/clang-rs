@@ -40,3 +40,4 @@
 
 ### Changed
 - Bumped `clang-sys` version
+- Bumped `libc` version
