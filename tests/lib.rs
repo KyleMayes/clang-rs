@@ -1,18 +1,19 @@
+#[macro_use]
+extern crate lazy_static;
+
 extern crate clang;
 extern crate libc;
-extern crate uuid;
 
 use std::env;
 use std::fs;
 use std::mem;
 use std::io::{Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use clang::*;
 
 use libc::{c_int};
-
-use uuid::{Uuid};
 
 //================================================
 // Macros
@@ -45,8 +46,12 @@ fn with_file<'c, F: FnOnce(&Path, File)>(clang: &'c Clang, contents: &str, f: F)
     });
 }
 
+lazy_static! { static ref COUNTER: AtomicUsize = AtomicUsize::new(0); }
+
 fn with_temporary_directory<F: FnOnce(&Path)>(f: F) {
-    let directory = env::temp_dir().join(Uuid::new_v4().to_simple_string());
+    let mut exe = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().into_owned();
+    exe.push_str(&COUNTER.fetch_add(1, Ordering::SeqCst).to_string());
+    let directory = env::temp_dir().join(exe);
     fs::create_dir(&directory).unwrap();
     f(&directory);
     fs::remove_dir_all(&directory).unwrap();
