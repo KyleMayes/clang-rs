@@ -49,12 +49,20 @@ fn with_file<'c, F: FnOnce(&Path, File)>(clang: &'c Clang, contents: &str, f: F)
 lazy_static! { static ref COUNTER: AtomicUsize = AtomicUsize::new(0); }
 
 fn with_temporary_directory<F: FnOnce(&Path)>(f: F) {
-    let mut exe = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().into_owned();
-    exe.push_str(&COUNTER.fetch_add(1, Ordering::SeqCst).to_string());
-    let directory = env::temp_dir().join(exe);
-    fs::create_dir(&directory).unwrap();
-    f(&directory);
-    fs::remove_dir_all(&directory).unwrap();
+    let exe = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().into_owned();
+    let mut path;
+
+    loop {
+        path = env::temp_dir().join(format!("{}{}", exe, COUNTER.fetch_add(1, Ordering::SeqCst)));
+
+        if !path.exists() {
+            break;
+        }
+    }
+
+    fs::create_dir(&path).unwrap();
+    f(&path);
+    fs::remove_dir_all(&path).unwrap();
 }
 
 fn with_temporary_file<F: FnOnce(&Path, &Path)>(name: &str, contents: &str, f: F) {
@@ -117,12 +125,12 @@ fn test() {
     with_temporary_file("compile_commands.json", source, |d, _| {
         #[cfg(not(target_os="windows"))]
         fn test_compilation_database(cd: CompilationDatabase) {
-            #[cfg(version="clang_3_8")]
+            #[cfg(feature="gte_clang_3_8")]
             fn test_get_file<F: AsRef<Path>>(cc: &CompileCommand, file: F) {
-                //assert_eq!(cc.get_file(), file);
+                assert_eq!(cc.get_file(), file.as_ref());
             }
 
-            #[cfg(not(version="clang_3_8"))]
+            #[cfg(not(feature="gte_clang_3_8"))]
             fn test_get_file<F: AsRef<Path>>(_: &CompileCommand, _: F) { }
 
             assert_eq!(cd.get_all_commands().len(), 2);
@@ -131,13 +139,13 @@ fn test() {
             assert_eq!(commands.len(), 1);
 
             assert_eq!(commands[0].get_arguments(), &["cc", "div0.c"]);
-            test_get_file(&commands[0], "div0.c");
+            test_get_file(&commands[0], "/tmp/div0.c");
 
             let commands = cd.get_commands("/tmp/div1.c");
             assert_eq!(commands.len(), 1);
 
             assert_eq!(commands[0].get_arguments(), &["cc", "-DFOO", "div1.c"]);
-            test_get_file(&commands[0], "div1.c");
+            test_get_file(&commands[0], "/tmp/div1.c");
         }
 
         #[cfg(target_os="windows")]
@@ -368,7 +376,7 @@ fn test() {
     // Entity ____________________________________
 
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
-        #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+        #[cfg(feature="gte_clang_3_6")]
         fn test_get_mangled_name<'tu>(entity: Entity<'tu>) {
             assert_eq!(entity.get_mangled_name(), None);
 
@@ -376,7 +384,7 @@ fn test() {
             assert_eq!(children[0].get_mangled_name(), Some("a".into()));
         }
 
-        #[cfg(not(any(feature="clang_3_6", feature="clang_3_7")))]
+        #[cfg(not(feature="gte_clang_3_6"))]
         fn test_get_mangled_name<'tu>(_: Entity<'tu>) { }
 
         let file = tu.get_file(f).unwrap();
@@ -469,7 +477,7 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
-        #[cfg(feature="clang_3_7")]
+        #[cfg(feature="gte_clang_3_7")]
         fn test_is_anonymous<'tu>(children: &[Entity<'tu>]) {
             assert!(!children[0].is_anonymous());
 
@@ -478,7 +486,7 @@ fn test() {
             assert!(!children[1].is_anonymous());
         }
 
-        #[cfg(not(feature="clang_3_7"))]
+        #[cfg(not(feature="gte_clang_3_7"))]
         fn test_is_anonymous<'tu>(_: &[Entity<'tu>]) { }
 
         let children = e.get_children();
@@ -610,7 +618,7 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
-        #[cfg(feature="clang_3_8")]
+        #[cfg(feature="gte_clang_3_8")]
         fn test_get_mangled_names<'tu>(children: &[Entity<'tu>]) {
             assert_eq!(children[0].get_mangled_names(), Some(vec![
                 "_ZN1AC2Ev".into(), "_ZN1AC1Ev".into()
@@ -621,7 +629,7 @@ fn test() {
             assert_eq!(children[2].get_mangled_names(), None);
         }
 
-        #[cfg(not(feature="clang_3_8"))]
+        #[cfg(not(feature="gte_clang_3_8"))]
         fn test_get_mangled_names<'tu>(_: &[Entity<'tu>]) { }
 
         let children = e.get_children()[0].get_children();
@@ -636,7 +644,7 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
-        #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+        #[cfg(feature="gte_clang_3_6")]
         fn test_get_storage_class<'tu>(entity: Entity<'tu>) {
             assert_eq!(entity.get_storage_class(), None);
 
@@ -645,7 +653,7 @@ fn test() {
             assert_eq!(children[1].get_storage_class(), Some(StorageClass::Static));
         }
 
-        #[cfg(not(any(feature="clang_3_6", feature="clang_3_7")))]
+        #[cfg(not(feature="gte_clang_3_6"))]
         fn test_get_storage_class<'tu>(_: Entity<'tu>) { }
 
         assert_eq!(e.get_linkage(), None);
@@ -707,7 +715,7 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
-        #[cfg(any(feature="clang_3_6", feature="clang_3_7"))]
+        #[cfg(feature="gte_clang_3_6")]
         fn test_get_template_arguments<'tu>(children: &[Entity<'tu>]) {
             assert_eq!(children[0].get_template_arguments(), None);
             assert_eq!(children[1].get_template_arguments(), None);
@@ -717,7 +725,7 @@ fn test() {
             ]));
         }
 
-        #[cfg(not(any(feature="clang_3_6", feature="clang_3_7")))]
+        #[cfg(not(feature="gte_clang_3_6"))]
         fn test_get_template_arguments<'tu>(_: &[Entity<'tu>]) { }
 
         let children = e.get_children();
@@ -754,13 +762,13 @@ fn test() {
     "#;
 
     with_entity(&clang, source, |e| {
-        #[cfg(feature="clang_3_8")]
+        #[cfg(feature="gte_clang_3_8")]
         fn test_get_visibility<'tu>(children: &[Entity<'tu>]) {
             assert_eq!(children[0].get_visibility(), Some(Visibility::Default));
             assert_eq!(children[1].get_visibility(), Some(Visibility::Hidden));
         }
 
-        #[cfg(not(feature="clang_3_8"))]
+        #[cfg(not(feature="gte_clang_3_8"))]
         fn test_get_visibility<'tu>(_: &[Entity<'tu>]) { }
 
         let children = e.get_children();
@@ -826,13 +834,13 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
-        #[cfg(feature="clang_3_8")]
+        #[cfg(feature="gte_clang_3_8")]
         fn test_is_mutable<'tu>(children: &[Entity<'tu>]) {
             assert!(!children[0].is_mutable());
             assert!(children[1].is_mutable());
         }
 
-        #[cfg(not(feature="clang_3_8"))]
+        #[cfg(not(feature="gte_clang_3_8"))]
         fn test_is_mutable<'tu>(_: &[Entity<'tu>]) { }
 
         let children = e.get_children()[0].get_children();
@@ -1123,12 +1131,12 @@ fn test() {
     ";
 
     with_entity(&clang, source, |e| {
-        #[cfg(feature="clang_3_7")]
+        #[cfg(feature="gte_clang_3_7")]
         fn test_get_fields<'tu>(entity: Entity<'tu>) {
             assert_eq!(entity.get_type().unwrap().get_fields(), Some(entity.get_children()));
         }
 
-        #[cfg(not(feature="clang_3_7"))]
+        #[cfg(not(feature="gte_clang_3_7"))]
         fn test_get_fields<'tu>(_: Entity<'tu>) { }
 
         test_get_fields(e.get_children()[0]);

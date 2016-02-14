@@ -39,5 +39,6 @@
 - Added support for `clang` 3.8.x
 
 ### Changed
+- Simplified internal usage of conditional compilation
 - Bumped `clang-sys` version
 - Bumped `libc` version
