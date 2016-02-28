@@ -945,6 +945,7 @@ impl From<OffsetofError> for String {
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
+#[cfg_attr(feature="clippy", allow(enum_variant_names))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum RefQualifier {
