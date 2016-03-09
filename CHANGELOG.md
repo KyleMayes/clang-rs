@@ -43,7 +43,7 @@
 - Bumped `clang-sys` version
 - Bumped `libc` version
 
-## [0.5.0] - UNRELEASED
+## [0.5.0] - 2016-3-9
 
 ### Added
 - Added a `sonar` module for finding C declarations
