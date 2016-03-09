@@ -15,6 +15,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", warn(clippy))]
+#![cfg_attr(feature="clippy", allow(if_not_else))]
 
 #[macro_use]
 extern crate lazy_static;
