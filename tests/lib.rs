@@ -1234,4 +1234,174 @@ fn test() {
     assert_eq!(Usr::from_objc_method(&class, "B", false), Usr("c:objc(cs)A(cm)B".into()));
     assert_eq!(Usr::from_objc_property(&class, "B"), Usr("c:objc(cs)A(py)B".into()));
     assert_eq!(Usr::from_objc_protocol("A"), Usr("c:objc(pl)A".into()));
+
+    //============================================
+    // sonar
+    //============================================
+
+    let source = "
+        enum A {
+            AA = 1,
+            AB = 2,
+            AC = 3,
+        };
+
+        typedef enum B {
+            CA,
+            CB,
+            CC,
+        } B;
+
+        typedef enum {
+            DA,
+            DB,
+            DC,
+        } C;
+
+        enum D {
+            EA,
+            EB,
+            EC,
+        };
+
+        typedef enum D D;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let enums = sonar::find_enums(&e.get_children()[..]);
+        assert_eq!(enums.len(), 4);
+
+        assert_eq!(enums[0].get_name(), Some("A".into()));
+        assert_eq!(enums[1].get_name(), Some("B".into()));
+        assert_eq!(enums[2].get_name(), Some("C".into()));
+        assert_eq!(enums[3].get_name(), Some("D".into()));
+    });
+
+    let source = "
+        void multiple(void);
+        void multiple(void);
+
+        int zero(void);
+
+        float one(int a);
+        float two(int a, int b);
+
+        double many(int a, int b, ...);
+    ";
+
+    with_entity(&clang, source, |e| {
+        let functions = sonar::find_functions(&e.get_children()[..]);
+        assert_eq!(functions.len(), 5);
+
+        assert_eq!(functions[0].get_name(), Some("multiple".into()));
+        assert_eq!(functions[1].get_name(), Some("zero".into()));
+        assert_eq!(functions[2].get_name(), Some("one".into()));
+        assert_eq!(functions[3].get_name(), Some("two".into()));
+        assert_eq!(functions[4].get_name(), Some("many".into()));
+    });
+
+    let source = "
+        struct A {
+            int a;
+        };
+
+        typedef struct B {
+            int b;
+        } B;
+
+        typedef struct {
+            int c;
+        } C;
+
+        struct D {
+            int d;
+        };
+
+        typedef struct D D;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let structs = sonar::find_structs(&e.get_children()[..]);
+        assert_eq!(structs.len(), 4);
+
+        assert_eq!(structs[0].get_name(), Some("A".into()));
+        assert_eq!(structs[1].get_name(), Some("B".into()));
+        assert_eq!(structs[2].get_name(), Some("C".into()));
+        assert_eq!(structs[3].get_name(), Some("D".into()));
+    });
+
+    let source = "
+        typedef int Integer;
+        typedef Integer IntegerTypedef;
+        typedef IntegerTypedef IntegerTypedefTypedef;
+
+        typedef int* IntegerPointer;
+
+        typedef int Function(int, float, double);
+        typedef int (*FunctionPointer)(int a, float b, double c, ...);
+
+        enum E { EA, EB, EC };
+        typedef enum E Enum;
+        typedef Enum EnumTypedef;
+
+        struct S { int s; };
+        typedef struct S Struct;
+        typedef Struct StructTypedef;
+
+        union U { int us; float uf; };
+        typedef union U Union;
+        typedef Union UnionTypedef;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let typedefs = sonar::find_typedefs(&e.get_children()[..]);
+        assert_eq!(typedefs.len(), 12);
+
+        assert_eq!(typedefs[0].get_name(), Some("Integer".into()));
+        assert_eq!(typedefs[1].get_name(), Some("IntegerTypedef".into()));
+        assert_eq!(typedefs[2].get_name(), Some("IntegerTypedefTypedef".into()));
+        assert_eq!(typedefs[3].get_name(), Some("IntegerPointer".into()));
+        assert_eq!(typedefs[4].get_name(), Some("Function".into()));
+        assert_eq!(typedefs[5].get_name(), Some("FunctionPointer".into()));
+        assert_eq!(typedefs[6].get_name(), Some("Enum".into()));
+        assert_eq!(typedefs[7].get_name(), Some("EnumTypedef".into()));
+        assert_eq!(typedefs[8].get_name(), Some("Struct".into()));
+        assert_eq!(typedefs[9].get_name(), Some("StructTypedef".into()));
+        assert_eq!(typedefs[10].get_name(), Some("Union".into()));
+        assert_eq!(typedefs[11].get_name(), Some("UnionTypedef".into()));
+    });
+
+    let source = "
+        union A {
+            int ai;
+            float af;
+        };
+
+        typedef union B {
+            int bi;
+            float bf;
+        } B;
+
+        typedef union {
+            int ci;
+            float cf;
+        } C;
+
+        union D {
+            int di;
+            float df;
+        };
+
+        typedef union D D;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let unions = sonar::find_unions(&e.get_children()[..]);
+        assert_eq!(unions.len(), 4);
+
+        assert_eq!(unions[0].get_name(), Some("A".into()));
+        assert_eq!(unions[1].get_name(), Some("B".into()));
+        assert_eq!(unions[2].get_name(), Some("C".into()));
+        assert_eq!(unions[3].get_name(), Some("D".into()));
+    });
 }

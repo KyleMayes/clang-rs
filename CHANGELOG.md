@@ -42,3 +42,8 @@
 - Simplified internal usage of conditional compilation
 - Bumped `clang-sys` version
 - Bumped `libc` version
+
+## [0.5.0] - UNRELEASED
+
+### Added
+- Added a `sonar` module for finding C declarations

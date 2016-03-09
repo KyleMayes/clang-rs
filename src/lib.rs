@@ -23,6 +23,8 @@ extern crate lazy_static;
 extern crate clang_sys;
 extern crate libc;
 
+pub mod sonar;
+
 use std::fmt;
 use std::hash;
 use std::mem;
