@@ -47,3 +47,8 @@
 
 ### Added
 - Added a `sonar` module for finding C declarations
+
+## [0.5.1] - UNRELEASED
+
+### Added
+- Added implementations of `std::error::Error` for error enums

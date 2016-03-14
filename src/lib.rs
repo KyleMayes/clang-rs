@@ -46,7 +46,10 @@ use libc::{c_int, c_uint, c_ulong, time_t};
 
 use utility::{Nullable};
 
-pub use detail::*;
+mod error;
+pub use self::error::*;
+
+pub use self::detail::*;
 
 //================================================
 // Enums
@@ -64,26 +67,6 @@ pub enum Accessibility {
     Protected = 2,
     /// The declaration or base class specifier is public.
     Public = 1,
-}
-
-// AlignofError __________________________________
-
-/// Indicates the error that prevented determining the alignment of a type.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum AlignofError {
-    /// The type is a dependent type.
-    Dependent,
-    /// The type is an incomplete type.
-    Incomplete,
-}
-
-impl From<AlignofError> for String {
-    fn from(error: AlignofError) -> String {
-        match error {
-            AlignofError::Dependent => "the type is a dependent type".into(),
-            AlignofError::Incomplete => "the type is an incomplete type".into(),
-        }
-    }
 }
 
 // Availability __________________________________
@@ -721,34 +704,6 @@ pub enum MemoryUsage {
     SourceManagerMMap = 8,
 }
 
-// OffsetofError _________________________________
-
-/// Indicates the error that prevented determining the offset of a field in a record type.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum OffsetofError {
-    /// The record type is a dependent type.
-    Dependent,
-    /// The record type is an incomplete type.
-    Incomplete,
-    /// The record type does not contain a field with the supplied name.
-    Name,
-    /// The record type has an invalid parent declaration.
-    Parent,
-}
-
-impl From<OffsetofError> for String {
-    fn from(error: OffsetofError) -> String {
-        match error {
-            OffsetofError::Dependent => "the record type is a dependent type".into(),
-            OffsetofError::Incomplete => "the record type is an incomplete type".into(),
-            OffsetofError::Name => {
-                "the record type does not contain a field with the supplied name".into()
-            },
-            OffsetofError::Parent => "the record type has an invalid parent declaration".into(),
-        }
-    }
-}
-
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
@@ -760,26 +715,6 @@ pub enum RefQualifier {
     LValue = 1,
     /// The function or method has an r-value ref qualifier (`&&`).
     RValue = 2,
-}
-
-// SaveError _____________________________________
-
-/// Indicates the type of error that prevented the saving of a translation unit to an AST file.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum SaveError {
-    /// Errors in the translation unit prevented saving.
-    Errors,
-    /// An unknown error occurred.
-    Unknown,
-}
-
-impl From<SaveError> for String {
-    fn from(error: SaveError) -> String {
-        match error {
-            SaveError::Errors => "errors in the translation unit prevented saving".into(),
-            SaveError::Unknown => "an unknown error occurred".into(),
-        }
-    }
 }
 
 // Severity ______________________________________
@@ -799,54 +734,6 @@ pub enum Severity {
     /// The diagnostic targets code that is ill-formed in such a way that parser recovery is
     /// unlikely to produce any useful results.
     Fatal = 4,
-}
-
-// SizeofError ___________________________________
-
-/// Indicates the error that prevented determining the size of a type.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum SizeofError {
-    /// The type is a dependent type.
-    Dependent,
-    /// The type is an incomplete type.
-    Incomplete,
-    /// The type is a variable size type.
-    VariableSize,
-}
-
-impl From<SizeofError> for String {
-    fn from(error: SizeofError) -> String {
-        match error {
-            SizeofError::Dependent => "the type is a dependent type".into(),
-            SizeofError::Incomplete => "the type is an incomplete type".into(),
-            SizeofError::VariableSize => "the type is a variable size type".into(),
-        }
-    }
-}
-
-// SourceError ___________________________________
-
-/// Indicates the type of error that prevented the loading of a translation unit from a source file.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum SourceError {
-    /// An error occurred while deserializing an AST file.
-    AstDeserialization,
-    /// `libclang` crashed.
-    Crash,
-    /// An unknown error occurred.
-    Unknown,
-}
-
-impl From<SourceError> for String {
-    fn from(error: SourceError) -> String {
-        match error {
-            SourceError::AstDeserialization => {
-                "an error occurred while deserializing an AST file".into()
-            },
-            SourceError::Crash => "`libclang` crashed".into(),
-            SourceError::Unknown => "an unknown error occurred".into(),
-        }
-    }
 }
 
 // StorageClass __________________________________
