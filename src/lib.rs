@@ -986,57 +986,48 @@ pub struct CompilationDatabase<'c> {
 impl<'c> CompilationDatabase<'c> {
     //- Constructors -----------------------------
 
+    fn from_ptr(ptr: ffi::CXCompilationDatabase) -> CompilationDatabase<'c> {
+        CompilationDatabase { ptr: ptr, _marker: PhantomData }
+    }
+
     /// Constructs a new `CompilationDatabase` from a directory containing a `compile_commands.json`
     /// file.
     pub fn from_directory<D: AsRef<Path>>(
         _: &'c Clang, directory: D
     ) -> Result<CompilationDatabase<'c>, ()> {
         unsafe {
+            let directory = utility::from_path(directory);
             let mut code = mem::uninitialized();
-
-            let ptr = ffi::clang_CompilationDatabase_fromDirectory(
-                utility::from_path(directory).as_ptr(), &mut code
-            );
-
-            if code == ffi::CXCompilationDatabase_Error::NoError {
-                Ok(CompilationDatabase { ptr: ptr, _marker: PhantomData })
-            } else {
-                Err(())
-            }
+            let ptr = ffi::clang_CompilationDatabase_fromDirectory(directory.as_ptr(), &mut code);
+            ptr.map(CompilationDatabase::from_ptr).ok_or(())
         }
     }
 
     //- Accessors --------------------------------
 
     fn get_commands_(&self, ptr: ffi::CXCompileCommands) -> Vec<CompileCommand> {
-        if !ptr.0.is_null() {
-            let commands = CompileCommands::from_ptr(ptr);
+        ptr.map(|p| {
+            let commands = CompileCommands::from_ptr(p);
 
             iter!(
                 clang_CompileCommands_getSize(commands.ptr),
                 clang_CompileCommands_getCommand(commands.ptr),
             ).map(|c| CompileCommand::from_ptr(c, commands.clone())).collect()
-        } else {
-            vec![]
-        }
+        }).unwrap_or_else(Vec::new)
     }
 
     /// Returns all the compilation commands in this compilation database.
     pub fn get_all_commands(&self) -> Vec<CompileCommand> {
-        unsafe {
-            let ptr = ffi::clang_CompilationDatabase_getAllCompileCommands(self.ptr);
-            self.get_commands_(ptr)
-        }
+        let ptr = unsafe { ffi::clang_CompilationDatabase_getAllCompileCommands(self.ptr) };
+        self.get_commands_(ptr)
     }
 
     /// Returns all the compilation commands for the supplied source file in this compilation
     /// database.
     pub fn get_commands<F: AsRef<Path>>(&self, file: F) -> Vec<CompileCommand> {
         unsafe {
-            let ptr = ffi::clang_CompilationDatabase_getCompileCommands(
-                self.ptr, utility::from_path(file).as_ptr()
-            );
-
+            let file = utility::from_path(file);
+            let ptr = ffi::clang_CompilationDatabase_getCompileCommands(self.ptr, file.as_ptr());
             self.get_commands_(ptr)
         }
     }
@@ -1095,12 +1086,23 @@ impl<'d> CompileCommand<'d> {
     }
 }
 
+#[cfg(feature="gte_clang_3_8")]
+impl<'c> fmt::Debug for CompileCommand<'c> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("CompileCommand")
+            .field("working_directory", &self.get_working_directory())
+            .field("file", &self.get_file())
+            .field("arguments", &self.get_arguments())
+            .finish()
+    }
+}
+
+#[cfg(not(feature="gte_clang_3_8"))]
 impl<'c> fmt::Debug for CompileCommand<'c> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.debug_struct("CompileCommand")
             .field("working_directory", &self.get_working_directory())
             .field("arguments", &self.get_arguments())
-            //.field("file", &self.get_file())
             .finish()
     }
 }
@@ -1292,14 +1294,12 @@ impl CompletionResults {
 
     /// Returns the code completion context for this set of code completion results, if any.
     pub fn get_context(&self) -> Option<CompletionContext> {
-        unsafe {
-            let bits = ffi::clang_codeCompleteGetContexts(self.ptr) as c_uint;
+        let bits = unsafe { ffi::clang_codeCompleteGetContexts(self.ptr) as c_uint };
 
-            if bits != 0 && bits != 4194303 {
-                Some(CompletionContext::from(ffi::CXCompletionContext::from_bits_truncate(bits)))
-            } else {
-                None
-            }
+        if bits != 0 && bits != 4194303 {
+            Some(CompletionContext::from(ffi::CXCompletionContext::from_bits_truncate(bits)))
+        } else {
+            None
         }
     }
 
@@ -1322,16 +1322,15 @@ impl CompletionResults {
     pub fn get_results(&self) -> Vec<CompletionResult> {
         unsafe {
             let raws = slice::from_raw_parts((*self.ptr).Results, (*self.ptr).NumResults as usize);
-            raws.iter().map(|r| CompletionResult::from_raw(*r)).collect()
+            raws.iter().cloned().map(CompletionResult::from_raw).collect()
         }
     }
 
     /// Returns the USR for the entity that contains the code completion context for this set of
     /// code completion results, if applicable.
     pub fn get_usr(&self) -> Option<Usr> {
-        unsafe {
-            utility::to_string_option(ffi::clang_codeCompleteGetContainerUSR(self.ptr)).map(Usr)
-        }
+        let usr = unsafe { ffi::clang_codeCompleteGetContainerUSR(self.ptr) };
+        utility::to_string_option(usr).map(Usr)
     }
 }
 
@@ -1395,10 +1394,8 @@ impl<'r> CompletionString<'r> {
 
             match k {
                 ffi::CXCompletionChunkKind::Optional => {
-                    let raw = unsafe {
-                        ffi::clang_getCompletionChunkCompletionString(self.raw, i as c_uint)
-                    };
-
+                    let i = i as c_uint;
+                    let raw = unsafe { ffi::clang_getCompletionChunkCompletionString(self.raw, i) };
                     CompletionChunk::Optional(CompletionString::from_raw(raw))
                 },
                 ffi::CXCompletionChunkKind::CurrentParameter => text!(CurrentParameter),
@@ -1526,11 +1523,8 @@ impl<'tu> Diagnostic<'tu> {
         unsafe {
             (0..ffi::clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
                 let mut range = mem::uninitialized();
-
-                let string = utility::to_string(
-                    ffi::clang_getDiagnosticFixIt(self.ptr, i, &mut range)
-                );
-
+                let fixit = ffi::clang_getDiagnosticFixIt(self.ptr, i, &mut range);
+                let string = utility::to_string(fixit);
                 let range = SourceRange::from_raw(range, self.tu);
 
                 if string.is_empty() {
@@ -1554,9 +1548,7 @@ impl<'tu> Diagnostic<'tu> {
         iter!(
             clang_getDiagnosticNumRanges(self.ptr),
             clang_getDiagnosticRange(self.ptr),
-        ).map(|r| {
-            SourceRange::from_raw(r, self.tu)
-        }).collect()
+        ).map(|r| SourceRange::from_raw(r, self.tu)).collect()
     }
 
     /// Returns the severity of this diagnostic.
@@ -1765,15 +1757,7 @@ impl<'tu> Entity<'tu> {
     /// Returns the mangled names of this C++ constructor or destructor, if applicable.
     #[cfg(feature="gte_clang_3_8")]
     pub fn get_mangled_names(&self) -> Option<Vec<String>> {
-        unsafe {
-            let set = ffi::clang_Cursor_getCXXManglings(self.raw);
-
-            if !set.is_null() && (*set).Count != 0 {
-                Some(utility::to_string_set(set))
-            } else {
-                None
-            }
-        }
+        unsafe { utility::to_string_set_option(ffi::clang_Cursor_getCXXManglings(self.raw)) }
     }
 
     /// Returns the module imported by this module import declaration, if applicable.
@@ -1788,23 +1772,15 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the source ranges of the name of this AST entity.
     pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
-        use std::ptr;
-
         unsafe {
             (0..).map(|i| ffi::clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
                 if ffi::clang_Range_isNull(*r) != 0 {
                     false
                 } else {
+                    let range = ffi::clang_getRangeStart(*r);
                     let mut file = mem::uninitialized();
-
-                    ffi::clang_getSpellingLocation(
-                        ffi::clang_getRangeStart(*r),
-                        &mut file,
-                        ptr::null_mut(),
-                        ptr::null_mut(),
-                        ptr::null_mut(),
-                    );
-
+                    let null = ptr::null_mut();
+                    ffi::clang_getSpellingLocation(range, &mut file, null, null, null);
                     !file.0.is_null()
                 }
             }).map(|r| SourceRange::from_raw(r, self.tu)).collect()
@@ -1813,14 +1789,12 @@ impl<'tu> Entity<'tu> {
 
     /// Returns which attributes were applied to this Objective-C property, if applicable.
     pub fn get_objc_attributes(&self) -> Option<ObjCAttributes> {
-        unsafe {
-            let attributes = ffi::clang_Cursor_getObjCPropertyAttributes(self.raw, 0);
+        let attributes = unsafe { ffi::clang_Cursor_getObjCPropertyAttributes(self.raw, 0) };
 
-            if attributes.bits() != 0 {
-                Some(ObjCAttributes::from(attributes))
-            } else {
-                None
-            }
+        if attributes.bits() != 0 {
+            Some(ObjCAttributes::from(attributes))
+        } else {
+            None
         }
     }
 
@@ -1838,14 +1812,12 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the selector index for this Objective-C selector identifier, if applicable.
     pub fn get_objc_selector_index(&self) -> Option<usize> {
-        unsafe {
-            let index = ffi::clang_Cursor_getObjCSelectorIndex(self.raw);
+        let index = unsafe { ffi::clang_Cursor_getObjCSelectorIndex(self.raw) };
 
-            if index >= 0 {
-                Some(index as usize)
-            } else {
-                None
-            }
+        if index >= 0 {
+            Some(index as usize)
+        } else {
+            None
         }
     }
 
@@ -1857,14 +1829,12 @@ impl<'tu> Entity<'tu> {
     /// Returns which qualifiers were applied to this Objective-C method return or parameter type,
     /// if applicable.
     pub fn get_objc_qualifiers(&self) -> Option<ObjCQualifiers> {
-        unsafe {
-            let qualifiers = ffi::clang_Cursor_getObjCDeclQualifiers(self.raw);
+        let qualifiers = unsafe { ffi::clang_Cursor_getObjCDeclQualifiers(self.raw) };
 
-            if qualifiers.bits() != 0 {
-                Some(ObjCQualifiers::from(qualifiers))
-            } else {
-                None
-            }
+        if qualifiers.bits() != 0 {
+            Some(ObjCQualifiers::from(qualifiers))
+        } else {
+            None
         }
     }
 
@@ -1926,10 +1896,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the source range of this AST entity, if any.
     pub fn get_range(&self) -> Option<SourceRange<'tu>> {
-        unsafe {
-            let range = ffi::clang_getCursorExtent(self.raw);
-            range.map(|r| SourceRange::from_raw(r, self.tu))
-        }
+        unsafe { ffi::clang_getCursorExtent(self.raw).map(|r| SourceRange::from_raw(r, self.tu)) }
     }
 
     /// Returns the AST entity referred to by this AST entity, if any.
@@ -2020,10 +1987,8 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the underlying type of this typedef declaration, if applicable.
     pub fn get_typedef_underlying_type(&self) -> Option<Type<'tu>> {
-        unsafe {
-            let type_ = ffi::clang_getTypedefDeclUnderlyingType(self.raw);
-            type_.map(|t| Type::from_raw(t, self.tu))
-        }
+        let type_ = unsafe { ffi::clang_getTypedefDeclUnderlyingType(self.raw) };
+        type_.map(|t| Type::from_raw(t, self.tu))
     }
 
     /// Returns the USR for this AST entity, if any.
@@ -2282,8 +2247,7 @@ impl<'tu> File<'tu> {
 
     /// Returns the absolute path to this file.
     pub fn get_path(&self) -> PathBuf {
-        let path = unsafe { ffi::clang_getFileName(self.ptr) };
-        Path::new(&utility::to_string(path)).into()
+        unsafe { Path::new(&utility::to_string(ffi::clang_getFileName(self.ptr))).into() }
     }
 
     /// Returns the references to the supplied entity in this file.
@@ -2399,13 +2363,16 @@ pub struct Index<'c> {
 impl<'c> Index<'c> {
     //- Constructors -----------------------------
 
+    fn from_ptr(ptr: ffi::CXIndex) -> Index<'c> {
+        Index { ptr: ptr, _marker: PhantomData }
+    }
+
     /// Constructs a new `Index`.
     ///
     /// `exclude` determines whether declarations from precompiled headers are excluded and
     /// `diagnostics` determines whether diagnostics are printed while parsing source files.
     pub fn new(_: &'c Clang, exclude: bool, diagnostics: bool) -> Index<'c> {
-        let ptr = unsafe { ffi::clang_createIndex(exclude as c_int, diagnostics as c_int) };
-        Index { ptr: ptr, _marker: PhantomData }
+        unsafe { Index::from_ptr(ffi::clang_createIndex(exclude as c_int, diagnostics as c_int)) }
     }
 
     //- Accessors --------------------------------
@@ -2476,20 +2443,17 @@ impl<'tu> Module<'tu> {
 
     /// Returns the full name of this module (e.g., `std.vector` for the `std.vector` module).
     pub fn get_full_name(&self) -> String {
-        let name = unsafe { ffi::clang_Module_getFullName(self.ptr) };
-        utility::to_string(name)
+        unsafe { utility::to_string(ffi::clang_Module_getFullName(self.ptr)) }
     }
 
     /// Returns the name of this module (e.g., `vector` for the `std.vector` module).
     pub fn get_name(&self) -> String {
-        let name = unsafe { ffi::clang_Module_getName(self.ptr) };
-        utility::to_string(name)
+        unsafe { utility::to_string(ffi::clang_Module_getName(self.ptr)) }
     }
 
     /// Returns the parent of this module, if any.
     pub fn get_parent(&self) -> Option<Module<'tu>> {
-        let parent = unsafe { ffi::clang_Module_getParent(self.ptr) };
-        parent.map(|p| Module::from_ptr(p, self.tu))
+        unsafe { ffi::clang_Module_getParent(self.ptr).map(|p| Module::from_ptr(p, self.tu)) }
     }
 
     /// Returns the top-level headers in this module.
@@ -2653,13 +2617,8 @@ macro_rules! location {
     ($function:ident, $location:expr, $tu:expr) => ({
         let (mut file, mut line, mut column, mut offset) = mem::uninitialized();
         ffi::$function($location, &mut file, &mut line, &mut column, &mut offset);
-
-        Location {
-            file: File::from_ptr(file, $tu),
-            line: line as u32,
-            column: column as u32,
-            offset: offset as u32,
-        }
+        let file = File::from_ptr(file, $tu);
+        Location { file: file, line: line as u32, column: column as u32, offset: offset as u32 }
     });
 }
 
@@ -2771,22 +2730,19 @@ impl<'tu> SourceRange<'tu> {
 
     /// Constructs a new `SourceRange` that spans [`start`, `end`).
     pub fn new(start: SourceLocation<'tu>, end: SourceLocation<'tu>) -> SourceRange<'tu> {
-        let raw = unsafe { ffi::clang_getRange(start.raw, end.raw) };
-        SourceRange::from_raw(raw, start.tu)
+        unsafe { SourceRange::from_raw(ffi::clang_getRange(start.raw, end.raw), start.tu) }
     }
 
     //- Accessors --------------------------------
 
     /// Returns the exclusive end of this source range.
     pub fn get_end(&self) -> SourceLocation<'tu> {
-        let end = unsafe { ffi::clang_getRangeEnd(self.raw) };
-        SourceLocation::from_raw(end, self.tu)
+        unsafe { SourceLocation::from_raw(ffi::clang_getRangeEnd(self.raw), self.tu) }
     }
 
     /// Returns the inclusive start of this source range.
     pub fn get_start(&self) -> SourceLocation<'tu> {
-        let start = unsafe { ffi::clang_getRangeStart(self.raw) };
-        SourceLocation::from_raw(start, self.tu)
+        unsafe { SourceLocation::from_raw(ffi::clang_getRangeStart(self.raw), self.tu) }
     }
 
     /// Tokenizes the source code covered by this source range and returns the resulting tokens.
@@ -2864,10 +2820,8 @@ impl<'tu> Token<'tu> {
 
     /// Returns the source location of this token.
     pub fn get_location(&self) -> SourceLocation<'tu> {
-        unsafe {
-            let raw = ffi::clang_getTokenLocation(self.tu.ptr, self.raw);
-            SourceLocation::from_raw(raw, self.tu)
-        }
+        let raw = unsafe { ffi::clang_getTokenLocation(self.tu.ptr, self.raw) };
+        SourceLocation::from_raw(raw, self.tu)
     }
 
     /// Returns the source range of this token.
@@ -3079,6 +3033,7 @@ impl<'i> Drop for TranslationUnit<'i> {
 impl<'i> fmt::Debug for TranslationUnit<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let spelling = unsafe { ffi::clang_getTranslationUnitSpelling(self.ptr) };
+
         formatter.debug_struct("TranslationUnit")
             .field("spelling", &utility::to_string(spelling))
             .finish()
@@ -3388,11 +3343,12 @@ impl Usr {
     //- Constructors -----------------------------
 
     /// Constructs a new `Usr` from an Objective-C category.
-    pub fn from_objc_category<C1: AsRef<str>, C2: AsRef<str>>(class: C1, category: C2) -> Usr {
+    pub fn from_objc_category<C: AsRef<str>>(class: C, category: C) -> Usr {
+        let class = utility::from_string(class);
+        let category = utility::from_string(category);
+
         let raw = unsafe {
-            ffi::clang_constructUSR_ObjCCategory(
-                utility::from_string(class).as_ptr(), utility::from_string(category).as_ptr()
-            )
+            ffi::clang_constructUSR_ObjCCategory(class.as_ptr(), category.as_ptr())
         };
 
         Usr(utility::to_string(raw))
@@ -3416,12 +3372,9 @@ impl Usr {
     /// Constructs a new `Usr` from an Objective-C method.
     pub fn from_objc_method<N: AsRef<str>>(class: &Usr, name: N, instance: bool) -> Usr {
         utility::with_string(&class.0, |s| {
-            let raw = unsafe {
-                ffi::clang_constructUSR_ObjCMethod(
-                    utility::from_string(name).as_ptr(), instance as c_uint, s
-                )
-            };
-
+            let name = utility::from_string(name);
+            let instance = instance as c_uint;
+            let raw = unsafe { ffi::clang_constructUSR_ObjCMethod(name.as_ptr(), instance, s) };
             Usr(utility::to_string(raw))
         })
     }
@@ -3429,20 +3382,16 @@ impl Usr {
     /// Constructs a new `Usr` from an Objective-C property.
     pub fn from_objc_property<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
         utility::with_string(&class.0, |s| {
-            let raw = unsafe {
-                ffi::clang_constructUSR_ObjCProperty(utility::from_string(name).as_ptr(), s)
-            };
-
+            let name = utility::from_string(name);
+            let raw = unsafe { ffi::clang_constructUSR_ObjCProperty(name.as_ptr(), s) };
             Usr(utility::to_string(raw))
         })
     }
 
     /// Constructs a new `Usr` from an Objective-C protocol.
     pub fn from_objc_protocol<P: AsRef<str>>(protocol: P) -> Usr {
-        unsafe {
-            let string = utility::from_string(protocol);
-            Usr(utility::to_string(ffi::clang_constructUSR_ObjCProtocol(string.as_ptr())))
-        }
+        let string = utility::from_string(protocol);
+        unsafe { Usr(utility::to_string(ffi::clang_constructUSR_ObjCProtocol(string.as_ptr()))) }
     }
 }
 

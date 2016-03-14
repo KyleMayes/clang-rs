@@ -108,8 +108,6 @@ pub trait FromError<T>: Sized where T: Sized {
 
 /// A type which may be null or otherwise invalid.
 pub trait Nullable: Sized {
-    /// Transforms this value into an `Option<U>`, mapping a null value to `None` and a non-null
-    /// value to `Some(v)` where `v` is the result of applying the supplied function to this value.
     fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U>;
 }
 
@@ -247,17 +245,21 @@ pub fn to_string_option(clang: ffi::CXString) -> Option<String> {
 }
 
 #[cfg(feature="gte_clang_3_8")]
-pub fn to_string_set(clang: *mut ffi::CXStringSet) -> Vec<String> {
+pub fn to_string_set_option(clang: *mut ffi::CXStringSet) -> Option<Vec<String>> {
     unsafe {
-        let c = slice::from_raw_parts((*clang).Strings, (*clang).Count as usize);
+        if clang.is_null() || (*clang).Count == 0 {
+            return None;
+        }
+
+        let c = ::std::slice::from_raw_parts((*clang).Strings, (*clang).Count as usize);
 
         let rust = c.iter().map(|c| {
-            let c = std::ffi::CStr::from_ptr(ffi::clang_getCString(*c));
+            let c = CStr::from_ptr(ffi::clang_getCString(*c));
             c.to_str().expect("invalid Rust string").into()
         }).collect();
 
         ffi::clang_disposeStringSet(clang);
-        rust
+        Some(rust)
     }
 }
 
