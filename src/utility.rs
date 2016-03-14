@@ -107,15 +107,15 @@ pub trait FromError<T>: Sized where T: Sized {
 // Nullable ______________________________________
 
 /// A type which may be null or otherwise invalid.
-pub trait Nullable<T> {
+pub trait Nullable: Sized {
     /// Transforms this value into an `Option<U>`, mapping a null value to `None` and a non-null
     /// value to `Some(v)` where `v` is the result of applying the supplied function to this value.
-    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Option<U>;
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U>;
 }
 
 macro_rules! nullable {
     ($name:ident) => (
-        impl Nullable<ffi::$name> for ffi::$name {
+        impl Nullable for ffi::$name {
             fn map<U, F: FnOnce(ffi::$name) -> U>(self, f: F) -> Option<U> {
                 if !self.0.is_null() {
                     Some(f(self))
@@ -147,7 +147,7 @@ nullable!(CXRemapping);
 nullable!(CXTranslationUnit);
 nullable!(CXVirtualFileOverlay);
 
-impl Nullable<ffi::CXCursor> for ffi::CXCursor {
+impl Nullable for ffi::CXCursor {
     fn map<U, F: FnOnce(ffi::CXCursor) -> U>(self, f: F) -> Option<U> {
         unsafe {
             let null = ffi::clang_equalCursors(self, ffi::clang_getNullCursor()) != 0;
@@ -161,7 +161,7 @@ impl Nullable<ffi::CXCursor> for ffi::CXCursor {
     }
 }
 
-impl Nullable<ffi::CXSourceLocation> for ffi::CXSourceLocation {
+impl Nullable for ffi::CXSourceLocation {
     fn map<U, F: FnOnce(ffi::CXSourceLocation) -> U>(self, f: F) -> Option<U> {
         unsafe {
             if ffi::clang_equalLocations(self, ffi::clang_getNullLocation()) == 0 {
@@ -173,7 +173,7 @@ impl Nullable<ffi::CXSourceLocation> for ffi::CXSourceLocation {
     }
 }
 
-impl Nullable<ffi::CXSourceRange> for ffi::CXSourceRange {
+impl Nullable for ffi::CXSourceRange {
     fn map<U, F: FnOnce(ffi::CXSourceRange) -> U>(self, f: F) -> Option<U> {
         unsafe {
             if ffi::clang_Range_isNull(self) == 0 {
@@ -185,7 +185,7 @@ impl Nullable<ffi::CXSourceRange> for ffi::CXSourceRange {
     }
 }
 
-impl Nullable<ffi::CXString> for ffi::CXString {
+impl Nullable for ffi::CXString {
     fn map<U, F: FnOnce(ffi::CXString) -> U>(self, f: F) -> Option<U> {
         if !self.data.is_null() {
             Some(f(self))
@@ -195,7 +195,7 @@ impl Nullable<ffi::CXString> for ffi::CXString {
     }
 }
 
-impl Nullable<ffi::CXType> for ffi::CXType {
+impl Nullable for ffi::CXType {
     fn map<U, F: FnOnce(ffi::CXType) -> U>(self, f: F) -> Option<U> {
         if self.kind != ffi::CXTypeKind::Invalid {
             Some(f(self))
@@ -205,7 +205,7 @@ impl Nullable<ffi::CXType> for ffi::CXType {
     }
 }
 
-impl Nullable<ffi::CXVersion> for ffi::CXVersion {
+impl Nullable for ffi::CXVersion {
     fn map<U, F: FnOnce(ffi::CXVersion) -> U>(self, f: F) -> Option<U> {
         if self.Major != -1 && self.Minor != -1 && self.Subminor != -1 {
             Some(f(self))
