@@ -44,7 +44,7 @@ use clang_sys as ffi;
 
 use libc::{c_int, c_uint, c_ulong, time_t};
 
-use utility::{Nullable};
+use utility::{FromError, Nullable};
 
 mod error;
 pub use self::error::*;
@@ -2959,13 +2959,7 @@ impl<'i> TranslationUnit<'i> {
                 &mut ptr,
             );
 
-            match code {
-                ffi::CXErrorCode::Success => Ok(TranslationUnit::from_ptr(ptr)),
-                ffi::CXErrorCode::ASTReadError => Err(SourceError::AstDeserialization),
-                ffi::CXErrorCode::Crashed => Err(SourceError::Crash),
-                ffi::CXErrorCode::Failure => Err(SourceError::Unknown),
-                _ => unreachable!(),
-            }
+            SourceError::from_error(code).map(|_| TranslationUnit::from_ptr(ptr))
         }
     }
 
@@ -3044,18 +3038,10 @@ impl<'i> TranslationUnit<'i> {
     /// * errors in the translation unit prevent saving
     /// * an unknown error occurs
     pub fn save<F: AsRef<Path>>(&self, file: F) -> Result<(), SaveError> {
-        let code = unsafe {
-            ffi::clang_saveTranslationUnit(
-                self.ptr, utility::from_path(file).as_ptr(), ffi::CXSaveTranslationUnit_None
-            )
-        };
-
-        match code {
-            ffi::CXSaveError::None => Ok(()),
-            ffi::CXSaveError::InvalidTU => Err(SaveError::Errors),
-            ffi::CXSaveError::Unknown => Err(SaveError::Unknown),
-            _ => unreachable!(),
-        }
+        let file = utility::from_path(file);
+        let flags = ffi::CXSaveTranslationUnit_None;
+        let code = unsafe { ffi::clang_saveTranslationUnit(self.ptr, file.as_ptr(), flags) };
+        SaveError::from_error(code)
     }
 
     //- Consumers --------------------------------
@@ -3079,13 +3065,7 @@ impl<'i> TranslationUnit<'i> {
                 ffi::CXReparse_None,
             );
 
-            match code {
-                ffi::CXErrorCode::Success => Ok(self),
-                ffi::CXErrorCode::ASTReadError => Err(SourceError::AstDeserialization),
-                ffi::CXErrorCode::Crashed => Err(SourceError::Crash),
-                ffi::CXErrorCode::Failure => Err(SourceError::Unknown),
-                _ => unreachable!(),
-            }
+            SourceError::from_error(code).map(|_| self)
         }
     }
 }
@@ -3130,13 +3110,8 @@ impl<'tu> Type<'tu> {
     /// * this type is a dependent type
     /// * this type is an incomplete type
     pub fn get_alignof(&self) -> Result<usize, AlignofError> {
-        unsafe {
-            match ffi::clang_Type_getAlignOf(self.raw) {
-                -3 => Err(AlignofError::Dependent),
-                -2 => Err(AlignofError::Incomplete),
-                other => Ok(other as usize),
-            }
-        }
+        let alignof_ = unsafe { ffi::clang_Type_getAlignOf(self.raw) };
+        AlignofError::from_error(alignof_).map(|_| alignof_ as usize)
     }
 
     /// Returns the argument types for this function or method type, if applicable.
@@ -3209,15 +3184,9 @@ impl<'tu> Type<'tu> {
     /// * this record record type is an incomplete type
     /// * this record type does not contain a field with the supplied name
     pub fn get_offsetof<F: AsRef<str>>(&self, field: F) -> Result<usize, OffsetofError> {
-        unsafe {
-            match ffi::clang_Type_getOffsetOf(self.raw, utility::from_string(field).as_ptr()) {
-                -1 => Err(OffsetofError::Parent),
-                -2 => Err(OffsetofError::Incomplete),
-                -3 => Err(OffsetofError::Dependent),
-                -5 => Err(OffsetofError::Name),
-                other => Ok(other as usize),
-            }
-        }
+        let field = utility::from_string(field);
+        let offsetof_ = unsafe { ffi::clang_Type_getOffsetOf(self.raw, field.as_ptr()) };
+        OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
     }
 
     /// Returns the kind of this type.
@@ -3264,14 +3233,8 @@ impl<'tu> Type<'tu> {
     /// * this type is an incomplete type
     /// * this type is a variable size type
     pub fn get_sizeof(&self) -> Result<usize, SizeofError> {
-        unsafe {
-            match ffi::clang_Type_getSizeOf(self.raw) {
-                -2 => Err(SizeofError::Incomplete),
-                -3 => Err(SizeofError::Dependent),
-                -4 => Err(SizeofError::VariableSize),
-                other => Ok(other as usize),
-            }
-        }
+        let sizeof_ = unsafe { ffi::clang_Type_getSizeOf(self.raw) };
+        SizeofError::from_error(sizeof_).map(|_| sizeof_ as usize)
     }
 
     /// Returns the template argument types for this template class specialization type, if

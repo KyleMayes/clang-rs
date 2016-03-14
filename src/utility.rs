@@ -97,6 +97,13 @@ macro_rules! options {
 // Traits
 //================================================
 
+// FromError _____________________________________
+
+/// A type that can convert a `T` into a `Result<(), Self>`.
+pub trait FromError<T>: Sized where T: Sized {
+    fn from_error(error: T) -> Result<(), Self>;
+}
+
 // Nullable ______________________________________
 
 /// A type which may be null or otherwise invalid.
