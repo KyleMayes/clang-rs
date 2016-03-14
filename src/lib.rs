@@ -23,6 +23,9 @@ extern crate lazy_static;
 extern crate clang_sys;
 extern crate libc;
 
+#[macro_use]
+mod utility;
+
 pub mod sonar;
 
 use std::fmt;
@@ -41,208 +44,9 @@ use clang_sys as ffi;
 
 use libc::{c_int, c_uint, c_ulong, time_t};
 
+use utility::{Nullable};
+
 pub use detail::*;
-
-//================================================
-// Macros
-//================================================
-
-// iter! _________________________________________
-
-macro_rules! iter {
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
-        let count = unsafe { ffi::$num($($num_argument), *) };
-        (0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i) })
-    });
-
-    ($num:ident($($num_argument:expr), *), $($get:ident($($get_argument:expr), *)), *,) => ({
-        let count = unsafe { ffi::$num($($num_argument), *) };
-        (0..count).map(|i| unsafe { ($(ffi::$get($($get_argument), *, i)), *) })
-    });
-}
-
-// iter_option! __________________________________
-
-macro_rules! iter_option {
-    ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
-        let count = unsafe { ffi::$num($($num_argument), *) };
-
-        if count >= 0 {
-            Some((0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i as c_uint) }))
-        } else {
-            None
-        }
-    });
-}
-
-// options! ______________________________________
-
-macro_rules! options {
-    ($(#[$attribute:meta])* options $name:ident: $underlying:ident {
-        $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
-    }) => (
-        $(#[$attribute])*
-        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-        pub struct $name {
-            $($(#[$fattribute])* pub $option: bool), +,
-        }
-
-        impl From<::clang_sys::$underlying> for $name {
-            fn from(flags: ::clang_sys::$underlying) -> $name {
-                $name { $($option: flags.contains(::clang_sys::$flag)), + }
-            }
-        }
-
-        impl Into<::clang_sys::$underlying> for $name {
-            fn into(self) -> ::clang_sys::$underlying {
-                let mut flags = ::clang_sys::$underlying::empty();
-                $(if self.$option { flags.insert(::clang_sys::$flag); })+
-                flags
-            }
-        }
-    );
-
-    ($(#[$attribute:meta])* options $name:ident: $underlying:ident {
-        $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
-        CONDITIONAL: #[$condition:meta] $($(#[$cfattribute:meta])* pub $coption:ident: $cflag:ident), +,
-    }) => (
-        #[cfg(not($condition))]
-        mod detail {
-            options! {
-                $(#[$attribute])*
-                options $name: $underlying {
-                    $($(#[$fattribute])* pub $option: $flag), +,
-                }
-            }
-        }
-
-        #[cfg($condition)]
-        mod detail {
-            options! {
-                $(#[$attribute])*
-                options $name: $underlying {
-                    $($(#[$fattribute])* pub $option: $flag), +,
-                    $($(#[$cfattribute])* pub $coption: $cflag), +,
-                }
-            }
-        }
-    );
-}
-
-//================================================
-// Traits
-//================================================
-
-// Nullable ______________________________________
-
-/// A type which may be null or otherwise invalid.
-pub trait Nullable<T> {
-    /// Transforms this value into an `Option<U>`, mapping a null value to `None` and a non-null
-    /// value to `Some(v)` where `v` is the result of applying the supplied function to this value.
-    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Option<U>;
-}
-
-macro_rules! nullable {
-    ($name:ident) => (
-        impl Nullable<ffi::$name> for ffi::$name {
-            fn map<U, F: FnOnce(ffi::$name) -> U>(self, f: F) -> Option<U> {
-                if !self.0.is_null() {
-                    Some(f(self))
-                } else {
-                    None
-                }
-            }
-        }
-    );
-}
-
-nullable!(CXCompilationDatabase);
-nullable!(CXCompileCommand);
-nullable!(CXCompileCommands);
-nullable!(CXCompletionString);
-nullable!(CXCursorSet);
-nullable!(CXDiagnostic);
-nullable!(CXDiagnosticSet);
-nullable!(CXFile);
-nullable!(CXIdxClientASTFile);
-nullable!(CXIdxClientContainer);
-nullable!(CXIdxClientEntity);
-nullable!(CXIdxClientFile);
-nullable!(CXIndex);
-nullable!(CXIndexAction);
-nullable!(CXModule);
-nullable!(CXModuleMapDescriptor);
-nullable!(CXRemapping);
-nullable!(CXTranslationUnit);
-nullable!(CXVirtualFileOverlay);
-
-impl Nullable<ffi::CXCursor> for ffi::CXCursor {
-    fn map<U, F: FnOnce(ffi::CXCursor) -> U>(self, f: F) -> Option<U> {
-        unsafe {
-            let null = ffi::clang_equalCursors(self, ffi::clang_getNullCursor()) != 0;
-
-            if !null && ffi::clang_isInvalid(self.kind) == 0 {
-                Some(f(self))
-            } else {
-                None
-            }
-        }
-    }
-}
-
-impl Nullable<ffi::CXSourceLocation> for ffi::CXSourceLocation {
-    fn map<U, F: FnOnce(ffi::CXSourceLocation) -> U>(self, f: F) -> Option<U> {
-        unsafe {
-            if ffi::clang_equalLocations(self, ffi::clang_getNullLocation()) == 0 {
-                Some(f(self))
-            } else {
-                None
-            }
-        }
-    }
-}
-
-impl Nullable<ffi::CXSourceRange> for ffi::CXSourceRange {
-    fn map<U, F: FnOnce(ffi::CXSourceRange) -> U>(self, f: F) -> Option<U> {
-        unsafe {
-            if ffi::clang_Range_isNull(self) == 0 {
-                Some(f(self))
-            } else {
-                None
-            }
-        }
-    }
-}
-
-impl Nullable<ffi::CXString> for ffi::CXString {
-    fn map<U, F: FnOnce(ffi::CXString) -> U>(self, f: F) -> Option<U> {
-        if !self.data.is_null() {
-            Some(f(self))
-        } else {
-            None
-        }
-    }
-}
-
-impl Nullable<ffi::CXType> for ffi::CXType {
-    fn map<U, F: FnOnce(ffi::CXType) -> U>(self, f: F) -> Option<U> {
-        if self.kind != ffi::CXTypeKind::Invalid {
-            Some(f(self))
-        } else {
-            None
-        }
-    }
-}
-
-impl Nullable<ffi::CXVersion> for ffi::CXVersion {
-    fn map<U, F: FnOnce(ffi::CXVersion) -> U>(self, f: F) -> Option<U> {
-        if self.Major != -1 && self.Minor != -1 && self.Subminor != -1 {
-            Some(f(self))
-        } else {
-            None
-        }
-    }
-}
 
 //================================================
 // Enums
@@ -1268,7 +1072,7 @@ impl Clang {
 
     /// Returns the version string for the version of `libclang` in use.
     pub fn get_version() -> String {
-        unsafe { to_string(ffi::clang_getClangVersion()) }
+        unsafe { utility::to_string(ffi::clang_getClangVersion()) }
     }
 }
 
@@ -1304,7 +1108,7 @@ impl<'c> CompilationDatabase<'c> {
             let mut code = mem::uninitialized();
 
             let ptr = ffi::clang_CompilationDatabase_fromDirectory(
-                from_path(directory).as_ptr(), &mut code
+                utility::from_path(directory).as_ptr(), &mut code
             );
 
             if code == ffi::CXCompilationDatabase_Error::NoError {
@@ -1343,7 +1147,7 @@ impl<'c> CompilationDatabase<'c> {
     pub fn get_commands<F: AsRef<Path>>(&self, file: F) -> Vec<CompileCommand> {
         unsafe {
             let ptr = ffi::clang_CompilationDatabase_getCompileCommands(
-                self.ptr, from_path(file).as_ptr()
+                self.ptr, utility::from_path(file).as_ptr()
             );
 
             self.get_commands_(ptr)
@@ -1389,18 +1193,18 @@ impl<'d> CompileCommand<'d> {
         iter!(
             clang_CompileCommand_getNumArgs(self.ptr),
             clang_CompileCommand_getArg(self.ptr),
-        ).map(to_string).collect()
+        ).map(utility::to_string).collect()
     }
 
     /// Returns the file of this compile command.
     #[cfg(feature="gte_clang_3_8")]
     pub fn get_file(&self) -> PathBuf {
-        unsafe { to_string(ffi::clang_CompileCommand_getFilename(self.ptr)).into() }
+        unsafe { utility::to_string(ffi::clang_CompileCommand_getFilename(self.ptr)).into() }
     }
 
     /// Returns the working directory of this compile command.
     pub fn get_working_directory(&self) -> PathBuf {
-        unsafe { to_string(ffi::clang_CompileCommand_getDirectory(self.ptr)).into() }
+        unsafe { utility::to_string(ffi::clang_CompileCommand_getDirectory(self.ptr)).into() }
     }
 }
 
@@ -1624,7 +1428,7 @@ impl CompletionResults {
     /// Returns the selector or partial selector that has been entered this far for the Objective-C
     /// message send context for this set of code completion results.
     pub fn get_objc_selector(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_codeCompleteGetObjCSelector(self.ptr)) }
+        unsafe { utility::to_string_option(ffi::clang_codeCompleteGetObjCSelector(self.ptr)) }
     }
 
     /// Returns the code completion results in this set of code completion results.
@@ -1638,7 +1442,9 @@ impl CompletionResults {
     /// Returns the USR for the entity that contains the code completion context for this set of
     /// code completion results, if applicable.
     pub fn get_usr(&self) -> Option<Usr> {
-        unsafe { to_string_option(ffi::clang_codeCompleteGetContainerUSR(self.ptr)).map(Usr) }
+        unsafe {
+            utility::to_string_option(ffi::clang_codeCompleteGetContainerUSR(self.ptr)).map(Usr)
+        }
     }
 }
 
@@ -1679,7 +1485,7 @@ impl<'r> CompletionString<'r> {
         iter!(
             clang_getCompletionNumAnnotations(self.raw),
             clang_getCompletionAnnotation(self.raw),
-        ).map(to_string).collect()
+        ).map(utility::to_string).collect()
     }
 
     /// Returns the availability of this completion string.
@@ -1696,7 +1502,7 @@ impl<'r> CompletionString<'r> {
             macro_rules! text {
                 ($variant:ident) => ({
                     let text = unsafe { ffi::clang_getCompletionChunkText(self.raw, i as c_uint) };
-                    CompletionChunk::$variant(to_string(text))
+                    CompletionChunk::$variant(utility::to_string(text))
                 });
             }
 
@@ -1735,13 +1541,15 @@ impl<'r> CompletionString<'r> {
     /// Returns the documentation comment brief associated with the declaration this completion
     /// string refers to, if applicable.
     pub fn get_comment_brief(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_getCompletionBriefComment(self.raw)) }
+        unsafe { utility::to_string_option(ffi::clang_getCompletionBriefComment(self.raw)) }
     }
 
     /// Returns the name of the semantic parent of the declaration this completion string refers to,
     /// if applicable.
     pub fn get_parent_name(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_getCompletionParent(self.raw, ptr::null_mut())) }
+        unsafe {
+            utility::to_string_option(ffi::clang_getCompletionParent(self.raw, ptr::null_mut()))
+        }
     }
 
     /// Returns an integer that represents how likely a user is to select this completion string as
@@ -1813,7 +1621,7 @@ impl<'tu> Diagnostic<'tu> {
 
     /// Returns this diagnostic as a formatted string.
     pub fn format(&self, options: FormatOptions) -> String {
-        unsafe { to_string(ffi::clang_formatDiagnostic(self.ptr, options.into())) }
+        unsafe { utility::to_string(ffi::clang_formatDiagnostic(self.ptr, options.into())) }
     }
 
     /// Returns the child diagnostics of this diagnostic.
@@ -1831,7 +1639,11 @@ impl<'tu> Diagnostic<'tu> {
         unsafe {
             (0..ffi::clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
                 let mut range = mem::uninitialized();
-                let string = to_string(ffi::clang_getDiagnosticFixIt(self.ptr, i, &mut range));
+
+                let string = utility::to_string(
+                    ffi::clang_getDiagnosticFixIt(self.ptr, i, &mut range)
+                );
+
                 let range = SourceRange::from_raw(range, self.tu);
 
                 if string.is_empty() {
@@ -1867,7 +1679,7 @@ impl<'tu> Diagnostic<'tu> {
 
     /// Returns the text of this diagnostic.
     pub fn get_text(&self) -> String {
-        unsafe { to_string(ffi::clang_getDiagnosticSpelling(self.ptr)) }
+        unsafe { utility::to_string(ffi::clang_getDiagnosticSpelling(self.ptr)) }
     }
 }
 
@@ -1951,12 +1763,12 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the comment associated with this AST entity, if any.
     pub fn get_comment(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_Cursor_getRawCommentText(self.raw)) }
+        unsafe { utility::to_string_option(ffi::clang_Cursor_getRawCommentText(self.raw)) }
     }
 
     /// Returns the brief of the comment associated with this AST entity, if any.
     pub fn get_comment_brief(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_Cursor_getBriefCommentText(self.raw)) }
+        unsafe { utility::to_string_option(ffi::clang_Cursor_getBriefCommentText(self.raw)) }
     }
 
     /// Returns the source range of the comment associated with this AST entity, if any.
@@ -1992,7 +1804,7 @@ impl<'tu> Entity<'tu> {
     /// The display name of an entity contains additional information that helps identify the
     /// entity.
     pub fn get_display_name(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
+        unsafe { utility::to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
     }
 
     /// Returns the value of this enum constant declaration, if applicable.
@@ -2060,7 +1872,7 @@ impl<'tu> Entity<'tu> {
     /// Returns the mangled name of this AST entity, if any.
     #[cfg(feature="gte_clang_3_6")]
     pub fn get_mangled_name(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
+        unsafe { utility::to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
     }
 
     /// Returns the mangled names of this C++ constructor or destructor, if applicable.
@@ -2070,7 +1882,7 @@ impl<'tu> Entity<'tu> {
             let set = ffi::clang_Cursor_getCXXManglings(self.raw);
 
             if !set.is_null() && (*set).Count != 0 {
-                Some(to_string_set(set))
+                Some(utility::to_string_set(set))
             } else {
                 None
             }
@@ -2084,7 +1896,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the name of this AST entity, if any.
     pub fn get_name(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_getCursorSpelling(self.raw)) }
+        unsafe { utility::to_string_option(ffi::clang_getCursorSpelling(self.raw)) }
     }
 
     /// Returns the source ranges of the name of this AST entity.
@@ -2152,7 +1964,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the type encoding for this Objective-C declaration, if applicable.
     pub fn get_objc_type_encoding(&self) -> Option<String> {
-        unsafe { to_string_option(ffi::clang_getDeclObjCTypeEncoding(self.raw)) }
+        unsafe { utility::to_string_option(ffi::clang_getDeclObjCTypeEncoding(self.raw)) }
     }
 
     /// Returns which qualifiers were applied to this Objective-C method return or parameter type,
@@ -2288,7 +2100,8 @@ impl<'tu> Entity<'tu> {
                         TemplateArgument::Integral(signed as i64, unsigned as u64)
                     },
                     ffi::CXTemplateArgumentKind::Template => TemplateArgument::Template,
-                    ffi::CXTemplateArgumentKind::TemplateExpansion => TemplateArgument::TemplateExpansion,
+                    ffi::CXTemplateArgumentKind::TemplateExpansion =>
+                        TemplateArgument::TemplateExpansion,
                     ffi::CXTemplateArgumentKind::Expression => TemplateArgument::Expression,
                     ffi::CXTemplateArgumentKind::Pack => TemplateArgument::Pack,
                     _ => unreachable!(),
@@ -2328,7 +2141,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the USR for this AST entity, if any.
     pub fn get_usr(&self) -> Option<Usr> {
-        unsafe { to_string_option(ffi::clang_getCursorUSR(self.raw)).map(Usr) }
+        unsafe { utility::to_string_option(ffi::clang_getCursorUSR(self.raw)).map(Usr) }
     }
 
     /// Returns the linker visibility for this AST entity, if any.
@@ -2422,7 +2235,8 @@ impl<'tu> Entity<'tu> {
             fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult;
         }
 
-        impl<'tu, F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult> EntityCallback<'tu> for F {
+        impl<'tu, F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult>
+        EntityCallback<'tu> for F {
             fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult {
                 self(entity, parent)
             }
@@ -2582,7 +2396,7 @@ impl<'tu> File<'tu> {
     /// Returns the absolute path to this file.
     pub fn get_path(&self) -> PathBuf {
         let path = unsafe { ffi::clang_getFileName(self.ptr) };
-        Path::new(&to_string(path)).into()
+        Path::new(&utility::to_string(path)).into()
     }
 
     /// Returns the references to the supplied entity in this file.
@@ -2776,13 +2590,13 @@ impl<'tu> Module<'tu> {
     /// Returns the full name of this module (e.g., `std.vector` for the `std.vector` module).
     pub fn get_full_name(&self) -> String {
         let name = unsafe { ffi::clang_Module_getFullName(self.ptr) };
-        to_string(name)
+        utility::to_string(name)
     }
 
     /// Returns the name of this module (e.g., `vector` for the `std.vector` module).
     pub fn get_name(&self) -> String {
         let name = unsafe { ffi::clang_Module_getName(self.ptr) };
-        to_string(name)
+        utility::to_string(name)
     }
 
     /// Returns the parent of this module, if any.
@@ -2933,12 +2747,12 @@ impl PlatformAvailability {
 
     fn from_raw(mut raw: ffi::CXPlatformAvailability) -> PlatformAvailability {
         let availability = PlatformAvailability {
-            platform: to_string(raw.Platform),
+            platform: utility::to_string(raw.Platform),
             unavailable: raw.Unavailable != 0,
             introduced: raw.Introduced.map(Version::from_raw),
             deprecated: raw.Deprecated.map(Version::from_raw),
             obsoleted: raw.Obsoleted.map(Version::from_raw),
-            message: to_string_option(raw.Message),
+            message: utility::to_string_option(raw.Message),
         };
 
         unsafe { ffi::clang_disposeCXPlatformAvailability(&mut raw); }
@@ -3006,7 +2820,7 @@ impl<'tu> SourceLocation<'tu> {
         unsafe {
             let (mut file, mut line, mut column) = mem::uninitialized();
             ffi::clang_getPresumedLocation(self.raw, &mut file, &mut line, &mut column);
-            (to_string(file), line as u32, column as u32)
+            (utility::to_string(file), line as u32, column as u32)
         }
     }
 
@@ -3176,7 +2990,7 @@ impl<'tu> Token<'tu> {
 
     /// Returns the textual representation of this token.
     pub fn get_spelling(&self) -> String {
-        unsafe { to_string(ffi::clang_getTokenSpelling(self.tu.ptr, self.raw)) }
+        unsafe { utility::to_string(ffi::clang_getTokenSpelling(self.tu.ptr, self.raw)) }
     }
 }
 
@@ -3213,7 +3027,8 @@ impl<'i> TranslationUnit<'i> {
     pub fn from_ast<F: AsRef<Path>>(
         index: &'i Index, file: F
     ) -> Result<TranslationUnit<'i>, ()> {
-        let ptr = unsafe { ffi::clang_createTranslationUnit(index.ptr, from_path(file).as_ptr()) };
+        let path = utility::from_path(file);
+        let ptr = unsafe { ffi::clang_createTranslationUnit(index.ptr, path.as_ptr()) };
         ptr.map(TranslationUnit::from_ptr).ok_or(())
     }
 
@@ -3239,7 +3054,7 @@ impl<'i> TranslationUnit<'i> {
         unsaved: &[Unsaved],
         options: ParseOptions,
     ) -> Result<TranslationUnit<'i>, SourceError> {
-        let arguments = arguments.iter().map(from_string).collect::<Vec<_>>();
+        let arguments = arguments.iter().map(utility::from_string).collect::<Vec<_>>();
         let arguments = arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
         let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
 
@@ -3248,7 +3063,7 @@ impl<'i> TranslationUnit<'i> {
 
             let code = ffi::clang_parseTranslationUnit2(
                 index.ptr,
-                from_path(file).as_ptr(),
+                utility::from_path(file).as_ptr(),
                 arguments.as_ptr(),
                 arguments.len() as c_int,
                 mem::transmute(unsaved.as_ptr()),
@@ -3294,7 +3109,7 @@ impl<'i> TranslationUnit<'i> {
         unsafe {
             let ptr = ffi::clang_codeCompleteAt(
                 self.ptr,
-                from_path(file).as_ptr(),
+                utility::from_path(file).as_ptr(),
                 line as c_uint,
                 column as c_uint,
                 mem::transmute(unsaved.as_ptr()),
@@ -3320,7 +3135,7 @@ impl<'i> TranslationUnit<'i> {
 
     /// Returns the file at the supplied path in this translation unit, if any.
     pub fn get_file<F: AsRef<Path>>(&'i self, file: F) -> Option<File<'i>> {
-        let file = unsafe { ffi::clang_getFile(self.ptr, from_path(file).as_ptr()) };
+        let file = unsafe { ffi::clang_getFile(self.ptr, utility::from_path(file).as_ptr()) };
         file.map(|f| File::from_ptr(f, self))
     }
 
@@ -3344,7 +3159,7 @@ impl<'i> TranslationUnit<'i> {
     pub fn save<F: AsRef<Path>>(&self, file: F) -> Result<(), SaveError> {
         let code = unsafe {
             ffi::clang_saveTranslationUnit(
-                self.ptr, from_path(file).as_ptr(), ffi::CXSaveTranslationUnit_None
+                self.ptr, utility::from_path(file).as_ptr(), ffi::CXSaveTranslationUnit_None
             )
         };
 
@@ -3397,7 +3212,9 @@ impl<'i> Drop for TranslationUnit<'i> {
 impl<'i> fmt::Debug for TranslationUnit<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let spelling = unsafe { ffi::clang_getTranslationUnitSpelling(self.ptr) };
-        formatter.debug_struct("TranslationUnit").field("spelling", &to_string(spelling)).finish()
+        formatter.debug_struct("TranslationUnit")
+            .field("spelling", &utility::to_string(spelling))
+            .finish()
     }
 }
 
@@ -3472,7 +3289,7 @@ impl<'tu> Type<'tu> {
 
     /// Returns the display name of this type.
     pub fn get_display_name(&self) -> String {
-        unsafe { to_string(ffi::clang_getTypeSpelling(self.raw)) }
+        unsafe { utility::to_string(ffi::clang_getTypeSpelling(self.raw)) }
     }
 
     /// Returns the element type for this array, complex, or vector type, if applicable.
@@ -3506,7 +3323,7 @@ impl<'tu> Type<'tu> {
     /// * this record type does not contain a field with the supplied name
     pub fn get_offsetof<F: AsRef<str>>(&self, field: F) -> Result<usize, OffsetofError> {
         unsafe {
-            match ffi::clang_Type_getOffsetOf(self.raw, from_string(field).as_ptr()) {
+            match ffi::clang_Type_getOffsetOf(self.raw, utility::from_string(field).as_ptr()) {
                 -1 => Err(OffsetofError::Parent),
                 -2 => Err(OffsetofError::Incomplete),
                 -3 => Err(OffsetofError::Dependent),
@@ -3694,7 +3511,7 @@ impl Unsaved {
 
     /// Constructs a new `Unsaved`.
     pub fn new<P: AsRef<Path>, C: AsRef<str>>(path: P, contents: C) -> Unsaved {
-        Unsaved { path: from_path(path), contents: from_string(contents) }
+        Unsaved { path: utility::from_path(path), contents: utility::from_string(contents) }
     }
 
     //- Accessors --------------------------------
@@ -3724,54 +3541,57 @@ impl Usr {
     pub fn from_objc_category<C1: AsRef<str>, C2: AsRef<str>>(class: C1, category: C2) -> Usr {
         let raw = unsafe {
             ffi::clang_constructUSR_ObjCCategory(
-                from_string(class).as_ptr(), from_string(category).as_ptr()
+                utility::from_string(class).as_ptr(), utility::from_string(category).as_ptr()
             )
         };
 
-        Usr(to_string(raw))
+        Usr(utility::to_string(raw))
     }
 
     /// Constructs a new `Usr` from an Objective-C class.
     pub fn from_objc_class<C: AsRef<str>>(class: C) -> Usr {
-        unsafe { Usr(to_string(ffi::clang_constructUSR_ObjCClass(from_string(class).as_ptr()))) }
+        let class = utility::from_string(class);
+        unsafe { Usr(utility::to_string(ffi::clang_constructUSR_ObjCClass(class.as_ptr()))) }
     }
 
     /// Constructs a new `Usr` from an Objective-C instance variable.
     pub fn from_objc_ivar<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
-        with_string(&class.0, |s| {
-            let raw = unsafe { ffi::clang_constructUSR_ObjCIvar(from_string(name).as_ptr(), s) };
-            Usr(to_string(raw))
+        utility::with_string(&class.0, |s| {
+            let name = utility::from_string(name);
+            let raw = unsafe { ffi::clang_constructUSR_ObjCIvar(name.as_ptr(), s) };
+            Usr(utility::to_string(raw))
         })
     }
 
     /// Constructs a new `Usr` from an Objective-C method.
     pub fn from_objc_method<N: AsRef<str>>(class: &Usr, name: N, instance: bool) -> Usr {
-        with_string(&class.0, |s| {
+        utility::with_string(&class.0, |s| {
             let raw = unsafe {
                 ffi::clang_constructUSR_ObjCMethod(
-                    from_string(name).as_ptr(), instance as c_uint, s
+                    utility::from_string(name).as_ptr(), instance as c_uint, s
                 )
             };
 
-            Usr(to_string(raw))
+            Usr(utility::to_string(raw))
         })
     }
 
     /// Constructs a new `Usr` from an Objective-C property.
     pub fn from_objc_property<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
-        with_string(&class.0, |s| {
+        utility::with_string(&class.0, |s| {
             let raw = unsafe {
-                ffi::clang_constructUSR_ObjCProperty(from_string(name).as_ptr(), s)
+                ffi::clang_constructUSR_ObjCProperty(utility::from_string(name).as_ptr(), s)
             };
 
-            Usr(to_string(raw))
+            Usr(utility::to_string(raw))
         })
     }
 
     /// Constructs a new `Usr` from an Objective-C protocol.
     pub fn from_objc_protocol<P: AsRef<str>>(protocol: P) -> Usr {
         unsafe {
-            Usr(to_string(ffi::clang_constructUSR_ObjCProtocol(from_string(protocol).as_ptr())))
+            let string = utility::from_string(protocol);
+            Usr(utility::to_string(ffi::clang_constructUSR_ObjCProtocol(string.as_ptr())))
         }
     }
 }
@@ -3800,48 +3620,6 @@ impl Version {
 //================================================
 // Functions
 //================================================
-
-fn from_path<P: AsRef<Path>>(path: P) -> std::ffi::CString {
-    from_string(path.as_ref().as_os_str().to_str().expect("invalid C string"))
-}
-
-fn from_string<S: AsRef<str>>(string: S) -> std::ffi::CString {
-    std::ffi::CString::new(string.as_ref()).expect("invalid C string")
-}
-
-fn to_string(clang: ffi::CXString) -> String {
-    unsafe {
-        let c = std::ffi::CStr::from_ptr(ffi::clang_getCString(clang));
-        let rust = c.to_str().expect("invalid Rust string").into();
-        ffi::clang_disposeString(clang);
-        rust
-    }
-}
-
-#[cfg(feature="gte_clang_3_8")]
-fn to_string_set(clang: *mut ffi::CXStringSet) -> Vec<String> {
-    unsafe {
-        let c = slice::from_raw_parts((*clang).Strings, (*clang).Count as usize);
-
-        let rust = c.iter().map(|c| {
-            let c = std::ffi::CStr::from_ptr(ffi::clang_getCString(*c));
-            c.to_str().expect("invalid Rust string").into()
-        }).collect();
-
-        ffi::clang_disposeStringSet(clang);
-        rust
-    }
-}
-
-fn to_string_option(clang: ffi::CXString) -> Option<String> {
-    clang.map(to_string).and_then(|s| {
-        if !s.is_empty() {
-            Some(s)
-        } else {
-            None
-        }
-    })
-}
 
 fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     where F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
@@ -3880,14 +3658,4 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     };
 
     g(visitor) == ffi::CXResult::VisitBreak
-}
-
-fn with_string<S: AsRef<str>, T, F: FnOnce(ffi::CXString) -> T>(string: S, f: F) -> T {
-    let string = from_string(string);
-
-    let cxstring = unsafe {
-        ffi::CXString { data: mem::transmute(string.as_ptr()), private_flags: 0 }
-    };
-
-    f(cxstring)
 }
