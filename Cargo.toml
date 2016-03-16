@@ -6,7 +6,7 @@ authors = ["Kyle Mayes <kyle@mayeses.com>"]
 version = "0.5.1"
 
 readme = "README.md"
-license = "MIT"
+license = "Apache-2.0"
 
 description = "An idiomatic Rust wrapper for libclang."
 
