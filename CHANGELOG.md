@@ -52,3 +52,5 @@
 
 ### Added
 - Added implementations of `std::error::Error` for error enums
+
+## [0.5.2] - 2016-3-16
