@@ -140,10 +140,8 @@ nullable!(CXIdxClientFile);
 nullable!(CXIndex);
 nullable!(CXIndexAction);
 nullable!(CXModule);
-nullable!(CXModuleMapDescriptor);
 nullable!(CXRemapping);
 nullable!(CXTranslationUnit);
-nullable!(CXVirtualFileOverlay);
 
 impl Nullable for ffi::CXCursor {
     fn map<U, F: FnOnce(ffi::CXCursor) -> U>(self, f: F) -> Option<U> {
