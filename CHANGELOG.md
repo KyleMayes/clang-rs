@@ -55,7 +55,7 @@
 
 ## [0.5.2] - 2016-3-16
 
-## [0.5.3] - UNRELEASED
+## [0.5.3] - 2016-3-21
 
 ### Added
 - Added support for finding `libclang`
