@@ -31,7 +31,7 @@ libc = "0.2.8"
 
 [dependencies.clang-sys]
 
-version = "0.3.0"
+version = "0.3.1"
 features = ["clang_3_5"]
 
 [dependencies.clippy]

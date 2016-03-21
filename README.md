@@ -13,13 +13,11 @@ Released under the MIT license.
 ### Dependencies
 
 This crate depends on `libclang.dll` (Windows), `libclang.so` (Linux), or `libclang.dylib` (OS X).
-These binaries can be either be installed as a part of clang or downloaded
+These binaries can be either be installed as a part of Clang or downloaded
 [here](http://llvm.org/releases/download.html).
 
-#### Windows
-
-On Windows, `libclang.dll` should be placed in `<rust>\lib\rustlib\*-pc-windows-*\lib` where
-`<rust>` is your Rust installation directory.
+The `libclang` binary will be looked for in likely places (e.g., `/usr/lib` on Linux), but you can
+specify the directory the `libclang` binary is in with the `LIBCLANG_PATH` environment variable.
 
 ### Supported Versions
 
