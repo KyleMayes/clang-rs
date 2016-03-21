@@ -10,9 +10,8 @@ rust:
 before_script:
   - wget http://llvm.org/releases/3.6.2/clang+llvm-3.6.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
   - tar -xf clang+llvm-3.6.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-  - export LIBCLANG=$PWD/clang+llvm-3.6.2-x86_64-linux-gnu-ubuntu-14.04/lib/libclang.so
+  - export LIBCLANG_PATH=$PWD/clang+llvm-3.6.2-x86_64-linux-gnu-ubuntu-14.04/lib
 
 script:
   - cargo build --verbose --features clang_3_6
-  - cp $LIBCLANG target/debug/deps/libclang.so
   - cargo test --verbose
