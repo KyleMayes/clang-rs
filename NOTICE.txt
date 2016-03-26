@@ -1,13 +1,24 @@
+clang-rs
 Copyright 2016 Kyle Mayes
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+The following components are provided under the Apache License 2.0.
+    clang-sys (https://github.com/KyleMayes/clang-sys)
+    libc (https://github.com/rust-lang/libc)
 
-    http://www.apache.org/licenses/LICENSE-2.0
+The following components are provided under the MIT license.
+    lazy-static.rs (https://github.com/rust-lang-nursery/lazy-static.rs)
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+==================================================
+clang-sys
+==================================================
+
+clang-sys
+Copyright 2016 Kyle Mayes
+
+The following components are provided under the Apache License 2.0.
+    bitflags (https://github.com/rust-lang-nursery/bitflags)
+    libc (https://github.com/rust-lang/libc)
+    rustc-version-rs (https://github.com/Kimundi/rustc-version-rs)
+
+The following components are provided under the UIUC license.
+    libclang (http://clang.llvm.org)
