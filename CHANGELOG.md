@@ -75,3 +75,6 @@
 
 ### Added
 - Added `static` feature
+
+### Changed
+- Bumped `clang-sys` version to `0.4.0`
