@@ -36,5 +36,5 @@ features = ["clang_3_5"]
 
 [dependencies.clippy]
 
-version = "0.0.53"
+version = "0.0.56"
 optional = true
