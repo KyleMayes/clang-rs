@@ -70,3 +70,8 @@
 
 ### Changed
 - Bumped `clang-sys` version to `0.3.1`
+
+## [0.5.4] - UNRELEASED
+
+### Added
+- Added `static` feature

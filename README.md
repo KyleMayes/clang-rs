@@ -19,6 +19,10 @@ These binaries can be either be installed as a part of Clang or downloaded
 The `libclang` binary will be looked for in likely places (e.g., `/usr/lib` on Linux), but you can
 specify the directory the `libclang` binary is in with the `LIBCLANG_PATH` environment variable.
 
+If you want to link to `libclang` statically, set the `LIBCLANG_STATIC` environment variable or
+enable the `static` feature. You can specify the directory the various LLVM and Clang static
+libraries are searched for with the `LIBCLANG_STATIC_PATH` environment variable.
+
 ### Supported Versions
 
 * 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
