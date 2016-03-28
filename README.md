@@ -8,7 +8,7 @@ An idiomatic Rust wrapper for libclang.
 
 Supported on the stable, beta, and nightly Rust channels.
 
-Released under the MIT license.
+Released under the Apache License 2.0.
 
 ### Dependencies
 
