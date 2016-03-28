@@ -5,6 +5,7 @@
 
 ### Changed
 - Moved FFI bindings into separate crate (`clang-sys`)
+- Bumped `libc` version to `0.2.4`
 
 ## [0.2.1] - 2015-12-22
 
@@ -18,17 +19,20 @@
 
 ## [0.3.0] - 2015-12-27
 
+### Removed
+- Removed `sonar` module
+
 ### Added
 - Added implementations of `From` to `String` for error enums
 - Added integer categorization methods to `Type` struct
 
-### Removed
-- Removed `sonar` module
+### Changed
+- Bumped `clang-sys` version to `0.1.1`
 
 ## [0.3.1] - 2016-2-5
 
 ### Changed
-- Bumped `clang-sys` version
+- Bumped `clang-sys` version to `0.1.2`
 
 ## [0.4.0] - 2016-2-13
 
@@ -40,8 +44,8 @@
 
 ### Changed
 - Simplified internal usage of conditional compilation
-- Bumped `clang-sys` version
-- Bumped `libc` version
+- Bumped `clang-sys` version to `0.2.0`
+- Bumped `libc` version to `0.2.7`
 
 ## [0.5.0] - 2016-3-9
 
@@ -55,7 +59,14 @@
 
 ## [0.5.2] - 2016-3-16
 
+### Changed
+- Bumped `clang-sys` version to `0.3.0`
+- Bumped `libc` version to `0.2.8`
+
 ## [0.5.3] - 2016-3-21
 
 ### Added
 - Added support for finding `libclang`
+
+### Changed
+- Bumped `clang-sys` version to `0.3.1`
