@@ -21,6 +21,31 @@ use super::{Entity, EntityKind, Type, TypeKind};
 type Seen = HashSet<String>;
 
 //================================================
+// Structs
+//================================================
+
+// Declaration ___________________________________
+
+/// A C declaration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Declaration<'tu> {
+    /// The name of the declaration.
+    pub name: String,
+    /// The entity that describes the declaration (e.g., contains the fields of a struct).
+    pub entity: Entity<'tu>,
+    /// The entity the declaration originated from if it differs from `entity`.
+    pub source: Option<Entity<'tu>>,
+}
+
+impl<'tu> Declaration<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(name: String, entity: Entity<'tu>, source: Option<Entity<'tu>>) -> Declaration<'tu> {
+        Declaration { name: name, entity: entity, source: source }
+    }
+}
+
+//================================================
 // Functions
 //================================================
 
@@ -49,7 +74,7 @@ fn is_pointer(type_: Type) -> bool {
     type_.get_kind() == TypeKind::Pointer
 }
 
-fn visit<'tu, F: FnMut(Entity<'tu>)>(
+fn visit<'tu, F: FnMut(Declaration<'tu>)>(
     entities: &[Entity<'tu>], mut f: F, kind: EntityKind, prefix: &str
 ) -> () {
     let mut seen = Seen::new();
@@ -58,16 +83,17 @@ fn visit<'tu, F: FnMut(Entity<'tu>)>(
         if entity.get_kind() == kind {
             if let Some(name) = entity.get_name() {
                 if !seen.contains(&name) {
-                    f(*entity);
+                    f(Declaration::new(entity.get_name().unwrap(), *entity, None));
                     seen.insert(name);
                 }
             }
         } else if entity.get_kind() == EntityKind::TypedefDecl {
             let underlying = entity.get_typedef_underlying_type().unwrap();
             let name = entity.get_name().unwrap();
+            let declaration = underlying.get_declaration().unwrap();
 
             if is(underlying, prefix) && !seen.contains(&name) {
-                f(*entity);
+                f(Declaration::new(entity.get_name().unwrap(), declaration, Some(*entity)));
                 seen.insert(name);
             }
         }
@@ -77,7 +103,7 @@ fn visit<'tu, F: FnMut(Entity<'tu>)>(
 /// Finds the enums in the supplied entities.
 ///
 /// If an enum is encountered multiple times, only the first instance is collected.
-pub fn find_enums<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
+pub fn find_enums<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
     let mut enums = vec![];
     visit_enums(entities, |e| enums.push(e));
     enums
@@ -87,14 +113,14 @@ pub fn find_enums<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
 ///
 /// If an enum is encountered multiple times, only the first instance is visited.
 #[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_enums<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], f: F) {
+pub fn visit_enums<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], f: F) {
     visit(entities, f, EntityKind::EnumDecl, "enum ");
 }
 
 /// Finds the functions in the supplied entities.
 ///
 /// If a function is encountered multiple times, only the first instance is collected.
-pub fn find_functions<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
+pub fn find_functions<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
     let mut functions = vec![];
     visit_functions(entities, |e| functions.push(e));
     functions
@@ -104,14 +130,14 @@ pub fn find_functions<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
 ///
 /// If a function is encountered multiple times, only the first instance is visited.
 #[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_functions<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], mut f: F) {
+pub fn visit_functions<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], mut f: F) {
     let mut seen = Seen::new();
 
     for entity in entities.iter().filter(|e| e.get_kind() == EntityKind::FunctionDecl) {
         let name = entity.get_name().unwrap();
 
         if !seen.contains(&name) {
-            f(*entity);
+            f(Declaration::new(name.clone(), *entity, None));
             seen.insert(name);
         }
     }
@@ -120,7 +146,7 @@ pub fn visit_functions<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], mut
 /// Finds the structs in the supplied entities.
 ///
 /// If a struct is encountered multiple times, only the first instance is collected.
-pub fn find_structs<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
+pub fn find_structs<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
     let mut structs = vec![];
     visit_structs(entities, |e| structs.push(e));
     structs
@@ -130,14 +156,14 @@ pub fn find_structs<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
 ///
 /// If a struct is encountered multiple times, only the first instance is visited.
 #[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_structs<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], f: F) {
+pub fn visit_structs<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], f: F) {
     visit(entities, f, EntityKind::StructDecl, "struct ");
 }
 
 /// Finds the typedefs in the supplied entities.
 ///
 /// If a typedef is encountered multiple times, only the first instance is collected.
-pub fn find_typedefs<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
+pub fn find_typedefs<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
     let mut typedefs = vec![];
     visit_typedefs(entities, |e| typedefs.push(e));
     typedefs
@@ -147,7 +173,7 @@ pub fn find_typedefs<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
 ///
 /// If a typedef is encountered multiple times, only the first instance is visited.
 #[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_typedefs<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], mut f: F) {
+pub fn visit_typedefs<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], mut f: F) {
     let mut seen = Seen::new();
 
     for entity in entities.iter().filter(|e| e.get_kind() == EntityKind::TypedefDecl) {
@@ -162,7 +188,7 @@ pub fn visit_typedefs<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], mut 
                 is_alias(underlying, &display);
 
             if typedef {
-                f(*entity);
+                f(Declaration::new(name.clone(), *entity, None));
                 seen.insert(name);
             }
         }
@@ -172,7 +198,7 @@ pub fn visit_typedefs<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], mut 
 /// Finds the unions in the supplied entities.
 ///
 /// If a union is encountered multiple times, only the first instance is collected.
-pub fn find_unions<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
+pub fn find_unions<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
     let mut unions = vec![];
     visit_unions(entities, |e| unions.push(e));
     unions
@@ -182,6 +208,6 @@ pub fn find_unions<'tu>(entities: &[Entity<'tu>]) -> Vec<Entity<'tu>> {
 ///
 /// If a union is encountered multiple times, only the first instance is visited.
 #[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_unions<'tu, F: FnMut(Entity<'tu>)>(entities: &[Entity<'tu>], f: F) {
+pub fn visit_unions<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], f: F) {
     visit(entities, f, EntityKind::UnionDecl, "union ");
 }

@@ -78,3 +78,8 @@
 
 ### Changed
 - Bumped `clang-sys` version to `0.4.0`
+
+## [0.6.0] - UNRELEASED
+
+### Changed
+- Changed `sonar` interface

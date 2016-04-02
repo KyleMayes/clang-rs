@@ -1271,10 +1271,21 @@ fn test() {
         let enums = sonar::find_enums(&e.get_children()[..]);
         assert_eq!(enums.len(), 4);
 
-        assert_eq!(enums[0].get_name(), Some("A".into()));
-        assert_eq!(enums[1].get_name(), Some("B".into()));
-        assert_eq!(enums[2].get_name(), Some("C".into()));
-        assert_eq!(enums[3].get_name(), Some("D".into()));
+        assert_eq!(enums[0].name, "A");
+        assert_eq!(enums[0].entity.get_name(), Some("A".into()));
+        assert!(enums[0].source.is_none());
+
+        assert_eq!(enums[1].name, "B");
+        assert_eq!(enums[1].entity.get_name(), Some("B".into()));
+        assert!(enums[1].source.is_none());
+
+        assert_eq!(enums[2].name, "C");
+        assert_eq!(enums[2].entity.get_name(), None);
+        assert_eq!(enums[2].source.unwrap().get_name(), Some("C".into()));
+
+        assert_eq!(enums[3].name, "D");
+        assert_eq!(enums[3].entity.get_name(), Some("D".into()));
+        assert!(enums[3].source.is_none());
     });
 
     let source = "
@@ -1293,11 +1304,25 @@ fn test() {
         let functions = sonar::find_functions(&e.get_children()[..]);
         assert_eq!(functions.len(), 5);
 
-        assert_eq!(functions[0].get_name(), Some("multiple".into()));
-        assert_eq!(functions[1].get_name(), Some("zero".into()));
-        assert_eq!(functions[2].get_name(), Some("one".into()));
-        assert_eq!(functions[3].get_name(), Some("two".into()));
-        assert_eq!(functions[4].get_name(), Some("many".into()));
+        assert_eq!(functions[0].name, "multiple");
+        assert_eq!(functions[0].entity.get_name(), Some("multiple".into()));
+        assert!(functions[0].source.is_none());
+
+        assert_eq!(functions[1].name, "zero");
+        assert_eq!(functions[1].entity.get_name(), Some("zero".into()));
+        assert!(functions[1].source.is_none());
+
+        assert_eq!(functions[2].name, "one");
+        assert_eq!(functions[2].entity.get_name(), Some("one".into()));
+        assert!(functions[2].source.is_none());
+
+        assert_eq!(functions[3].name, "two");
+        assert_eq!(functions[3].entity.get_name(), Some("two".into()));
+        assert!(functions[3].source.is_none());
+
+        assert_eq!(functions[4].name, "many");
+        assert_eq!(functions[4].entity.get_name(), Some("many".into()));
+        assert!(functions[4].source.is_none());
     });
 
     let source = "
@@ -1324,10 +1349,21 @@ fn test() {
         let structs = sonar::find_structs(&e.get_children()[..]);
         assert_eq!(structs.len(), 4);
 
-        assert_eq!(structs[0].get_name(), Some("A".into()));
-        assert_eq!(structs[1].get_name(), Some("B".into()));
-        assert_eq!(structs[2].get_name(), Some("C".into()));
-        assert_eq!(structs[3].get_name(), Some("D".into()));
+        assert_eq!(structs[0].name, "A");
+        assert_eq!(structs[0].entity.get_name(), Some("A".into()));
+        assert!(structs[0].source.is_none());
+
+        assert_eq!(structs[1].name, "B");
+        assert_eq!(structs[1].entity.get_name(), Some("B".into()));
+        assert!(structs[1].source.is_none());
+
+        assert_eq!(structs[2].name, "C");
+        assert_eq!(structs[2].entity.get_name(), None);
+        assert_eq!(structs[2].source.unwrap().get_name(), Some("C".into()));
+
+        assert_eq!(structs[3].name, "D");
+        assert_eq!(structs[3].entity.get_name(), Some("D".into()));
+        assert!(structs[3].source.is_none());
     });
 
     let source = "
@@ -1357,18 +1393,53 @@ fn test() {
         let typedefs = sonar::find_typedefs(&e.get_children()[..]);
         assert_eq!(typedefs.len(), 12);
 
-        assert_eq!(typedefs[0].get_name(), Some("Integer".into()));
-        assert_eq!(typedefs[1].get_name(), Some("IntegerTypedef".into()));
-        assert_eq!(typedefs[2].get_name(), Some("IntegerTypedefTypedef".into()));
-        assert_eq!(typedefs[3].get_name(), Some("IntegerPointer".into()));
-        assert_eq!(typedefs[4].get_name(), Some("Function".into()));
-        assert_eq!(typedefs[5].get_name(), Some("FunctionPointer".into()));
-        assert_eq!(typedefs[6].get_name(), Some("Enum".into()));
-        assert_eq!(typedefs[7].get_name(), Some("EnumTypedef".into()));
-        assert_eq!(typedefs[8].get_name(), Some("Struct".into()));
-        assert_eq!(typedefs[9].get_name(), Some("StructTypedef".into()));
-        assert_eq!(typedefs[10].get_name(), Some("Union".into()));
-        assert_eq!(typedefs[11].get_name(), Some("UnionTypedef".into()));
+        assert_eq!(typedefs[0].name, "Integer");
+        assert_eq!(typedefs[0].entity.get_name(), Some("Integer".into()));
+        assert!(typedefs[0].source.is_none());
+
+        assert_eq!(typedefs[1].name, "IntegerTypedef");
+        assert_eq!(typedefs[1].entity.get_name(), Some("IntegerTypedef".into()));
+        assert!(typedefs[1].source.is_none());
+
+        assert_eq!(typedefs[2].name, "IntegerTypedefTypedef");
+        assert_eq!(typedefs[2].entity.get_name(), Some("IntegerTypedefTypedef".into()));
+        assert!(typedefs[2].source.is_none());
+
+        assert_eq!(typedefs[3].name, "IntegerPointer");
+        assert_eq!(typedefs[3].entity.get_name(), Some("IntegerPointer".into()));
+        assert!(typedefs[3].source.is_none());
+
+        assert_eq!(typedefs[4].name, "Function");
+        assert_eq!(typedefs[4].entity.get_name(), Some("Function".into()));
+        assert!(typedefs[4].source.is_none());
+
+        assert_eq!(typedefs[5].name, "FunctionPointer");
+        assert_eq!(typedefs[5].entity.get_name(), Some("FunctionPointer".into()));
+        assert!(typedefs[5].source.is_none());
+
+        assert_eq!(typedefs[6].name, "Enum");
+        assert_eq!(typedefs[6].entity.get_name(), Some("Enum".into()));
+        assert!(typedefs[6].source.is_none());
+
+        assert_eq!(typedefs[7].name, "EnumTypedef");
+        assert_eq!(typedefs[7].entity.get_name(), Some("EnumTypedef".into()));
+        assert!(typedefs[7].source.is_none());
+
+        assert_eq!(typedefs[8].name, "Struct");
+        assert_eq!(typedefs[8].entity.get_name(), Some("Struct".into()));
+        assert!(typedefs[8].source.is_none());
+
+        assert_eq!(typedefs[9].name, "StructTypedef");
+        assert_eq!(typedefs[9].entity.get_name(), Some("StructTypedef".into()));
+        assert!(typedefs[9].source.is_none());
+
+        assert_eq!(typedefs[10].name, "Union");
+        assert_eq!(typedefs[10].entity.get_name(), Some("Union".into()));
+        assert!(typedefs[10].source.is_none());
+
+        assert_eq!(typedefs[11].name, "UnionTypedef");
+        assert_eq!(typedefs[11].entity.get_name(), Some("UnionTypedef".into()));
+        assert!(typedefs[11].source.is_none());
     });
 
     let source = "
@@ -1399,9 +1470,20 @@ fn test() {
         let unions = sonar::find_unions(&e.get_children()[..]);
         assert_eq!(unions.len(), 4);
 
-        assert_eq!(unions[0].get_name(), Some("A".into()));
-        assert_eq!(unions[1].get_name(), Some("B".into()));
-        assert_eq!(unions[2].get_name(), Some("C".into()));
-        assert_eq!(unions[3].get_name(), Some("D".into()));
+        assert_eq!(unions[0].name, "A");
+        assert_eq!(unions[0].entity.get_name(), Some("A".into()));
+        assert!(unions[0].source.is_none());
+
+        assert_eq!(unions[1].name, "B");
+        assert_eq!(unions[1].entity.get_name(), Some("B".into()));
+        assert!(unions[1].source.is_none());
+
+        assert_eq!(unions[2].name, "C");
+        assert_eq!(unions[2].entity.get_name(), None);
+        assert_eq!(unions[2].source.unwrap().get_name(), Some("C".into()));
+
+        assert_eq!(unions[3].name, "D");
+        assert_eq!(unions[3].entity.get_name(), Some("D".into()));
+        assert!(unions[3].source.is_none());
     });
 }
