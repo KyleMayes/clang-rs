@@ -2114,7 +2114,7 @@ impl<'tu> Entity<'tu> {
             unsafe {
                 let &mut (tu, ref mut callback):
                     &mut (&TranslationUnit, Box<EntityCallback>) =
-                        mem::transmute(data);
+                        &mut *(data as *mut (&TranslationUnit, Box<EntityCallback>));
 
                 let entity = Entity::from_raw(cursor, tu);
                 let parent = Entity::from_raw(parent, tu);
@@ -3454,7 +3454,7 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
         unsafe {
             let &mut (tu, ref mut callback):
                 &mut (&TranslationUnit, Box<Callback>) =
-                    mem::transmute(data);
+                    &mut *(data as *mut (&TranslationUnit, Box<Callback>));
 
             if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
                 ffi::CXVisitorResult::Continue
