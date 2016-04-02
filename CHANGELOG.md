@@ -86,3 +86,9 @@
 
 ### Changed
 - Changed `sonar` interface
+
+## [0.6.1] - UNRELEASED
+
+### Changed
+- Bumped `clang-sys` version to `0.4.1`
+- Bumped `libc` version to `0.2.9`
