@@ -81,5 +81,8 @@
 
 ## [0.6.0] - UNRELEASED
 
+### Added
+- Added preprocessor definition finding to `sonar` module
+
 ### Changed
 - Changed `sonar` interface

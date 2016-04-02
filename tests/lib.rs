@@ -1240,6 +1240,41 @@ fn test() {
     //============================================
 
     let source = "
+        #define A 4
+        #define B -322
+        #define C 3.14159
+        #define D -2.71828
+    ";
+
+    with_temporary_file("header.h", source, |_, f| {
+        use clang::sonar::{DefinitionValue};
+
+        let index = Index::new(&clang, false, false);
+        let mut options = ParseOptions::default();
+        options.detailed_preprocessing_record = true;
+        let tu = TranslationUnit::from_source(&index, f, &[], &[], options).unwrap();
+
+        let definitions = sonar::find_definitions(&tu.get_entity().get_children()[..]);
+        assert_eq!(definitions.len(), 4);
+
+        assert_eq!(definitions[0].name, "A");
+        assert_eq!(definitions[0].value, DefinitionValue::Integer(false, 4));
+        assert_eq!(definitions[0].entity.get_name(), Some("A".into()));
+
+        assert_eq!(definitions[1].name, "B");
+        assert_eq!(definitions[1].value, DefinitionValue::Integer(true, 322));
+        assert_eq!(definitions[1].entity.get_name(), Some("B".into()));
+
+        assert_eq!(definitions[2].name, "C");
+        assert_eq!(definitions[2].value, DefinitionValue::Real(3.14159));
+        assert_eq!(definitions[2].entity.get_name(), Some("C".into()));
+
+        assert_eq!(definitions[3].name, "D");
+        assert_eq!(definitions[3].value, DefinitionValue::Real(-2.71828));
+        assert_eq!(definitions[3].entity.get_name(), Some("D".into()));
+    });
+
+    let source = "
         enum A {
             AA = 1,
             AB = 2,
