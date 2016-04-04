@@ -98,3 +98,8 @@
 
 ### Fixed
 - Fixed panic in `sonar` module when encountering certain kinds of typedefs
+
+## [0.7.2] - UNRELEASED
+
+### Changed
+- Changed `Parser::arguments` parameter type

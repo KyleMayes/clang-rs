@@ -135,10 +135,8 @@ builder! {
         tu: &'tu TranslationUnit<'tu>,
         file: PathBuf,
         line: u32,
-        column: u32;
-    FIELDS:
-        /// Sets the unsaved files to use.
-        pub unsaved: (Vec<Unsaved>, &[Unsaved]) = |us: &[Unsaved]| us.to_vec();
+        column: u32,
+        unsaved: Vec<Unsaved>;
     OPTIONS:
         /// Sets whether macros will be included in code completion results.
         pub macros: CXCodeComplete_IncludeMacros,
@@ -160,6 +158,14 @@ impl<'tu> Completer<'tu> {
         let file = file.into();
         let flags = unsafe { ffi::clang_defaultCodeCompleteOptions() };
         Completer {  tu: tu, file: file, line: line, column: column, unsaved: vec![], flags: flags }
+    }
+
+    //- Mutators ---------------------------------
+
+    /// Sets the unsaved files to use.
+    pub fn unsaved(&mut self, unsaved: &[Unsaved]) -> &mut Completer<'tu> {
+        self.unsaved = unsaved.into();
+        self
     }
 
     //- Accessors --------------------------------

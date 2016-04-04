@@ -1562,22 +1562,9 @@ builder! {
     /// Parses translation units.
     builder Parser: CXTranslationUnit_Flags {
         index: &'tu Index<'tu>,
-        file: PathBuf;
-    FIELDS:
-        /// Sets the compiler arguments to provide to `libclang`.
-        ///
-        /// Any compiler argument that could be supplied to `clang` may be supplied to this
-        /// function. However, the following arguments are ignored:
-        ///
-        /// * `-c`
-        /// * `-emit-ast`
-        /// * `-fsyntax-only`
-        /// * `-o` and the following `<output>`
-        pub arguments: (Vec<CString>, &[&str]) = |as_: &[&str]| {
-            as_.iter().map(utility::from_string).collect()
-        },
-        /// Sets the unsaved files to use.
-        pub unsaved: (Vec<Unsaved>, &[Unsaved]) = |us: &[Unsaved]| us.to_vec();
+        file: PathBuf,
+        arguments: Vec<CString>,
+        unsaved: Vec<Unsaved>;
     OPTIONS:
         /// Sets whether certain code completion results will be cached when the translation unit is
         /// reparsed.
@@ -1606,6 +1593,28 @@ impl<'tu> Parser<'tu> {
     fn new<F: Into<PathBuf>>(index: &'tu Index<'tu>, file: F) -> Parser<'tu> {
         let flags = ffi::CXTranslationUnit_Flags::empty();
         Parser { index: index, file: file.into(), arguments: vec![], unsaved: vec![], flags: flags }
+    }
+
+    //- Mutators ---------------------------------
+
+    /// Sets the compiler arguments to provide to `libclang`.
+    ///
+    /// Any compiler argument that could be supplied to `clang` may be supplied to this
+    /// function. However, the following arguments are ignored:
+    ///
+    /// * `-c`
+    /// * `-emit-ast`
+    /// * `-fsyntax-only`
+    /// * `-o` and the following `<output>`
+    pub fn arguments<S: AsRef<str>>(&mut self, arguments: &[S]) -> &mut Parser<'tu> {
+        self.arguments = arguments.iter().map(utility::from_string).collect();
+        self
+    }
+
+    /// Sets the unsaved files to use.
+    pub fn unsaved(&mut self, unsaved: &[Unsaved]) -> &mut Parser<'tu> {
+        self.unsaved = unsaved.into();
+        self
     }
 
     //- Accessors --------------------------------

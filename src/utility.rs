@@ -28,8 +28,6 @@ use clang_sys as ffi;
 macro_rules! builder {
     ($(#[$doc:meta])+ builder $name:ident: $underlying:ident {
         $($parameter:ident: $pty:ty), +;
-    $(FIELDS:
-        $($(#[$fdoc:meta])+ pub $field:ident: ($fty:ty, $fparam:ty) = $converter:expr), +;)*
     OPTIONS:
         $($(#[$odoc:meta])+ pub $option:ident: $flag:ident), +,
     }) => (
@@ -37,16 +35,10 @@ macro_rules! builder {
         #[derive(Clone, Debug)]
         pub struct $name<'tu> {
             $($parameter: $pty), *,
-            $($($field: $fty), +,)*
             flags: ::clang_sys::$underlying,
         }
 
         impl<'tu> $name<'tu> {
-            $($($(#[$fdoc])+ pub fn $field(&mut self, $field: $fparam) -> &mut $name<'tu> {
-                self.$field = $converter($field);
-                self
-            })+)*
-
             $($(#[$odoc])+ pub fn $option(&mut self, $option: bool) -> &mut $name<'tu> {
                 if $option {
                     self.flags.insert(::clang_sys::$flag);
