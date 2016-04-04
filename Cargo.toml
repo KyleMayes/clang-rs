@@ -36,3 +36,8 @@ libc = "0.2.9"
 
 version = "0.0.60"
 optional = true
+
+[[test]]
+
+name = "tests"
+harness = true

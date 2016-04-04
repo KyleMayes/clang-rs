@@ -22,6 +22,43 @@ use clang_sys as ffi;
 // Macros
 //================================================
 
+// builder! ______________________________________
+
+/// Defines a struct that builds a set of fields and bitflags.
+macro_rules! builder {
+    ($(#[$doc:meta])+ builder $name:ident: $underlying:ident {
+        $($parameter:ident: $pty:ty), +;
+    $(FIELDS:
+        $($(#[$fdoc:meta])+ pub $field:ident: ($fty:ty, $fparam:ty) = $converter:expr), +;)*
+    OPTIONS:
+        $($(#[$odoc:meta])+ pub $option:ident: $flag:ident), +,
+    }) => (
+        $(#[$doc])+
+        #[derive(Clone, Debug)]
+        pub struct $name<'tu> {
+            $($parameter: $pty), *,
+            $($($field: $fty), +,)*
+            flags: ::clang_sys::$underlying,
+        }
+
+        impl<'tu> $name<'tu> {
+            $($($(#[$fdoc])+ pub fn $field(&mut self, $field: $fparam) -> &mut $name<'tu> {
+                self.$field = $converter($field);
+                self
+            })+)*
+
+            $($(#[$odoc])+ pub fn $option(&mut self, $option: bool) -> &mut $name<'tu> {
+                if $option {
+                    self.flags.insert(::clang_sys::$flag);
+                } else {
+                    self.flags.remove(::clang_sys::$flag);
+                }
+                self
+            })+
+        }
+    );
+}
+
 // iter! _________________________________________
 
 /// Returns an iterator over the values returned by `get_argument`.
@@ -71,37 +108,11 @@ macro_rules! options {
             }
         }
 
-        impl Into<::clang_sys::$underlying> for $name {
-            fn into(self) -> ::clang_sys::$underlying {
+        impl From<$name> for ::clang_sys::$underlying {
+            fn from(options: $name) -> ::clang_sys::$underlying {
                 let mut flags = ::clang_sys::$underlying::empty();
-                $(if self.$option { flags.insert(::clang_sys::$flag); })+
+                $(if options.$option { flags.insert(::clang_sys::$flag); })+
                 flags
-            }
-        }
-    );
-
-    ($(#[$attribute:meta])* options $name:ident: $underlying:ident {
-        $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
-        CONDITIONAL: #[$condition:meta] $($(#[$cfattribute:meta])* pub $coption:ident: $cflag:ident), +,
-    }) => (
-        #[cfg(not($condition))]
-        mod detail {
-            options! {
-                $(#[$attribute])*
-                options $name: $underlying {
-                    $($(#[$fattribute])* pub $option: $flag), +,
-                }
-            }
-        }
-
-        #[cfg($condition)]
-        mod detail {
-            options! {
-                $(#[$attribute])*
-                options $name: $underlying {
-                    $($(#[$fattribute])* pub $option: $flag), +,
-                    $($(#[$cfattribute])* pub $coption: $cflag), +,
-                }
             }
         }
     );

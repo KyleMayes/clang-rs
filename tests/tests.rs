@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use clang::*;
+use clang::completion::*;
+use clang::source::*;
 
 use libc::{c_int};
 
@@ -28,7 +30,8 @@ macro_rules! assert_location_eq {
 
 macro_rules! range {
     ($file:expr, $sl:expr, $sc:expr, $el:expr, $ec:expr) => ({
-        SourceRange::new($file.get_location($sl, $sc), $file.get_location($el, $ec))
+        let start = $file.get_location($sl, $sc);
+        ::clang::source::SourceRange::new(start, $file.get_location($el, $ec))
     })
 }
 
@@ -86,9 +89,7 @@ fn with_translation_unit<'c, F>(
 ) where F: FnOnce(&Path, &Path, TranslationUnit) {
     with_temporary_file(name, contents, |d, file| {
         let index = Index::new(clang, false, false);
-        let options = ParseOptions::default();
-        let tu = TranslationUnit::from_source(&index, file, arguments, &[], options).unwrap();
-        f(d, &file, tu);
+        f(d, &file, index.parser(file).arguments(arguments).parse().unwrap());
     });
 }
 
@@ -102,276 +103,28 @@ fn with_types<'c, F: FnOnce(Vec<Type>)>(clang: &'c Clang, contents: &str, f: F) 
 // Tests
 //================================================
 
+#[path="completion.rs"]
+mod completion_test;
+#[path="diagnostic.rs"]
+mod diagnostic_test;
+#[path="source.rs"]
+mod source_test;
+#[path="token.rs"]
+mod token_test;
+
+#[path="sonar.rs"]
+mod sonar_test;
+
 #[test]
 fn test() {
     let clang = Clang::new().unwrap();
 
-    // CompilationDatabase _______________________
+    completion_test::test(&clang);
+    diagnostic_test::test(&clang);
+    source_test::test(&clang);
+    token_test::test(&clang);
 
-    let source = r#"[
-        {
-          "directory": "/tmp",
-          "command": "cc div0.c",
-          "file": "/tmp/div0.c"
-        },
-        {
-          "directory": "/tmp",
-          "command": "cc -DFOO div1.c",
-          "file": "/tmp/div1.c"
-        }
-    ]"#;
-
-    // FIXME: possible libclang bug on Windows
-    with_temporary_file("compile_commands.json", source, |d, _| {
-        #[cfg(not(target_os="windows"))]
-        fn test_compilation_database(cd: CompilationDatabase) {
-            #[cfg(feature="gte_clang_3_8")]
-            fn test_get_file<F: AsRef<Path>>(cc: &CompileCommand, file: F) {
-                assert_eq!(cc.get_file(), file.as_ref());
-            }
-
-            #[cfg(not(feature="gte_clang_3_8"))]
-            fn test_get_file<F: AsRef<Path>>(_: &CompileCommand, _: F) { }
-
-            assert_eq!(cd.get_all_commands().len(), 2);
-
-            let commands = cd.get_commands("/tmp/div0.c");
-            assert_eq!(commands.len(), 1);
-
-            assert_eq!(commands[0].get_arguments(), &["cc", "div0.c"]);
-            test_get_file(&commands[0], "/tmp/div0.c");
-
-            let commands = cd.get_commands("/tmp/div1.c");
-            assert_eq!(commands.len(), 1);
-
-            assert_eq!(commands[0].get_arguments(), &["cc", "-DFOO", "div1.c"]);
-            test_get_file(&commands[0], "/tmp/div1.c");
-        }
-
-        #[cfg(target_os="windows")]
-        fn test_compilation_database(_: CompilationDatabase) { }
-
-        test_compilation_database(CompilationDatabase::from_directory(&clang, d).unwrap());
-    });
-
-    // CompletionString __________________________
-
-    let source = "
-        struct A {
-            /// \\brief An integer field.
-            int a;
-            int b;
-            int c;
-        };
-        void b() { A a; a. }
-    ";
-
-    with_temporary_file("test.cpp", source, |_, f| {
-        let index = Index::new(&clang, false, false);
-        let mut options = ParseOptions::default();
-        options.briefs_in_completion_results = true;
-        let tu = TranslationUnit::from_source(&index, f, &[], &[], options).unwrap();
-
-        let mut options = CompletionOptions::default();
-        options.briefs = true;
-        let results = tu.complete(f, 8, 27, &[], options);
-        assert_eq!(results.get_container_kind(), Some((EntityKind::StructDecl, false)));
-        assert!(results.get_diagnostics(&tu).is_empty());
-        assert_eq!(results.get_usr(), Some(Usr("c:@S@A".into())));
-
-        let context = results.get_context().unwrap();
-        assert!(!context.all_types);
-        assert!(!context.all_values);
-        assert!(!context.class_type_values);
-        assert!(context.dot_members);
-        assert!(!context.arrow_members);
-        assert!(!context.enum_tags);
-        assert!(!context.union_tags);
-        assert!(!context.struct_tags);
-        assert!(!context.class_names);
-        assert!(!context.namespaces);
-        assert!(!context.nested_name_specifiers);
-        assert!(!context.macro_names);
-        assert!(!context.natural_language);
-        assert!(!context.objc_object_values);
-        assert!(!context.objc_selector_values);
-        assert!(!context.objc_property_members);
-        assert!(!context.objc_interfaces);
-        assert!(!context.objc_protocols);
-        assert!(!context.objc_categories);
-        assert!(!context.objc_instance_messages);
-        assert!(!context.objc_class_messages);
-        assert!(!context.objc_selector_names);
-
-        let mut results = results.get_results();
-        assert_eq!(results.len(), 6);
-        results.sort();
-
-        assert_eq!(results[0].get_kind(), EntityKind::Method);
-        let string = results[0].get_string();
-        assert_eq!(string.get_annotations(), &[] as &[&str]);
-        assert_eq!(string.get_availability(), Availability::Available);
-        assert_eq!(string.get_comment_brief(), None);
-        assert_eq!(string.get_chunks(), &[
-            CompletionChunk::ResultType("A &".into()),
-            CompletionChunk::TypedText("operator=".into()),
-            CompletionChunk::LeftParenthesis("(".into()),
-            CompletionChunk::Placeholder("const A &".into()),
-            CompletionChunk::RightParenthesis(")".into()),
-        ]);
-        assert_eq!(string.get_parent_name(), Some("A".into()));
-        assert_eq!(string.get_priority(), 34);
-        assert_eq!(string.get_typed_text(), Some("operator=".into()));
-
-        assert_eq!(results[1].get_kind(), EntityKind::Destructor);
-        let string = results[1].get_string();
-        assert_eq!(string.get_annotations(), &[] as &[&str]);
-        assert_eq!(string.get_availability(), Availability::Available);
-        assert_eq!(string.get_chunks(), &[
-            CompletionChunk::ResultType("void".into()),
-            CompletionChunk::TypedText("~A".into()),
-            CompletionChunk::LeftParenthesis("(".into()),
-            CompletionChunk::RightParenthesis(")".into()),
-        ]);
-        assert_eq!(string.get_parent_name(), Some("A".into()));
-        assert_eq!(string.get_priority(), 34);
-        assert_eq!(string.get_typed_text(), Some("~A".into()));
-
-        assert_eq!(results[2].get_kind(), EntityKind::FieldDecl);
-        let string = results[2].get_string();
-        assert_eq!(string.get_annotations(), &[] as &[&str]);
-        assert_eq!(string.get_availability(), Availability::Available);
-        assert_eq!(string.get_comment_brief(), Some("An integer field.".into()));
-        assert_eq!(string.get_chunks(), &[
-            CompletionChunk::ResultType("int".into()),
-            CompletionChunk::TypedText("a".into()),
-        ]);
-        assert_eq!(string.get_parent_name(), Some("A".into()));
-        assert_eq!(string.get_priority(), 35);
-        assert_eq!(string.get_typed_text(), Some("a".into()));
-
-        assert_eq!(results[3].get_kind(), EntityKind::FieldDecl);
-        let string = results[3].get_string();
-        assert_eq!(string.get_annotations(), &[] as &[&str]);
-        assert_eq!(string.get_availability(), Availability::Available);
-        assert_eq!(string.get_comment_brief(), None);
-        assert_eq!(string.get_chunks(), &[
-            CompletionChunk::ResultType("int".into()),
-            CompletionChunk::TypedText("b".into()),
-        ]);
-        assert_eq!(string.get_parent_name(), Some("A".into()));
-        assert_eq!(string.get_priority(), 35);
-        assert_eq!(string.get_typed_text(), Some("b".into()));
-
-        assert_eq!(results[4].get_kind(), EntityKind::FieldDecl);
-        let string = results[4].get_string();
-        assert_eq!(string.get_annotations(), &[] as &[&str]);
-        assert_eq!(string.get_availability(), Availability::Available);
-        assert_eq!(string.get_comment_brief(), None);
-        assert_eq!(string.get_chunks(), &[
-            CompletionChunk::ResultType("int".into()),
-            CompletionChunk::TypedText("c".into()),
-        ]);
-        assert_eq!(string.get_parent_name(), Some("A".into()));
-        assert_eq!(string.get_priority(), 35);
-        assert_eq!(string.get_typed_text(), Some("c".into()));
-
-        assert_eq!(results[5].get_kind(), EntityKind::StructDecl);
-        let string = results[5].get_string();
-        assert_eq!(string.get_annotations(), &[] as &[&str]);
-        assert_eq!(string.get_availability(), Availability::Available);
-        assert_eq!(string.get_comment_brief(), None);
-        assert_eq!(string.get_chunks(), &[
-            CompletionChunk::TypedText("A".into()),
-            CompletionChunk::Text("::".into()),
-        ]);
-        assert_eq!(string.get_parent_name(), Some("A".into()));
-        assert_eq!(string.get_priority(), 75);
-        assert_eq!(string.get_typed_text(), Some("A".into()));
-    });
-
-    // File ______________________________________
-
-    with_file(&clang, "int a = 322;", |p, f| {
-        with_file(&clang, "int a = 322;", |_, g| assert!(f.get_id() != g.get_id()));
-        assert_eq!(f.get_path(), p.to_path_buf());
-        assert_eq!(f.get_skipped_ranges(), &[]);
-        assert!(f.get_time() != 0);
-        assert!(!f.is_include_guarded());
-    });
-
-    let source = "
-        #if 0
-        int skipped = 32;
-        #endif
-        int unskipped = 32;
-    ";
-
-    with_temporary_file("test.cpp", source, |_, f| {
-        let index = Index::new(&clang, false, false);
-        let mut options = ParseOptions::default();
-        options.detailed_preprocessing_record = true;
-        let tu = TranslationUnit::from_source(&index, f, &[], &[], options).unwrap();
-
-        let file = tu.get_file(f).unwrap();
-        assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
-    });
-
-    with_file(&clang, "#ifndef _TEST_H_\n#define _TEST_H_\nint a = 322;\n#endif", |_, f| {
-        assert!(f.is_include_guarded());
-    });
-
-    // Diagnostic ________________________________
-
-    let source = "
-        int add(float a, float b) { return a + b; }
-        template <typename T> struct A { typedef T::U dependent; };
-        struct Integer { int i; }; Integer i = { i: 0 };
-    ";
-
-    with_translation_unit(&clang, "test.cpp", source, &["-Wconversion"], |_, f, tu| {
-        let mut options = FormatOptions::default();
-        options.source_location = false;
-        options.option = false;
-
-        let file = tu.get_file(f).unwrap();
-
-        let diagnostics = tu.get_diagnostics();
-        assert_eq!(diagnostics.len(), 3);
-
-        let text = "implicit conversion turns floating-point number into integer: 'float' to 'int'";
-        assert_eq!(diagnostics[0].format(options), format!("warning: {}", text));
-        assert!(diagnostics[0].get_children().is_empty());
-        assert_eq!(diagnostics[0].get_fix_its(), &[]);
-        assert_eq!(diagnostics[0].get_location(), file.get_location(2, 46));
-        assert_eq!(diagnostics[0].get_ranges(), &[
-            range!(file, 2, 44, 2, 49),
-            range!(file, 2, 37, 2, 43),
-        ]);
-        assert_eq!(diagnostics[0].get_severity(), Severity::Warning);
-        assert_eq!(diagnostics[0].get_text(), text);
-
-        let text = "missing 'typename' prior to dependent type name 'T::U'";
-        assert_eq!(diagnostics[1].format(options), format!("error: {}", text));
-        assert!(diagnostics[1].get_children().is_empty());
-        assert_eq!(diagnostics[1].get_fix_its(), &[
-            FixIt::Insertion(file.get_location(3, 50), "typename ".into())
-        ]);
-        assert_eq!(diagnostics[1].get_location(), file.get_location(3, 50));
-        assert_eq!(diagnostics[1].get_ranges(), &[range!(file, 3, 50, 3, 54)]);
-        assert_eq!(diagnostics[1].get_severity(), Severity::Error);
-        assert_eq!(diagnostics[1].get_text(), text);
-
-        let text = "use of GNU old-style field designator extension";
-        assert_eq!(diagnostics[2].format(options), format!("warning: {}", text));
-        let range = range!(file, 4, 50, 4, 52);
-        assert!(diagnostics[2].get_children().is_empty());
-        assert_eq!(diagnostics[2].get_fix_its(), &[FixIt::Replacement(range, ".i = ".into())]);
-        assert_eq!(diagnostics[2].get_location(), range.get_start());
-        assert_eq!(diagnostics[2].get_ranges(), &[]);
-        assert_eq!(diagnostics[2].get_severity(), Severity::Warning);
-        assert_eq!(diagnostics[2].get_text(), text);
-    });
+    sonar_test::test(&clang);
 
     // Entity ____________________________________
 
@@ -564,9 +317,7 @@ fn test() {
 
     with_temporary_files(files, |_, fs| {
         let index = Index::new(&clang, false, false);
-        let mut options = ParseOptions::default();
-        options.detailed_preprocessing_record = true;
-        let tu = TranslationUnit::from_source(&index, &fs[1], &[], &[], options).unwrap();
+        let tu = index.parser(&fs[1]).detailed_preprocessing_record(true).parse().unwrap();
 
         let last = tu.get_entity().get_children().iter().last().unwrap().clone();
         assert_eq!(last.get_kind(), EntityKind::InclusionDirective);
@@ -887,111 +638,6 @@ fn test() {
     index.set_thread_options(options);
     assert_eq!(index.get_thread_options(), options);
 
-    // Module ____________________________________
-
-    let files = &[
-        ("module.modulemap", "module parent { module child [system] { header \"test.hpp\" } }"),
-        ("test.hpp", ""),
-        ("test.cpp", "#include \"test.hpp\""),
-    ];
-
-    with_temporary_files(files, |_, fs| {
-        let index = Index::new(&clang, false, false);
-        let arguments = &["-fmodules"];
-        let options = ParseOptions::default();
-        let tu = TranslationUnit::from_source(&index, &fs[2], arguments, &[], options).unwrap();
-
-        let module = tu.get_file(&fs[1]).unwrap().get_module().unwrap();
-        assert_eq!(module.get_file().get_path().extension(), Some(std::ffi::OsStr::new("pcm")));
-        assert_eq!(module.get_full_name(), "parent.child");
-        assert_eq!(module.get_name(), "child");
-        assert_eq!(module.get_top_level_headers(), &[tu.get_file(&fs[1]).unwrap()]);
-        assert!(module.is_system());
-
-        let module = module.get_parent().unwrap();
-        assert_eq!(module.get_file().get_path().extension(), Some(std::ffi::OsStr::new("pcm")));
-        assert_eq!(module.get_full_name(), "parent");
-        assert_eq!(module.get_name(), "parent");
-        assert_eq!(module.get_parent(), None);
-        assert_eq!(module.get_top_level_headers(), &[]);
-        assert!(!module.is_system());
-    });
-
-    // SourceLocation ____________________________
-
-    let source = "
-        #define ADD(LEFT, RIGHT) (LEFT + RIGHT)
-        #line 322 \"presumed.hpp\"
-        int add(int left, int right) { return ADD(left, right); }
-    ";
-
-    with_file(&clang, source, |_, f| {
-        let location = f.get_location(3, 51);
-        assert_location_eq!(location.get_expansion_location(), f, 3, 33, 81);
-        assert_location_eq!(location.get_file_location(), f, 3, 33, 81);
-        assert_eq!(location.get_presumed_location(), ("presumed.hpp".into(), 321, 33));
-        assert_location_eq!(location.get_spelling_location(), f, 3, 33, 81);
-        assert!(location.is_in_main_file());
-        assert!(!location.is_in_system_header());
-    });
-
-    // SourceRange _______________________________
-
-    with_file(&clang, "int a = 322;", |_, f| {
-        let range = range!(f, 1, 5, 1, 6);
-        assert_location_eq!(range.get_end().get_spelling_location(), f, 1, 6, 5);
-        assert_location_eq!(range.get_start().get_spelling_location(), f, 1, 5, 4);
-    });
-
-    // Tokens ____________________________________
-
-    // FIXME: possible libclang bug on Windows
-    with_translation_unit(&clang, "test.cpp", "int a = 322; ", &[], |_, f, tu| {
-        #[cfg(not(target_os="windows"))]
-        fn test_annotate<'tu>(tu: &'tu TranslationUnit<'tu>, tokens: &[Token<'tu>]) {
-            let entity = tu.get_entity().get_children()[0];
-
-            assert_eq!(tu.annotate(tokens), &[
-                Some(entity), Some(entity), None, None, Some(entity.get_children()[0])
-            ]);
-        }
-
-        #[cfg(target_os="windows")]
-        fn test_annotate<'tu>(_: &'tu TranslationUnit<'tu>, _: &[Token<'tu>]) { }
-
-        let file = tu.get_file(f).unwrap();
-
-        let tokens = range!(file, 1, 1, 1, 13).tokenize();
-        assert_eq!(tokens.len(), 5);
-
-        assert_eq!(tokens[0].get_kind(), TokenKind::Keyword);
-        assert_location_eq!(tokens[0].get_location().get_spelling_location(), file, 1, 1, 0);
-        assert_eq!(tokens[0].get_range(), range!(file, 1, 1, 1, 4));
-        assert_eq!(tokens[0].get_spelling(), "int");
-
-        assert_eq!(tokens[1].get_kind(), TokenKind::Identifier);
-        assert_location_eq!(tokens[1].get_location().get_spelling_location(), file, 1, 5, 4);
-        assert_eq!(tokens[1].get_range(), range!(file, 1, 5, 1, 6));
-        assert_eq!(tokens[1].get_spelling(), "a");
-
-        assert_eq!(tokens[2].get_kind(), TokenKind::Punctuation);
-        assert_location_eq!(tokens[2].get_location().get_spelling_location(), file, 1, 7, 6);
-        assert_eq!(tokens[2].get_range(), range!(file, 1, 7, 1, 8));
-        assert_eq!(tokens[2].get_spelling(), "=");
-
-        assert_eq!(tokens[3].get_kind(), TokenKind::Literal);
-        assert_location_eq!(tokens[3].get_location().get_spelling_location(), file, 1, 9, 8);
-        assert_eq!(tokens[3].get_range(), range!(file, 1, 9, 1, 12));
-        assert_eq!(tokens[3].get_spelling(), "322");
-
-        assert_eq!(tokens[4].get_kind(), TokenKind::Punctuation);
-        assert_location_eq!(tokens[4].get_location().get_spelling_location(), file, 1, 12, 11);
-        assert_eq!(tokens[4].get_range(), range!(file, 1, 12, 1, 13));
-        assert_eq!(tokens[4].get_spelling(), ";");
-
-        test_annotate(&tu, &tokens);
-    });
-
     // TranslationUnit ___________________________
 
     //- from_ast ---------------------------------
@@ -1008,9 +654,7 @@ fn test() {
 
     with_temporary_file("test.cpp", "int a = 322;", |_, f| {
         let index = Index::new(&clang, false, false);
-        let unsaved = &[Unsaved::new(f, "int a = 644;")];
-        let options = ParseOptions::default();
-        let _ = TranslationUnit::from_source(&index, f, &[], unsaved, options).unwrap();
+        let _ = index.parser(f).unsaved(&[Unsaved::new(f, "int a = 644;")]).parse().unwrap();
     });
 
     //- get_file ---------------------------------
@@ -1234,291 +878,4 @@ fn test() {
     assert_eq!(Usr::from_objc_method(&class, "B", false), Usr("c:objc(cs)A(cm)B".into()));
     assert_eq!(Usr::from_objc_property(&class, "B"), Usr("c:objc(cs)A(py)B".into()));
     assert_eq!(Usr::from_objc_protocol("A"), Usr("c:objc(pl)A".into()));
-
-    //============================================
-    // sonar
-    //============================================
-
-    let source = "
-        #define A 4
-        #define B -322
-        #define C 3.14159
-        #define D -2.71828
-    ";
-
-    with_temporary_file("header.h", source, |_, f| {
-        use clang::sonar::{DefinitionValue};
-
-        let index = Index::new(&clang, false, false);
-        let mut options = ParseOptions::default();
-        options.detailed_preprocessing_record = true;
-        let tu = TranslationUnit::from_source(&index, f, &[], &[], options).unwrap();
-
-        let definitions = sonar::find_definitions(&tu.get_entity().get_children()[..]);
-        assert_eq!(definitions.len(), 4);
-
-        assert_eq!(definitions[0].name, "A");
-        assert_eq!(definitions[0].value, DefinitionValue::Integer(false, 4));
-        assert_eq!(definitions[0].entity.get_name(), Some("A".into()));
-
-        assert_eq!(definitions[1].name, "B");
-        assert_eq!(definitions[1].value, DefinitionValue::Integer(true, 322));
-        assert_eq!(definitions[1].entity.get_name(), Some("B".into()));
-
-        assert_eq!(definitions[2].name, "C");
-        assert_eq!(definitions[2].value, DefinitionValue::Real(3.14159));
-        assert_eq!(definitions[2].entity.get_name(), Some("C".into()));
-
-        assert_eq!(definitions[3].name, "D");
-        assert_eq!(definitions[3].value, DefinitionValue::Real(-2.71828));
-        assert_eq!(definitions[3].entity.get_name(), Some("D".into()));
-    });
-
-    let source = "
-        enum A {
-            AA = 1,
-            AB = 2,
-            AC = 3,
-        };
-
-        typedef enum B {
-            CA,
-            CB,
-            CC,
-        } B;
-
-        typedef enum {
-            DA,
-            DB,
-            DC,
-        } C;
-
-        enum D {
-            EA,
-            EB,
-            EC,
-        };
-
-        typedef enum D D;
-    ";
-
-    with_entity(&clang, source, |e| {
-        let enums = sonar::find_enums(&e.get_children()[..]);
-        assert_eq!(enums.len(), 4);
-
-        assert_eq!(enums[0].name, "A");
-        assert_eq!(enums[0].entity.get_name(), Some("A".into()));
-        assert!(enums[0].source.is_none());
-
-        assert_eq!(enums[1].name, "B");
-        assert_eq!(enums[1].entity.get_name(), Some("B".into()));
-        assert!(enums[1].source.is_none());
-
-        assert_eq!(enums[2].name, "C");
-        assert_eq!(enums[2].entity.get_name(), None);
-        assert_eq!(enums[2].source.unwrap().get_name(), Some("C".into()));
-
-        assert_eq!(enums[3].name, "D");
-        assert_eq!(enums[3].entity.get_name(), Some("D".into()));
-        assert!(enums[3].source.is_none());
-    });
-
-    let source = "
-        void multiple(void);
-        void multiple(void);
-
-        int zero(void);
-
-        float one(int a);
-        float two(int a, int b);
-
-        double many(int a, int b, ...);
-    ";
-
-    with_entity(&clang, source, |e| {
-        let functions = sonar::find_functions(&e.get_children()[..]);
-        assert_eq!(functions.len(), 5);
-
-        assert_eq!(functions[0].name, "multiple");
-        assert_eq!(functions[0].entity.get_name(), Some("multiple".into()));
-        assert!(functions[0].source.is_none());
-
-        assert_eq!(functions[1].name, "zero");
-        assert_eq!(functions[1].entity.get_name(), Some("zero".into()));
-        assert!(functions[1].source.is_none());
-
-        assert_eq!(functions[2].name, "one");
-        assert_eq!(functions[2].entity.get_name(), Some("one".into()));
-        assert!(functions[2].source.is_none());
-
-        assert_eq!(functions[3].name, "two");
-        assert_eq!(functions[3].entity.get_name(), Some("two".into()));
-        assert!(functions[3].source.is_none());
-
-        assert_eq!(functions[4].name, "many");
-        assert_eq!(functions[4].entity.get_name(), Some("many".into()));
-        assert!(functions[4].source.is_none());
-    });
-
-    let source = "
-        struct A {
-            int a;
-        };
-
-        typedef struct B {
-            int b;
-        } B;
-
-        typedef struct {
-            int c;
-        } C;
-
-        struct D {
-            int d;
-        };
-
-        typedef struct D D;
-    ";
-
-    with_entity(&clang, source, |e| {
-        let structs = sonar::find_structs(&e.get_children()[..]);
-        assert_eq!(structs.len(), 4);
-
-        assert_eq!(structs[0].name, "A");
-        assert_eq!(structs[0].entity.get_name(), Some("A".into()));
-        assert!(structs[0].source.is_none());
-
-        assert_eq!(structs[1].name, "B");
-        assert_eq!(structs[1].entity.get_name(), Some("B".into()));
-        assert!(structs[1].source.is_none());
-
-        assert_eq!(structs[2].name, "C");
-        assert_eq!(structs[2].entity.get_name(), None);
-        assert_eq!(structs[2].source.unwrap().get_name(), Some("C".into()));
-
-        assert_eq!(structs[3].name, "D");
-        assert_eq!(structs[3].entity.get_name(), Some("D".into()));
-        assert!(structs[3].source.is_none());
-    });
-
-    let source = "
-        typedef int Integer;
-        typedef Integer IntegerTypedef;
-        typedef IntegerTypedef IntegerTypedefTypedef;
-
-        typedef int* IntegerPointer;
-
-        typedef int Function(int, float, double);
-        typedef int (*FunctionPointer)(int a, float b, double c, ...);
-
-        enum E { EA, EB, EC };
-        typedef enum E Enum;
-        typedef Enum EnumTypedef;
-
-        struct S { int s; };
-        typedef struct S Struct;
-        typedef Struct StructTypedef;
-
-        union U { int us; float uf; };
-        typedef union U Union;
-        typedef Union UnionTypedef;
-    ";
-
-    with_entity(&clang, source, |e| {
-        let typedefs = sonar::find_typedefs(&e.get_children()[..]);
-        assert_eq!(typedefs.len(), 12);
-
-        assert_eq!(typedefs[0].name, "Integer");
-        assert_eq!(typedefs[0].entity.get_name(), Some("Integer".into()));
-        assert!(typedefs[0].source.is_none());
-
-        assert_eq!(typedefs[1].name, "IntegerTypedef");
-        assert_eq!(typedefs[1].entity.get_name(), Some("IntegerTypedef".into()));
-        assert!(typedefs[1].source.is_none());
-
-        assert_eq!(typedefs[2].name, "IntegerTypedefTypedef");
-        assert_eq!(typedefs[2].entity.get_name(), Some("IntegerTypedefTypedef".into()));
-        assert!(typedefs[2].source.is_none());
-
-        assert_eq!(typedefs[3].name, "IntegerPointer");
-        assert_eq!(typedefs[3].entity.get_name(), Some("IntegerPointer".into()));
-        assert!(typedefs[3].source.is_none());
-
-        assert_eq!(typedefs[4].name, "Function");
-        assert_eq!(typedefs[4].entity.get_name(), Some("Function".into()));
-        assert!(typedefs[4].source.is_none());
-
-        assert_eq!(typedefs[5].name, "FunctionPointer");
-        assert_eq!(typedefs[5].entity.get_name(), Some("FunctionPointer".into()));
-        assert!(typedefs[5].source.is_none());
-
-        assert_eq!(typedefs[6].name, "Enum");
-        assert_eq!(typedefs[6].entity.get_name(), Some("Enum".into()));
-        assert!(typedefs[6].source.is_none());
-
-        assert_eq!(typedefs[7].name, "EnumTypedef");
-        assert_eq!(typedefs[7].entity.get_name(), Some("EnumTypedef".into()));
-        assert!(typedefs[7].source.is_none());
-
-        assert_eq!(typedefs[8].name, "Struct");
-        assert_eq!(typedefs[8].entity.get_name(), Some("Struct".into()));
-        assert!(typedefs[8].source.is_none());
-
-        assert_eq!(typedefs[9].name, "StructTypedef");
-        assert_eq!(typedefs[9].entity.get_name(), Some("StructTypedef".into()));
-        assert!(typedefs[9].source.is_none());
-
-        assert_eq!(typedefs[10].name, "Union");
-        assert_eq!(typedefs[10].entity.get_name(), Some("Union".into()));
-        assert!(typedefs[10].source.is_none());
-
-        assert_eq!(typedefs[11].name, "UnionTypedef");
-        assert_eq!(typedefs[11].entity.get_name(), Some("UnionTypedef".into()));
-        assert!(typedefs[11].source.is_none());
-    });
-
-    let source = "
-        union A {
-            int ai;
-            float af;
-        };
-
-        typedef union B {
-            int bi;
-            float bf;
-        } B;
-
-        typedef union {
-            int ci;
-            float cf;
-        } C;
-
-        union D {
-            int di;
-            float df;
-        };
-
-        typedef union D D;
-    ";
-
-    with_entity(&clang, source, |e| {
-        let unions = sonar::find_unions(&e.get_children()[..]);
-        assert_eq!(unions.len(), 4);
-
-        assert_eq!(unions[0].name, "A");
-        assert_eq!(unions[0].entity.get_name(), Some("A".into()));
-        assert!(unions[0].source.is_none());
-
-        assert_eq!(unions[1].name, "B");
-        assert_eq!(unions[1].entity.get_name(), Some("B".into()));
-        assert!(unions[1].source.is_none());
-
-        assert_eq!(unions[2].name, "C");
-        assert_eq!(unions[2].entity.get_name(), None);
-        assert_eq!(unions[2].source.unwrap().get_name(), Some("C".into()));
-
-        assert_eq!(unions[3].name, "D");
-        assert_eq!(unions[3].entity.get_name(), Some("D".into()));
-        assert!(unions[3].source.is_none());
-    });
 }

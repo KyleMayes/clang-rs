@@ -10,9 +10,7 @@ fn main() {
     let index = Index::new(&clang, false, false);
 
     // Parse a source file into a translation unit
-    let tu = TranslationUnit::from_source(
-        &index, "examples/structs.c", &[], &[], ParseOptions::default()
-    ).unwrap();
+    let tu = index.parser("examples/structs.c").parse().unwrap();
 
     // Get the structs in this translation unit
     let structs = tu.get_entity().get_children().into_iter().filter(|e| {

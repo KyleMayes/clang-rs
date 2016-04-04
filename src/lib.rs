@@ -40,30 +40,37 @@ extern crate libc;
 #[macro_use]
 mod utility;
 
+pub mod completion;
+pub mod diagnostic;
+pub mod source;
+pub mod token;
+
 pub mod sonar;
 
+use std::cmp;
 use std::fmt;
 use std::hash;
 use std::mem;
 use std::ptr;
 use std::slice;
-use std::cmp::{self, Ordering};
 use std::collections::{HashMap};
+use std::ffi::{CString};
 use std::marker::{PhantomData};
 use std::path::{Path, PathBuf};
-use std::rc::{Rc};
 use std::sync::atomic::{self, AtomicBool};
 
 use clang_sys as ffi;
 
-use libc::{c_int, c_uint, c_ulong, time_t};
+use libc::{c_int, c_uint, c_ulong};
 
+use completion::{Completer, CompletionString};
+use diagnostic::{Diagnostic};
+use source::{File, Module, SourceLocation, SourceRange};
+use token::{Token};
 use utility::{FromError, Nullable};
 
 mod error;
 pub use self::error::*;
-
-pub use self::detail::*;
 
 //================================================
 // Enums
@@ -130,93 +137,6 @@ pub enum CallingConvention {
     SysV64 = 11,
     /// The function type uses the x64 C calling convention as implemented on Windows.
     Win64 = 10,
-}
-
-// CompletionChunk _______________________________
-
-/// A piece of a code completion string.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CompletionChunk<'r> {
-    /// An optional piece that could be part of the template but is not required.
-    Optional(CompletionString<'r>),
-    /// Text that describes the current parameter when code completion was run on a function call,
-    /// message send, or template specialization.
-    CurrentParameter(String),
-    /// Informative text that should be displayed but not inserted as part of the template.
-    Informative(String),
-    /// Text that should be replaced by the user.
-    Placeholder(String),
-    /// Text that specifies the result type of the containing result.
-    ResultType(String),
-    /// Text that should be inserted.
-    Text(String),
-    /// Text that the user would be expected to type to get the containing code completion result.
-    TypedText(String),
-    /// A colon (`':'`).
-    Colon(String),
-    /// A comma (`','`).
-    Comma(String),
-    /// An equals sign (`'='`).
-    Equals(String),
-    /// A semicolon (`';'`).
-    Semicolon(String),
-    /// A left angle bracket (`'<'`).
-    LeftAngleBracket(String),
-    /// A right angle bracket (`'>'`).
-    RightAngleBracket(String),
-    /// A left brace (`'{'`).
-    LeftBrace(String),
-    /// A right brace (`'}'`).
-    RightBrace(String),
-    /// A left parentesis (`'('`)).
-    LeftParenthesis(String),
-    /// A right parenthesis (`')'`).
-    RightParenthesis(String),
-    /// A left square bracket (`'['`).
-    LeftSquareBracket(String),
-    /// A right square bracket (`']'`).
-    RightSquareBracket(String),
-    /// Horizontal space (e.g., `' '`).
-    HorizontalSpace(String),
-    /// Vertical space (e.g., `'\n'`).
-    VerticalSpace(String),
-}
-
-impl<'r> CompletionChunk<'r> {
-    //- Accessors --------------------------------
-
-    /// Returns the text associated with this completion chunk.
-    ///
-    /// # Panics
-    ///
-    /// * this completion chunk is a `CompletionChunk::Optional`
-    pub fn get_text(&self) -> String {
-        match *self {
-            CompletionChunk::Optional(_) => {
-                panic!("this completion chunk is a `CompletionChunk::Optional`")
-            },
-            CompletionChunk::CurrentParameter(ref text) |
-            CompletionChunk::Informative(ref text) |
-            CompletionChunk::Placeholder(ref text) |
-            CompletionChunk::ResultType(ref text) |
-            CompletionChunk::TypedText(ref text) |
-            CompletionChunk::Text(ref text) |
-            CompletionChunk::Colon(ref text) |
-            CompletionChunk::Comma(ref text) |
-            CompletionChunk::Equals(ref text) |
-            CompletionChunk::Semicolon(ref text) |
-            CompletionChunk::LeftAngleBracket(ref text) |
-            CompletionChunk::RightAngleBracket(ref text) |
-            CompletionChunk::LeftBrace(ref text) |
-            CompletionChunk::RightBrace(ref text) |
-            CompletionChunk::LeftParenthesis(ref text) |
-            CompletionChunk::RightParenthesis(ref text) |
-            CompletionChunk::LeftSquareBracket(ref text) |
-            CompletionChunk::RightSquareBracket(ref text) |
-            CompletionChunk::HorizontalSpace(ref text) |
-            CompletionChunk::VerticalSpace(ref text) => text.clone(),
-        }
-    }
 }
 
 // EntityKind ____________________________________
@@ -639,19 +559,6 @@ pub enum EntityVisitResult {
     Recurse = 2,
 }
 
-// FixIt _________________________________________
-
-/// A suggested fix for an issue with a source file.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum FixIt<'tu> {
-    /// Delete a segment of the source file.
-    Deletion(SourceRange<'tu>),
-    /// Insert a string into the source file.
-    Insertion(SourceLocation<'tu>, String),
-    /// Replace a segment of the source file with a string.
-    Replacement(SourceRange<'tu>, String),
-}
-
 // Language ______________________________________
 
 /// Indicates the language used by a declaration.
@@ -731,25 +638,6 @@ pub enum RefQualifier {
     RValue = 2,
 }
 
-// Severity ______________________________________
-
-/// Indicates the severity of a diagnostic.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[repr(C)]
-pub enum Severity {
-    /// The diagnostic has been suppressed (e.g., by a command-line option).
-    Ignored = 0,
-    /// The diagnostic is attached to the previous non-note diagnostic.
-    Note = 1,
-    /// The diagnostic targets suspicious code that may or may not be wrong.
-    Warning = 2,
-    /// The diagnostic targets ill-formed code.
-    Error = 3,
-    /// The diagnostic targets code that is ill-formed in such a way that parser recovery is
-    /// unlikely to produce any useful results.
-    Fatal = 4,
-}
-
 // StorageClass __________________________________
 
 /// Indicates the storage class of a declaration.
@@ -800,24 +688,6 @@ pub enum TemplateArgument<'tu> {
     Integral(i64, u64),
     /// A type.
     Type(Type<'tu>),
-}
-
-// TokenKind _____________________________________
-
-/// Indicates the categorization of a token.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[repr(C)]
-pub enum TokenKind {
-    /// A comment token.
-    Comment = 4,
-    /// An identifier token.
-    Identifier = 2,
-    /// A keyword token.
-    Keyword = 1,
-    /// A literal token.
-    Literal = 3,
-    /// A puncuation token.
-    Punctuation = 0,
 }
 
 // TypeKind ______________________________________
@@ -949,6 +819,7 @@ pub enum Visibility {
 lazy_static! { static ref AVAILABLE: AtomicBool = AtomicBool::new(true); }
 
 /// An empty type which prevents the use of this library from multiple threads simultaneously.
+#[derive(Debug)]
 pub struct Clang;
 
 impl Clang {
@@ -968,627 +839,11 @@ impl Clang {
             Err(())
         }
     }
-
-    //- Static -----------------------------------
-
-    /// Returns the version string for the version of `libclang` in use.
-    pub fn get_version() -> String {
-        unsafe { utility::to_string(ffi::clang_getClangVersion()) }
-    }
 }
 
 impl Drop for Clang {
     fn drop(&mut self) {
         AVAILABLE.store(true, atomic::Ordering::Relaxed);
-    }
-}
-
-impl fmt::Debug for Clang {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Clang").finish()
-    }
-}
-
-// CompilationDatabase ___________________________
-
-/// The information used to compile the source files in a project.
-pub struct CompilationDatabase<'c> {
-    ptr: ffi::CXCompilationDatabase,
-    _marker: PhantomData<&'c Clang>,
-}
-
-impl<'c> CompilationDatabase<'c> {
-    //- Constructors -----------------------------
-
-    fn from_ptr(ptr: ffi::CXCompilationDatabase) -> CompilationDatabase<'c> {
-        CompilationDatabase { ptr: ptr, _marker: PhantomData }
-    }
-
-    /// Constructs a new `CompilationDatabase` from a directory containing a `compile_commands.json`
-    /// file.
-    pub fn from_directory<D: AsRef<Path>>(
-        _: &'c Clang, directory: D
-    ) -> Result<CompilationDatabase<'c>, ()> {
-        unsafe {
-            let directory = utility::from_path(directory);
-            let mut code = mem::uninitialized();
-            let ptr = ffi::clang_CompilationDatabase_fromDirectory(directory.as_ptr(), &mut code);
-            ptr.map(CompilationDatabase::from_ptr).ok_or(())
-        }
-    }
-
-    //- Accessors --------------------------------
-
-    fn get_commands_(&self, ptr: ffi::CXCompileCommands) -> Vec<CompileCommand> {
-        ptr.map(|p| {
-            let commands = CompileCommands::from_ptr(p);
-
-            iter!(
-                clang_CompileCommands_getSize(commands.ptr),
-                clang_CompileCommands_getCommand(commands.ptr),
-            ).map(|c| CompileCommand::from_ptr(c, commands.clone())).collect()
-        }).unwrap_or_else(Vec::new)
-    }
-
-    /// Returns all the compilation commands in this compilation database.
-    pub fn get_all_commands(&self) -> Vec<CompileCommand> {
-        let ptr = unsafe { ffi::clang_CompilationDatabase_getAllCompileCommands(self.ptr) };
-        self.get_commands_(ptr)
-    }
-
-    /// Returns all the compilation commands for the supplied source file in this compilation
-    /// database.
-    pub fn get_commands<F: AsRef<Path>>(&self, file: F) -> Vec<CompileCommand> {
-        unsafe {
-            let file = utility::from_path(file);
-            let ptr = ffi::clang_CompilationDatabase_getCompileCommands(self.ptr, file.as_ptr());
-            self.get_commands_(ptr)
-        }
-    }
-}
-
-impl<'c> Drop for CompilationDatabase<'c> {
-    fn drop(&mut self) {
-        unsafe { ffi::clang_CompilationDatabase_dispose(self.ptr); }
-    }
-}
-
-impl<'c> fmt::Debug for CompilationDatabase<'c> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompilationDatabase")
-            .field("commands", &self.get_all_commands())
-            .finish()
-    }
-}
-
-// CompileCommand ________________________________
-
-/// The information used to compile a source file in a project.
-#[derive(Clone)]
-pub struct CompileCommand<'d> {
-    ptr: ffi::CXCompileCommand,
-    parent: Rc<CompileCommands>,
-    _marker: PhantomData<&'d CompilationDatabase<'d>>,
-}
-
-impl<'d> CompileCommand<'d> {
-    //- Constructors -----------------------------
-
-    fn from_ptr(ptr: ffi::CXCompileCommand, parent: Rc<CompileCommands>) -> CompileCommand<'d> {
-        CompileCommand { ptr: ptr, parent: parent, _marker: PhantomData }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the arguments in the compiler invocation for this compile command.
-    pub fn get_arguments(&self) -> Vec<String> {
-        iter!(
-            clang_CompileCommand_getNumArgs(self.ptr),
-            clang_CompileCommand_getArg(self.ptr),
-        ).map(utility::to_string).collect()
-    }
-
-    /// Returns the file of this compile command.
-    #[cfg(feature="gte_clang_3_8")]
-    pub fn get_file(&self) -> PathBuf {
-        unsafe { utility::to_string(ffi::clang_CompileCommand_getFilename(self.ptr)).into() }
-    }
-
-    /// Returns the working directory of this compile command.
-    pub fn get_working_directory(&self) -> PathBuf {
-        unsafe { utility::to_string(ffi::clang_CompileCommand_getDirectory(self.ptr)).into() }
-    }
-}
-
-#[cfg(feature="gte_clang_3_8")]
-impl<'c> fmt::Debug for CompileCommand<'c> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompileCommand")
-            .field("working_directory", &self.get_working_directory())
-            .field("file", &self.get_file())
-            .field("arguments", &self.get_arguments())
-            .finish()
-    }
-}
-
-#[cfg(not(feature="gte_clang_3_8"))]
-impl<'c> fmt::Debug for CompileCommand<'c> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompileCommand")
-            .field("working_directory", &self.get_working_directory())
-            .field("arguments", &self.get_arguments())
-            .finish()
-    }
-}
-
-// CompileCommands _______________________________
-
-#[derive(Clone)]
-struct CompileCommands {
-    ptr: ffi::CXCompileCommands,
-}
-
-impl CompileCommands {
-    //- Constructors -----------------------------
-
-    fn from_ptr(ptr: ffi::CXCompileCommands) -> Rc<CompileCommands> {
-        Rc::new(CompileCommands { ptr: ptr })
-    }
-}
-
-impl Drop for CompileCommands {
-    fn drop(&mut self) {
-        unsafe { ffi::clang_CompileCommands_dispose(self.ptr); }
-    }
-}
-
-// CompletionContext _____________________________
-
-options! {
-    /// Indicates which types of results were included in a set of code completion results.
-    options CompletionContext: CXCompletionContext {
-        /// Indicates whether all possible types were included.
-        pub all_types: CXCompletionContext_AnyType,
-        /// Indicates whether all possible values were included.
-        pub all_values: CXCompletionContext_AnyValue,
-        /// Indicates whether values that resolve to C++ class types were included.
-        pub class_type_values: CXCompletionContext_CXXClassTypeValue,
-        /// Indicates whether the members of a record that are accessed with the dot operator were
-        /// included.
-        pub dot_members: CXCompletionContext_DotMemberAccess,
-        /// Indicates whether the members of a record that are accessed with the arrow operator were
-        /// included.
-        pub arrow_members: CXCompletionContext_ArrowMemberAccess,
-        /// Indicates whether enum tags were included.
-        pub enum_tags: CXCompletionContext_EnumTag,
-        /// Indicates whether union tags were included.
-        pub union_tags: CXCompletionContext_UnionTag,
-        /// Indicates whether struct tags were included.
-        pub struct_tags: CXCompletionContext_StructTag,
-        /// Indicates whether C++ class names were included.
-        pub class_names: CXCompletionContext_ClassTag,
-        /// Indicates whether C++ namespaces and namespace aliases were included.
-        pub namespaces: CXCompletionContext_Namespace,
-        /// Indicates whether C++ nested name specifiers were included.
-        pub nested_name_specifiers: CXCompletionContext_NestedNameSpecifier,
-        /// Indicates whether macro names were included.
-        pub macro_names: CXCompletionContext_MacroName,
-        /// Indicates whether natural language results were included.
-        pub natural_language: CXCompletionContext_NaturalLanguage,
-        /// Indicates whether values that resolve to Objective-C objects were included.
-        pub objc_object_values: CXCompletionContext_ObjCObjectValue,
-        /// Indicates whether values that resolve to Objective-C selectors were included.
-        pub objc_selector_values: CXCompletionContext_ObjCSelectorValue,
-        /// Indicates whether the properties of an Objective-C object that are accessed with the dot
-        /// operator were included.
-        pub objc_property_members: CXCompletionContext_ObjCPropertyAccess,
-        /// Indicates whether Objective-C interfaces were included.
-        pub objc_interfaces: CXCompletionContext_ObjCInterface,
-        /// Indicates whether Objective-C protocols were included.
-        pub objc_protocols: CXCompletionContext_ObjCProtocol,
-        /// Indicates whether Objective-C categories were included.
-        pub objc_categories: CXCompletionContext_ObjCCategory,
-        /// Indicates whether Objective-C instance messages were included.
-        pub objc_instance_messages: CXCompletionContext_ObjCInstanceMessage,
-        /// Indicates whether Objective-C class messages were included.
-        pub objc_class_messages: CXCompletionContext_ObjCClassMessage,
-        /// Indicates whether Objective-C selector names were included.
-        pub objc_selector_names: CXCompletionContext_ObjCSelectorName,
-    }
-}
-
-// CompletionOptions _____________________________
-
-options! {
-    /// A set of options that determines how code completion is run.
-    options CompletionOptions: CXCodeComplete_Flags {
-        /// Indicates whether macros will be included in code completion results.
-        pub macros: CXCodeComplete_IncludeMacros,
-        /// Indicates whether code patterns (e.g., for loops) will be included in code completion
-        /// results.
-        pub code_patterns: CXCodeComplete_IncludeCodePatterns,
-        /// Indicates whether documentation comment briefs will be included in code completion
-        /// results.
-        pub briefs: CXCodeComplete_IncludeBriefComments,
-    }
-}
-
-impl Default for CompletionOptions {
-    fn default() -> CompletionOptions {
-        unsafe { CompletionOptions::from(ffi::clang_defaultCodeCompleteOptions()) }
-    }
-}
-
-// CompletionResult ______________________________
-
-/// A code completion result.
-#[derive(Copy, Clone)]
-pub struct CompletionResult<'r> {
-    raw: ffi::CXCompletionResult,
-    _marker: PhantomData<&'r CompletionResults>
-}
-
-impl<'r> CompletionResult<'r> {
-    //- Constructors -----------------------------
-
-    fn from_raw(raw: ffi::CXCompletionResult) -> CompletionResult<'r> {
-        CompletionResult { raw: raw, _marker: PhantomData }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the categorization of the AST entity this code completion result produces.
-    pub fn get_kind(&self) -> EntityKind {
-        unsafe { mem::transmute(self.raw.CursorKind) }
-    }
-
-    /// Returns the completion string for this code completion result.
-    pub fn get_string(&self) -> CompletionString<'r> {
-        CompletionString::from_raw(self.raw.CompletionString)
-    }
-}
-
-impl<'r> cmp::Eq for CompletionResult<'r> { }
-
-impl<'r> cmp::Ord for CompletionResult<'r> {
-    fn cmp(&self, other: &CompletionResult<'r>) -> Ordering {
-        self.get_string().cmp(&other.get_string())
-    }
-}
-
-impl<'r> cmp::PartialEq for CompletionResult<'r> {
-    fn eq(&self, other: &CompletionResult<'r>) -> bool {
-        self.get_kind() == other.get_kind() && self.get_string() == other.get_string()
-    }
-}
-
-impl<'r> cmp::PartialOrd for CompletionResult<'r> {
-    fn partial_cmp(&self, other: &CompletionResult<'r>) -> Option<Ordering> {
-        self.get_string().partial_cmp(&other.get_string())
-    }
-}
-
-impl<'r> fmt::Debug for CompletionResult<'r> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompletionResult")
-            .field("kind", &self.get_kind())
-            .field("string", &self.get_string())
-            .finish()
-    }
-}
-
-// CompletionResults _____________________________
-
-/// A set of code completion results.
-pub struct CompletionResults {
-    ptr: *mut ffi::CXCodeCompleteResults,
-}
-
-impl CompletionResults {
-    //- Constructors -----------------------------
-
-    fn from_ptr(ptr: *mut ffi::CXCodeCompleteResults) -> CompletionResults {
-        CompletionResults { ptr: ptr }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the categorization of the entity that contains the code completion context for this
-    /// set of code completion results and whether that entity is incomplete, if applicable.
-    pub fn get_container_kind(&self) -> Option<(EntityKind, bool)> {
-        unsafe {
-            let mut incomplete = mem::uninitialized();
-
-            match ffi::clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
-                ffi::CXCursorKind::InvalidCode => None,
-                other => Some((mem::transmute(other), incomplete != 0)),
-            }
-        }
-    }
-
-    /// Returns the code completion context for this set of code completion results, if any.
-    pub fn get_context(&self) -> Option<CompletionContext> {
-        let bits = unsafe { ffi::clang_codeCompleteGetContexts(self.ptr) as c_uint };
-
-        if bits != 0 && bits != 4194303 {
-            Some(CompletionContext::from(ffi::CXCompletionContext::from_bits_truncate(bits)))
-        } else {
-            None
-        }
-    }
-
-    /// Returns the diagnostics that were produced prior to the code completion context for this set
-    /// of code completion results.
-    pub fn get_diagnostics<'tu>(&self, tu: &'tu TranslationUnit<'tu>) -> Vec<Diagnostic<'tu>> {
-        iter!(
-            clang_codeCompleteGetNumDiagnostics(self.ptr),
-            clang_codeCompleteGetDiagnostic(self.ptr),
-        ).map(|d| Diagnostic::from_ptr(d, tu)).collect()
-    }
-
-    /// Returns the selector or partial selector that has been entered this far for the Objective-C
-    /// message send context for this set of code completion results.
-    pub fn get_objc_selector(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_codeCompleteGetObjCSelector(self.ptr)) }
-    }
-
-    /// Returns the code completion results in this set of code completion results.
-    pub fn get_results(&self) -> Vec<CompletionResult> {
-        unsafe {
-            let raws = slice::from_raw_parts((*self.ptr).Results, (*self.ptr).NumResults as usize);
-            raws.iter().cloned().map(CompletionResult::from_raw).collect()
-        }
-    }
-
-    /// Returns the USR for the entity that contains the code completion context for this set of
-    /// code completion results, if applicable.
-    pub fn get_usr(&self) -> Option<Usr> {
-        let usr = unsafe { ffi::clang_codeCompleteGetContainerUSR(self.ptr) };
-        utility::to_string_option(usr).map(Usr)
-    }
-}
-
-impl Drop for CompletionResults {
-    fn drop(&mut self) {
-        unsafe { ffi::clang_disposeCodeCompleteResults(self.ptr); }
-    }
-}
-
-impl fmt::Debug for CompletionResults {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompletionResults")
-            .field("results", &self.get_results())
-            .finish()
-    }
-}
-
-// CompletionString ______________________________
-
-/// A semantic string that describes a code completion result.
-#[derive(Copy, Clone)]
-pub struct CompletionString<'r> {
-    raw: ffi::CXCompletionString,
-    _marker: PhantomData<&'r CompletionResults>
-}
-
-impl<'r> CompletionString<'r> {
-    //- Constructors -----------------------------
-
-    fn from_raw(raw: ffi::CXCompletionString) -> CompletionString<'r> {
-        CompletionString { raw: raw, _marker: PhantomData }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the annotations associated with this completion string.
-    pub fn get_annotations(&self) -> Vec<String> {
-        iter!(
-            clang_getCompletionNumAnnotations(self.raw),
-            clang_getCompletionAnnotation(self.raw),
-        ).map(utility::to_string).collect()
-    }
-
-    /// Returns the availability of this completion string.
-    pub fn get_availability(&self) -> Availability {
-        unsafe { mem::transmute(ffi::clang_getCompletionAvailability(self.raw)) }
-    }
-
-    /// Returns the chunks of this completion string.
-    pub fn get_chunks(&self) -> Vec<CompletionChunk> {
-        iter!(
-            clang_getNumCompletionChunks(self.raw),
-            clang_getCompletionChunkKind(self.raw),
-        ).enumerate().map(|(i, k)| {
-            macro_rules! text {
-                ($variant:ident) => ({
-                    let text = unsafe { ffi::clang_getCompletionChunkText(self.raw, i as c_uint) };
-                    CompletionChunk::$variant(utility::to_string(text))
-                });
-            }
-
-            match k {
-                ffi::CXCompletionChunkKind::Optional => {
-                    let i = i as c_uint;
-                    let raw = unsafe { ffi::clang_getCompletionChunkCompletionString(self.raw, i) };
-                    CompletionChunk::Optional(CompletionString::from_raw(raw))
-                },
-                ffi::CXCompletionChunkKind::CurrentParameter => text!(CurrentParameter),
-                ffi::CXCompletionChunkKind::TypedText => text!(TypedText),
-                ffi::CXCompletionChunkKind::Text => text!(Text),
-                ffi::CXCompletionChunkKind::Placeholder => text!(Placeholder),
-                ffi::CXCompletionChunkKind::Informative => text!(Informative),
-                ffi::CXCompletionChunkKind::ResultType => text!(ResultType),
-                ffi::CXCompletionChunkKind::Colon => text!(Colon),
-                ffi::CXCompletionChunkKind::Comma => text!(Comma),
-                ffi::CXCompletionChunkKind::Equal => text!(Equals),
-                ffi::CXCompletionChunkKind::SemiColon => text!(Semicolon),
-                ffi::CXCompletionChunkKind::LeftAngle => text!(LeftAngleBracket),
-                ffi::CXCompletionChunkKind::RightAngle => text!(RightAngleBracket),
-                ffi::CXCompletionChunkKind::LeftBrace => text!(LeftBrace),
-                ffi::CXCompletionChunkKind::RightBrace => text!(RightBrace),
-                ffi::CXCompletionChunkKind::LeftParen => text!(LeftParenthesis),
-                ffi::CXCompletionChunkKind::RightParen => text!(RightParenthesis),
-                ffi::CXCompletionChunkKind::LeftBracket => text!(LeftSquareBracket),
-                ffi::CXCompletionChunkKind::RightBracket => text!(RightSquareBracket),
-                ffi::CXCompletionChunkKind::HorizontalSpace => text!(HorizontalSpace),
-                ffi::CXCompletionChunkKind::VerticalSpace => text!(VerticalSpace),
-            }
-        }).collect()
-    }
-
-    /// Returns the documentation comment brief associated with the declaration this completion
-    /// string refers to, if applicable.
-    pub fn get_comment_brief(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_getCompletionBriefComment(self.raw)) }
-    }
-
-    /// Returns the name of the semantic parent of the declaration this completion string refers to,
-    /// if applicable.
-    pub fn get_parent_name(&self) -> Option<String> {
-        unsafe {
-            utility::to_string_option(ffi::clang_getCompletionParent(self.raw, ptr::null_mut()))
-        }
-    }
-
-    /// Returns an integer that represents how likely a user is to select this completion string as
-    /// determined by internal heuristics. Smaller values indicate higher priorities.
-    pub fn get_priority(&self) -> usize {
-        unsafe { ffi::clang_getCompletionPriority(self.raw) as usize }
-    }
-
-    /// Returns the text of the typed text chunk for this completion string, if any.
-    pub fn get_typed_text(&self) -> Option<String> {
-        for chunk in self.get_chunks() {
-            if let CompletionChunk::TypedText(text) = chunk {
-                return Some(text);
-            }
-        }
-
-        None
-    }
-}
-
-impl<'r> cmp::Eq for CompletionString<'r> { }
-
-impl<'r> cmp::Ord for CompletionString<'r> {
-    fn cmp(&self, other: &CompletionString<'r>) -> Ordering {
-        match self.get_priority().cmp(&other.get_priority()) {
-            Ordering::Equal => self.get_typed_text().cmp(&other.get_typed_text()),
-            other => other,
-        }
-    }
-}
-
-impl<'r> cmp::PartialEq for CompletionString<'r> {
-    fn eq(&self, other: &CompletionString<'r>) -> bool {
-        self.get_chunks() == other.get_chunks()
-    }
-}
-
-impl<'r> cmp::PartialOrd for CompletionString<'r> {
-    fn partial_cmp(&self, other: &CompletionString<'r>) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<'r> fmt::Debug for CompletionString<'r> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompletionString")
-            .field("chunks", &self.get_chunks())
-            .finish()
-    }
-}
-
-// Diagnostic ____________________________________
-
-/// A message from the compiler about an issue with a source file.
-#[derive(Copy, Clone)]
-pub struct Diagnostic<'tu> {
-    ptr: ffi::CXDiagnostic,
-    tu: &'tu TranslationUnit<'tu>,
-}
-
-impl<'tu> Diagnostic<'tu> {
-    //- Constructors -----------------------------
-
-    fn from_ptr(ptr: ffi::CXDiagnostic, tu: &'tu TranslationUnit<'tu>) -> Diagnostic<'tu> {
-        Diagnostic { ptr: ptr, tu: tu }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns this diagnostic as a formatted string.
-    pub fn format(&self, options: FormatOptions) -> String {
-        unsafe { utility::to_string(ffi::clang_formatDiagnostic(self.ptr, options.into())) }
-    }
-
-    /// Returns the child diagnostics of this diagnostic.
-    pub fn get_children(&self) -> Vec<Diagnostic> {
-        let raw = unsafe { ffi::clang_getChildDiagnostics(self.ptr) };
-
-        iter!(
-            clang_getNumDiagnosticsInSet(raw),
-            clang_getDiagnosticInSet(raw),
-        ).map(|d| Diagnostic::from_ptr(d, self.tu)).collect()
-    }
-
-    /// Returns the fix-its for this diagnostic.
-    pub fn get_fix_its(&self) -> Vec<FixIt<'tu>> {
-        unsafe {
-            (0..ffi::clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
-                let mut range = mem::uninitialized();
-                let fixit = ffi::clang_getDiagnosticFixIt(self.ptr, i, &mut range);
-                let string = utility::to_string(fixit);
-                let range = SourceRange::from_raw(range, self.tu);
-
-                if string.is_empty() {
-                    FixIt::Deletion(range)
-                } else if range.get_start() == range.get_end() {
-                    FixIt::Insertion(range.get_start(), string)
-                } else {
-                    FixIt::Replacement(range, string)
-                }
-            }).collect()
-        }
-    }
-
-    /// Returns the source location of this diagnostic.
-    pub fn get_location(&self) -> SourceLocation<'tu> {
-        unsafe { SourceLocation::from_raw(ffi::clang_getDiagnosticLocation(self.ptr), self.tu) }
-    }
-
-    /// Returns the source ranges of this diagnostic.
-    pub fn get_ranges(&self) -> Vec<SourceRange<'tu>> {
-        iter!(
-            clang_getDiagnosticNumRanges(self.ptr),
-            clang_getDiagnosticRange(self.ptr),
-        ).map(|r| SourceRange::from_raw(r, self.tu)).collect()
-    }
-
-    /// Returns the severity of this diagnostic.
-    pub fn get_severity(&self) -> Severity {
-        unsafe { mem::transmute(ffi::clang_getDiagnosticSeverity(self.ptr)) }
-    }
-
-    /// Returns the text of this diagnostic.
-    pub fn get_text(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_getDiagnosticSpelling(self.ptr)) }
-    }
-}
-
-impl<'tu> fmt::Debug for Diagnostic<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Diagnostic")
-            .field("location", &self.get_location())
-            .field("severity", &self.get_severity())
-            .field("text", &self.get_text())
-            .finish()
-    }
-}
-
-impl<'tu> fmt::Display for Diagnostic<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.format(FormatOptions::default()))
     }
 }
 
@@ -1609,6 +864,32 @@ impl<'tu> Entity<'tu> {
     }
 
     //- Accessors --------------------------------
+
+    /// Returns the categorization of this AST entity.
+    pub fn get_kind(&self) -> EntityKind {
+        unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
+    }
+
+    /// Returns the display name of this AST entity, if any.
+    ///
+    /// The display name of an entity contains additional information that helps identify the
+    /// entity.
+    pub fn get_display_name(&self) -> Option<String> {
+        unsafe { utility::to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
+    }
+
+    /// Returns the source location of this AST entity, if any.
+    pub fn get_location(&self) -> Option<SourceLocation<'tu>> {
+        unsafe {
+            let location = ffi::clang_getCursorLocation(self.raw);
+            location.map(|l| SourceLocation::from_raw(l, self.tu))
+        }
+    }
+
+    /// Returns the source range of this AST entity, if any.
+    pub fn get_range(&self) -> Option<SourceRange<'tu>> {
+        unsafe { ffi::clang_getCursorExtent(self.raw).map(|r| SourceRange::from_raw(r, self.tu)) }
+    }
 
     /// Returns the accessibility of this declaration or base class specifier, if applicable.
     pub fn get_accessibility(&self) -> Option<Accessibility> {
@@ -1692,14 +973,6 @@ impl<'tu> Entity<'tu> {
         unsafe { ffi::clang_getCursorDefinition(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
     }
 
-    /// Returns the display name of this AST entity, if any.
-    ///
-    /// The display name of an entity contains additional information that helps identify the
-    /// entity.
-    pub fn get_display_name(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
-    }
-
     /// Returns the value of this enum constant declaration, if applicable.
     pub fn get_enum_constant_value(&self) -> Option<(i64, u64)> {
         unsafe {
@@ -1721,11 +994,6 @@ impl<'tu> Entity<'tu> {
     /// Returns the file included by this inclusion directive, if applicable.
     pub fn get_file(&self) -> Option<File<'tu>> {
         unsafe { ffi::clang_getIncludedFile(self.raw).map(|f| File::from_ptr(f, self.tu)) }
-    }
-
-    /// Returns the categorization of this AST entity.
-    pub fn get_kind(&self) -> EntityKind {
-        unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
     }
 
     /// Returns the language used by this declaration, if applicable.
@@ -1751,14 +1019,6 @@ impl<'tu> Entity<'tu> {
                 ffi::CXLinkageKind::Invalid => None,
                 other => Some(mem::transmute(other)),
             }
-        }
-    }
-
-    /// Returns the source location of this AST entity, if any.
-    pub fn get_location(&self) -> Option<SourceLocation<'tu>> {
-        unsafe {
-            let location = ffi::clang_getCursorLocation(self.raw);
-            location.map(|l| SourceLocation::from_raw(l, self.tu))
         }
     }
 
@@ -1906,11 +1166,6 @@ impl<'tu> Entity<'tu> {
 
             Some((0..count as usize).map(|i| PlatformAvailability::from_raw(buffer[i])).collect())
         }
-    }
-
-    /// Returns the source range of this AST entity, if any.
-    pub fn get_range(&self) -> Option<SourceRange<'tu>> {
-        unsafe { ffi::clang_getCursorExtent(self.raw).map(|r| SourceRange::from_raw(r, self.tu)) }
     }
 
     /// Returns the AST entity referred to by this AST entity, if any.
@@ -2164,7 +1419,15 @@ impl<'tu> Entity<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for Entity<'tu> { }
+impl<'tu> fmt::Debug for Entity<'tu> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Entity")
+            .field("kind", &self.get_kind())
+            .field("display_name", &self.get_display_name())
+            .field("location", &self.get_location())
+            .finish()
+    }
+}
 
 impl<'tu> cmp::PartialEq for Entity<'tu> {
     fn eq(&self, other: &Entity<'tu>) -> bool {
@@ -2172,15 +1435,7 @@ impl<'tu> cmp::PartialEq for Entity<'tu> {
     }
 }
 
-impl<'tu> fmt::Debug for Entity<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Entity")
-            .field("location", &self.get_location())
-            .field("kind", &self.get_kind())
-            .field("display_name", &self.get_display_name())
-            .finish()
-    }
-}
+impl<'tu> cmp::Eq for Entity<'tu> { }
 
 impl<'tu> hash::Hash for Entity<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
@@ -2189,180 +1444,6 @@ impl<'tu> hash::Hash for Entity<'tu> {
             let slice = slice::from_raw_parts(mem::transmute(&integer), mem::size_of_val(&integer));
             hasher.write(slice);
         }
-    }
-}
-
-// File __________________________________________
-
-/// A source file.
-#[derive(Copy, Clone)]
-pub struct File<'tu> {
-    ptr: ffi::CXFile,
-    tu: &'tu TranslationUnit<'tu>,
-}
-
-impl<'tu> File<'tu> {
-    //- Constructors -----------------------------
-
-    fn from_ptr(ptr: ffi::CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
-        File { ptr: ptr, tu: tu }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns a unique identifier for this file.
-    pub fn get_id(&self) -> (u64, u64, u64) {
-        unsafe {
-            let mut id = mem::uninitialized();
-            ffi::clang_getFileUniqueID(self.ptr, &mut id);
-            (id.data[0] as u64, id.data[1] as u64, id.data[2] as u64)
-        }
-    }
-
-    /// Returns the inclusion directives in this file.
-    pub fn get_includes(&self) -> Vec<Entity<'tu>> {
-        let mut includes = vec![];
-
-        self.visit_includes(|e, _| {
-            includes.push(e);
-            true
-        });
-
-        includes
-    }
-
-    /// Returns the source location at the supplied line and column in this file.
-    ///
-    /// # Panics
-    ///
-    /// * `line` or `column` is `0`
-    pub fn get_location(&self, line: u32, column: u32) -> SourceLocation<'tu> {
-        if line == 0 || column == 0 {
-            panic!("`line` or `column` is `0`");
-        }
-
-        let (line, column) = (line, column) as (c_uint, c_uint);
-        let location = unsafe { ffi::clang_getLocation(self.tu.ptr, self.ptr, line, column) };
-        SourceLocation::from_raw(location, self.tu)
-    }
-
-    /// Returns the module containing this file, if any.
-    pub fn get_module(&self) -> Option<Module<'tu>> {
-        let module = unsafe { ffi::clang_getModuleForFile(self.tu.ptr, self.ptr) };
-        module.map(|m| Module::from_ptr(m, self.tu))
-    }
-
-    /// Returns the source location at the supplied character offset in this file.
-    pub fn get_offset_location(&self, offset: u32) -> SourceLocation<'tu> {
-        let offset = offset as c_uint;
-        let location = unsafe { ffi::clang_getLocationForOffset(self.tu.ptr, self.ptr, offset) };
-        SourceLocation::from_raw(location, self.tu)
-    }
-
-    /// Returns the absolute path to this file.
-    pub fn get_path(&self) -> PathBuf {
-        unsafe { Path::new(&utility::to_string(ffi::clang_getFileName(self.ptr))).into() }
-    }
-
-    /// Returns the references to the supplied entity in this file.
-    pub fn get_references(&self, entity: Entity<'tu>) -> Vec<Entity<'tu>> {
-        let mut references = vec![];
-
-        self.visit_references(entity, |e, _| {
-            references.push(e);
-            true
-        });
-
-        references
-    }
-
-    /// Returns the source ranges in this file that were skipped by the preprocessor.
-    ///
-    /// This will always return an empty `Vec` if the translation unit that contains this file was
-    /// not constructed with a detailed preprocessing record.
-    pub fn get_skipped_ranges(&self) -> Vec<SourceRange<'tu>> {
-        unsafe {
-            let raw = ffi::clang_getSkippedRanges(self.tu.ptr, self.ptr);
-            let raws = slice::from_raw_parts((*raw).ranges, (*raw).count as usize);
-            let ranges = raws.iter().map(|r| SourceRange::from_raw(*r, self.tu)).collect();
-            ffi::clang_disposeSourceRangeList(raw);
-            ranges
-        }
-    }
-
-    /// Returns the last modification time for this file.
-    pub fn get_time(&self) -> time_t {
-        unsafe { ffi::clang_getFileTime(self.ptr) }
-    }
-
-    /// Returns whether this file is guarded against multiple inclusions.
-    pub fn is_include_guarded(&self) -> bool {
-        unsafe { ffi::clang_isFileMultipleIncludeGuarded(self.tu.ptr, self.ptr) != 0 }
-    }
-
-    /// Visits the inclusion directives in this file and returns whether visitation was ended by the
-    /// callback returning `false`.
-    pub fn visit_includes<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(&self, f: F) -> bool {
-        visit(self.tu, f, |v| unsafe { ffi::clang_findIncludesInFile(self.tu.ptr, self.ptr, v) })
-    }
-
-    /// Visits the references to the supplied entity in this file and returns whether visitation was
-    /// ended by the callback returning `false`.
-    pub fn visit_references<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(
-        &self, entity: Entity<'tu>, f: F
-    ) -> bool {
-        visit(self.tu, f, |v| unsafe { ffi::clang_findReferencesInFile(entity.raw, self.ptr, v) })
-    }
-}
-
-impl<'tu> cmp::Eq for File<'tu> { }
-
-impl<'tu> cmp::PartialEq for File<'tu> {
-    fn eq(&self, other: &File<'tu>) -> bool {
-        self.get_id() == other.get_id()
-    }
-}
-
-impl<'tu> fmt::Debug for File<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("File").field("path", &self.get_path()).finish()
-    }
-}
-
-impl<'tu> hash::Hash for File<'tu> {
-    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
-        self.get_id().hash(hasher);
-    }
-}
-
-// FormatOptions _________________________________
-
-options! {
-    /// A set of options that determines how a diagnostic is formatted.
-    options FormatOptions: CXDiagnosticDisplayOptions {
-        /// Indicates whether the diagnostic text will be prefixed by the file and line of the
-        /// source location the diagnostic indicates. This prefix may also contain column and/or
-        /// source range information.
-        pub source_location: CXDiagnostic_DisplaySourceLocation,
-        /// Indicates whether the column will be included in the source location prefix.
-        pub column: CXDiagnostic_DisplayColumn,
-        /// Indicates whether the source ranges will be included to the source location prefix.
-        pub source_ranges: CXDiagnostic_DisplaySourceRanges,
-        /// Indicates whether the option associated with the diagnostic (e.g., `-Wconversion`) will
-        /// be placed in brackets after the diagnostic text if there is such an option.
-        pub option: CXDiagnostic_DisplayOption,
-        /// Indicates whether the category number associated with the diagnostic will be placed in
-        /// brackets after the diagnostic text if there is such a category number.
-        pub category_id: CXDiagnostic_DisplayCategoryId,
-        /// Indicates whether the category name associated with the diagnostic will be placed in
-        /// brackets after the diagnostic text if there is such a category name.
-        pub category_name: CXDiagnostic_DisplayCategoryName,
-    }
-}
-
-impl Default for FormatOptions {
-    fn default() -> FormatOptions {
-        unsafe { FormatOptions::from(ffi::clang_defaultDiagnosticDisplayOptions()) }
     }
 }
 
@@ -2391,6 +1472,11 @@ impl<'c> Index<'c> {
 
     //- Accessors --------------------------------
 
+    /// Returns a parser for the supplied file.
+    pub fn parser<F: Into<PathBuf>>(&'c self, f: F) -> Parser<'c> {
+        Parser::new(self, f)
+    }
+
     /// Returns the thread options for this index.
     pub fn get_thread_options(&self) -> ThreadOptions {
         unsafe { ThreadOptions::from(ffi::clang_CXIndex_getGlobalOptions(self.ptr)) }
@@ -2412,91 +1498,8 @@ impl<'c> Drop for Index<'c> {
 
 impl<'c> fmt::Debug for Index<'c> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Index").finish()
-    }
-}
-
-// Location ______________________________________
-
-/// The file, line, column, and character offset of a source location.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Location<'tu> {
-    /// The file of the source location.
-    pub file: File<'tu>,
-    /// The line of the source location.
-    pub line: u32,
-    /// The column of the source location.
-    pub column: u32,
-    /// The character offset of the source location.
-    pub offset: u32,
-}
-
-// Module ________________________________________
-
-/// A collection of headers.
-#[derive(Copy, Clone)]
-pub struct Module<'tu> {
-    ptr: ffi::CXModule,
-    tu: &'tu TranslationUnit<'tu>,
-}
-
-impl<'tu> Module<'tu> {
-    //- Constructors -----------------------------
-
-    fn from_ptr(ptr: ffi::CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
-        Module { ptr: ptr, tu: tu }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the AST file this module came from.
-    pub fn get_file(&self) -> File<'tu> {
-        let ptr = unsafe { ffi::clang_Module_getASTFile(self.ptr) };
-        File::from_ptr(ptr, self.tu)
-    }
-
-    /// Returns the full name of this module (e.g., `std.vector` for the `std.vector` module).
-    pub fn get_full_name(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_Module_getFullName(self.ptr)) }
-    }
-
-    /// Returns the name of this module (e.g., `vector` for the `std.vector` module).
-    pub fn get_name(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_Module_getName(self.ptr)) }
-    }
-
-    /// Returns the parent of this module, if any.
-    pub fn get_parent(&self) -> Option<Module<'tu>> {
-        unsafe { ffi::clang_Module_getParent(self.ptr).map(|p| Module::from_ptr(p, self.tu)) }
-    }
-
-    /// Returns the top-level headers in this module.
-    pub fn get_top_level_headers(&self) -> Vec<File<'tu>> {
-        iter!(
-            clang_Module_getNumTopLevelHeaders(self.tu.ptr, self.ptr),
-            clang_Module_getTopLevelHeader(self.tu.ptr, self.ptr),
-        ).map(|h| File::from_ptr(h, self.tu)).collect()
-    }
-
-    /// Returns whether this module is a system module.
-    pub fn is_system(&self) -> bool {
-        unsafe { ffi::clang_Module_isSystem(self.ptr) != 0 }
-    }
-}
-
-impl<'tu> cmp::Eq for Module<'tu> { }
-
-impl<'tu> cmp::PartialEq for Module<'tu> {
-    fn eq(&self, other: &Module<'tu>) -> bool {
-        self.get_file() == other.get_file() && self.get_full_name() == other.get_full_name()
-    }
-}
-
-impl<'tu> fmt::Debug for Module<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Module")
-            .field("file", &self.get_file())
-            .field("full_name", &self.get_full_name())
+        formatter.debug_struct("Index")
+            .field("thread_options", &self.get_thread_options())
             .finish()
     }
 }
@@ -2553,38 +1556,84 @@ options! {
     }
 }
 
-// ParseOptions __________________________________
+// Parser ________________________________________
 
-options! {
-    /// A set of options that determines how a source file is parsed into a translation unit.
-    #[derive(Default)]
-    options ParseOptions: CXTranslationUnit_Flags {
-        /// Indicates whether certain code completion results will be cached when the translation
-        /// unit is reparsed.
+builder! {
+    /// Parses translation units.
+    builder Parser: CXTranslationUnit_Flags {
+        index: &'tu Index<'tu>,
+        file: PathBuf;
+    FIELDS:
+        /// Sets the compiler arguments to provide to `libclang`.
+        ///
+        /// Any compiler argument that could be supplied to `clang` may be supplied to this
+        /// function. However, the following arguments are ignored:
+        ///
+        /// * `-c`
+        /// * `-emit-ast`
+        /// * `-fsyntax-only`
+        /// * `-o` and the following `<output>`
+        pub arguments: (Vec<CString>, &[&str]) = |as_: &[&str]| {
+            as_.iter().map(utility::from_string).collect()
+        },
+        /// Sets the unsaved files to use.
+        pub unsaved: (Vec<Unsaved>, &[Unsaved]) = |us: &[Unsaved]| us.to_vec();
+    OPTIONS:
+        /// Sets whether certain code completion results will be cached when the translation unit is
+        /// reparsed.
         ///
         /// This option increases the time it takes to reparse the translation unit but improves
         /// code completion performance.
-        pub cached_completion_results: CXTranslationUnit_CacheCompletionResults,
-        /// Indicates whether a detailed preprocessing record will be constructed which tracks all
-        /// macro definitions and instantiations.
+        pub cache_completion_results: CXTranslationUnit_CacheCompletionResults,
+        /// Sets whether a detailed preprocessing record will be constructed which tracks all macro
+        /// definitions and instantiations.
         pub detailed_preprocessing_record: CXTranslationUnit_DetailedPreprocessingRecord,
-        /// Indicates whether documentation comment briefs will be included in code completion
-        /// results.
+        /// Sets whether documentation comment briefs will be included in code completion results.
         pub briefs_in_completion_results: CXTranslationUnit_IncludeBriefCommentsInCodeCompletion,
-        /// Indicates whether the translation unit will be considered incomplete.
+        /// Sets whether the translation unit will be considered incomplete.
         ///
         /// This option suppresses certain semantic analyses and is typically used when parsing
         /// headers with the intent of creating a precompiled header.
         pub incomplete: CXTranslationUnit_Incomplete,
-        /// Indicates whether function and method bodies will be skipped.
-        pub skipped_function_bodies: CXTranslationUnit_SkipFunctionBodies,
-    CONDITIONAL: #[feature="clang_3_8"]
-        /// Indicates whether the precompiled preamble should be created on the first parse.
-        ///
-        /// By default, the precompiled preamble is created on the first reparse, so this option
-        /// increases the time it takes to parse code the first time but decreases the time it takes
-        /// to reparse that code for the first time.
-        pub preamble_on_first_parse: CXTranslationUnit_CreatePreambleOnFirstParse,
+        /// Sets whether function and method bodies will be skipped.
+        pub skip_function_bodies: CXTranslationUnit_SkipFunctionBodies,
+    }
+}
+
+impl<'tu> Parser<'tu> {
+    //- Constructors -----------------------------
+
+    fn new<F: Into<PathBuf>>(index: &'tu Index<'tu>, file: F) -> Parser<'tu> {
+        let flags = ffi::CXTranslationUnit_Flags::empty();
+        Parser { index: index, file: file.into(), arguments: vec![], unsaved: vec![], flags: flags }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Parses a translation unit.
+    ///
+    /// # Failures
+    ///
+    /// * an error occurs while deserializing an AST file
+    /// * `libclang` crashes
+    /// * an unknown error occurs
+    pub fn parse(&self) -> Result<TranslationUnit<'tu>, SourceError> {
+        let arguments = self.arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
+        let unsaved = self.unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
+        unsafe {
+            let mut ptr = mem::uninitialized();
+            let code = ffi::clang_parseTranslationUnit2(
+                self.index.ptr,
+                utility::from_path(&self.file).as_ptr(),
+                arguments.as_ptr(),
+                arguments.len() as c_int,
+                mem::transmute(unsaved.as_ptr()),
+                unsaved.len() as c_uint,
+                self.flags,
+                &mut ptr,
+            );
+            SourceError::from_error(code).map(|_| TranslationUnit::from_ptr(ptr))
+        }
     }
 }
 
@@ -2625,177 +1674,6 @@ impl PlatformAvailability {
     }
 }
 
-// SourceLocation ________________________________
-
-macro_rules! location {
-    ($function:ident, $location:expr, $tu:expr) => ({
-        let (mut file, mut line, mut column, mut offset) = mem::uninitialized();
-        ffi::$function($location, &mut file, &mut line, &mut column, &mut offset);
-        let file = File::from_ptr(file, $tu);
-        Location { file: file, line: line as u32, column: column as u32, offset: offset as u32 }
-    });
-}
-
-/// A location in a source file.
-#[derive(Copy, Clone)]
-pub struct SourceLocation<'tu> {
-    raw: ffi::CXSourceLocation,
-    tu: &'tu TranslationUnit<'tu>,
-}
-
-impl<'tu> SourceLocation<'tu> {
-    //- Constructors -----------------------------
-
-    fn from_raw(raw: ffi::CXSourceLocation, tu: &'tu TranslationUnit<'tu>) -> SourceLocation<'tu> {
-        SourceLocation { raw: raw, tu: tu }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the AST entity at this source location, if any.
-    pub fn get_entity(&self) -> Option<Entity<'tu>> {
-        unsafe { ffi::clang_getCursor(self.tu.ptr, self.raw).map(|c| Entity::from_raw(c, self.tu)) }
-    }
-
-    /// Returns the file, line, column and character offset of this source location.
-    ///
-    /// If this source location is inside a macro expansion, the location of the macro expansion is
-    /// returned instead.
-    pub fn get_expansion_location(&self) -> Location<'tu> {
-        unsafe { location!(clang_getExpansionLocation, self.raw, self.tu) }
-    }
-
-    /// Returns the file, line, column and character offset of this source location.
-    ///
-    /// If this source location is inside a macro expansion, the location of the macro expansion is
-    /// returned instead unless this source location is inside a macro argument. In that case, the
-    /// location of the macro argument is returned.
-    pub fn get_file_location(&self) -> Location<'tu> {
-        unsafe { location!(clang_getFileLocation, self.raw, self.tu) }
-    }
-
-    /// Returns the file path, line, and column of this source location taking line directives into
-    /// account.
-    pub fn get_presumed_location(&self) -> (String, u32, u32) {
-        unsafe {
-            let (mut file, mut line, mut column) = mem::uninitialized();
-            ffi::clang_getPresumedLocation(self.raw, &mut file, &mut line, &mut column);
-            (utility::to_string(file), line as u32, column as u32)
-        }
-    }
-
-    /// Returns the file, line, column and character offset of this source location.
-    pub fn get_spelling_location(&self) -> Location<'tu> {
-        unsafe { location!(clang_getSpellingLocation, self.raw, self.tu) }
-    }
-
-    /// Returns whether this source location is in the main file of its translation unit.
-    pub fn is_in_main_file(&self) -> bool {
-        unsafe { ffi::clang_Location_isFromMainFile(self.raw) != 0 }
-    }
-
-    /// Returns whether this source location is in a system header.
-    pub fn is_in_system_header(&self) -> bool {
-        unsafe { ffi::clang_Location_isInSystemHeader(self.raw) != 0 }
-    }
-}
-
-impl<'tu> cmp::Eq for SourceLocation<'tu> { }
-
-impl<'tu> cmp::PartialEq for SourceLocation<'tu> {
-    fn eq(&self, other: &SourceLocation<'tu>) -> bool {
-        unsafe { ffi::clang_equalLocations(self.raw, other.raw) != 0 }
-    }
-}
-
-impl<'tu> fmt::Debug for SourceLocation<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let location = self.get_spelling_location();
-        formatter.debug_struct("SourceLocation")
-            .field("file", &location.file)
-            .field("line", &location.line)
-            .field("column", &location.column)
-            .field("offset", &location.offset)
-            .finish()
-    }
-}
-
-impl<'tu> hash::Hash for SourceLocation<'tu> {
-    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
-        self.get_spelling_location().hash(hasher)
-    }
-}
-
-// SourceRange ___________________________________
-
-/// A half-open range in a source file.
-#[derive(Copy, Clone)]
-pub struct SourceRange<'tu> {
-    raw: ffi::CXSourceRange,
-    tu: &'tu TranslationUnit<'tu>,
-}
-
-impl<'tu> SourceRange<'tu> {
-    //- Constructors -----------------------------
-
-    fn from_raw(raw: ffi::CXSourceRange, tu: &'tu TranslationUnit<'tu>) -> SourceRange<'tu> {
-        SourceRange { raw: raw, tu: tu }
-    }
-
-    /// Constructs a new `SourceRange` that spans [`start`, `end`).
-    pub fn new(start: SourceLocation<'tu>, end: SourceLocation<'tu>) -> SourceRange<'tu> {
-        unsafe { SourceRange::from_raw(ffi::clang_getRange(start.raw, end.raw), start.tu) }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the exclusive end of this source range.
-    pub fn get_end(&self) -> SourceLocation<'tu> {
-        unsafe { SourceLocation::from_raw(ffi::clang_getRangeEnd(self.raw), self.tu) }
-    }
-
-    /// Returns the inclusive start of this source range.
-    pub fn get_start(&self) -> SourceLocation<'tu> {
-        unsafe { SourceLocation::from_raw(ffi::clang_getRangeStart(self.raw), self.tu) }
-    }
-
-    /// Tokenizes the source code covered by this source range and returns the resulting tokens.
-    pub fn tokenize(&self) -> Vec<Token<'tu>> {
-        unsafe {
-            let (mut raw, mut count) = mem::uninitialized();
-            ffi::clang_tokenize(self.tu.ptr, self.raw, &mut raw, &mut count);
-            let raws = slice::from_raw_parts(raw, count as usize);
-            let tokens = raws.iter().map(|t| Token::from_raw(*t, self.tu)).collect();
-            ffi::clang_disposeTokens(self.tu.ptr, raw, count);
-            tokens
-        }
-    }
-}
-
-impl<'tu> cmp::Eq for SourceRange<'tu> { }
-
-impl<'tu> cmp::PartialEq for SourceRange<'tu> {
-    fn eq(&self, other: &SourceRange<'tu>) -> bool {
-        unsafe { ffi::clang_equalRanges(self.raw, other.raw) != 0 }
-    }
-}
-
-impl<'tu> fmt::Debug for SourceRange<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("SourceRange")
-            .field("start", &self.get_start())
-            .field("end", &self.get_end())
-            .finish()
-    }
-}
-
-impl<'tu> hash::Hash for SourceRange<'tu> {
-    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
-        self.get_start().hash(hasher);
-        self.get_end().hash(hasher);
-    }
-}
-
 // ThreadOptions _________________________________
 
 options! {
@@ -2806,56 +1684,6 @@ options! {
         pub editing: CXGlobalOpt_ThreadBackgroundPriorityForEditing,
         /// Indicates whether threads creating for indexing purposes should use background priority.
         pub indexing: CXGlobalOpt_ThreadBackgroundPriorityForIndexing,
-    }
-}
-
-// Token _________________________________________
-
-/// A lexed piece of a source file.
-#[derive(Copy, Clone)]
-pub struct Token<'tu> {
-    raw: ffi::CXToken,
-    tu: &'tu TranslationUnit<'tu>,
-}
-
-impl<'tu> Token<'tu> {
-    //- Constructors -----------------------------
-
-    fn from_raw(raw: ffi::CXToken, tu: &'tu TranslationUnit<'tu>) -> Token<'tu> {
-        Token{ raw: raw, tu: tu }
-    }
-
-    //- Accessors --------------------------------
-
-    /// Returns the categorization of this token.
-    pub fn get_kind(&self) -> TokenKind {
-        unsafe { mem::transmute(ffi::clang_getTokenKind(self.raw)) }
-    }
-
-    /// Returns the source location of this token.
-    pub fn get_location(&self) -> SourceLocation<'tu> {
-        let raw = unsafe { ffi::clang_getTokenLocation(self.tu.ptr, self.raw) };
-        SourceLocation::from_raw(raw, self.tu)
-    }
-
-    /// Returns the source range of this token.
-    pub fn get_range(&self) -> SourceRange<'tu> {
-        unsafe { SourceRange::from_raw(ffi::clang_getTokenExtent(self.tu.ptr, self.raw), self.tu) }
-    }
-
-    /// Returns the textual representation of this token.
-    pub fn get_spelling(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_getTokenSpelling(self.tu.ptr, self.raw)) }
-    }
-}
-
-impl<'tu> fmt::Debug for Token<'tu> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Token")
-            .field("range", &self.get_range())
-            .field("kind", &self.get_kind())
-            .field("spelling", &self.get_spelling())
-            .finish()
     }
 }
 
@@ -2887,88 +1715,7 @@ impl<'i> TranslationUnit<'i> {
         ptr.map(TranslationUnit::from_ptr).ok_or(())
     }
 
-    /// Constructs a new `TranslationUnit` from a source file.
-    ///
-    /// Any compiler argument that may be supplied to `clang` may be supplied to this function.
-    /// However, the following arguments are ignored:
-    ///
-    /// * `-c`
-    /// * `-emit-ast`
-    /// * `-fsyntax-only`
-    /// * `-o` and the following `<output>`
-    ///
-    /// # Failures
-    ///
-    /// * an error occurs while deserializing an AST file
-    /// * `libclang` crashes
-    /// * an unknown error occurs
-    pub fn from_source<F: AsRef<Path>>(
-        index: &'i Index,
-        file: F,
-        arguments: &[&str],
-        unsaved: &[Unsaved],
-        options: ParseOptions,
-    ) -> Result<TranslationUnit<'i>, SourceError> {
-        let arguments = arguments.iter().map(utility::from_string).collect::<Vec<_>>();
-        let arguments = arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
-        let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
-
-        unsafe {
-            let mut ptr = mem::uninitialized();
-
-            let code = ffi::clang_parseTranslationUnit2(
-                index.ptr,
-                utility::from_path(file).as_ptr(),
-                arguments.as_ptr(),
-                arguments.len() as c_int,
-                mem::transmute(unsaved.as_ptr()),
-                unsaved.len() as c_uint,
-                options.into(),
-                &mut ptr,
-            );
-
-            SourceError::from_error(code).map(|_| TranslationUnit::from_ptr(ptr))
-        }
-    }
-
     //- Accessors --------------------------------
-
-    /// Returns the AST entities which correspond to the supplied tokens, if any.
-    pub fn annotate(&'i self, tokens: &[Token<'i>]) -> Vec<Option<Entity<'i>>> {
-        unsafe {
-            let mut raws = vec![mem::uninitialized(); tokens.len()];
-
-            ffi::clang_annotateTokens(
-                self.ptr, mem::transmute(tokens.as_ptr()), tokens.len() as c_uint, raws.as_mut_ptr()
-            );
-
-            raws.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
-        }
-    }
-
-    /// Runs code completion at the supplied location.
-    pub fn complete<F: AsRef<Path>>(
-        &self,
-        file: F,
-        line: u32,
-        column: u32,
-        unsaved: &[Unsaved],
-        options: CompletionOptions,
-    ) -> CompletionResults {
-        unsafe {
-            let ptr = ffi::clang_codeCompleteAt(
-                self.ptr,
-                utility::from_path(file).as_ptr(),
-                line as c_uint,
-                column as c_uint,
-                mem::transmute(unsaved.as_ptr()),
-                unsaved.len() as c_uint,
-                options.into(),
-            );
-
-            CompletionResults::from_ptr(ptr)
-        }
-    }
 
     /// Returns the diagnostics for this translation unit.
     pub fn get_diagnostics(&'i self) -> Vec<Diagnostic<'i>> {
@@ -2997,6 +1744,21 @@ impl<'i> TranslationUnit<'i> {
             ffi::clang_disposeCXTUResourceUsage(raw);
             usage
         }
+    }
+
+    /// Returns the AST entities which correspond to the supplied tokens, if any.
+    pub fn annotate(&'i self, tokens: &[Token<'i>]) -> Vec<Option<Entity<'i>>> {
+        unsafe {
+            let mut raws = vec![mem::uninitialized(); tokens.len()];
+            let ptr = mem::transmute(tokens.as_ptr());
+            ffi::clang_annotateTokens(self.ptr, ptr, tokens.len() as c_uint, raws.as_mut_ptr());
+            raws.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
+        }
+    }
+
+    /// Returns a completer which runs code completion.
+    pub fn completer<F: Into<PathBuf>>(&self, file: F, line: u32, column: u32) -> Completer {
+        Completer::new(self, file, line, column)
     }
 
     /// Saves this translation unit to an AST file.
@@ -3072,6 +1834,16 @@ impl<'tu> Type<'tu> {
 
     //- Accessors --------------------------------
 
+    /// Returns the kind of this type.
+    pub fn get_kind(&self) -> TypeKind {
+        unsafe { mem::transmute(self.raw.kind) }
+    }
+
+    /// Returns the display name of this type.
+    pub fn get_display_name(&self) -> String {
+        unsafe { utility::to_string(ffi::clang_getTypeSpelling(self.raw)) }
+    }
+
     /// Returns the alignment of this type in bytes.
     ///
     /// # Failures
@@ -3081,6 +1853,31 @@ impl<'tu> Type<'tu> {
     pub fn get_alignof(&self) -> Result<usize, AlignofError> {
         let alignof_ = unsafe { ffi::clang_Type_getAlignOf(self.raw) };
         AlignofError::from_error(alignof_).map(|_| alignof_ as usize)
+    }
+
+    /// Returns the offset of the field with the supplied name in this record type in bits.
+    ///
+    /// # Failures
+    ///
+    /// * this record type is a dependent type
+    /// * this record record type is an incomplete type
+    /// * this record type does not contain a field with the supplied name
+    pub fn get_offsetof<F: AsRef<str>>(&self, field: F) -> Result<usize, OffsetofError> {
+        let field = utility::from_string(field);
+        let offsetof_ = unsafe { ffi::clang_Type_getOffsetOf(self.raw, field.as_ptr()) };
+        OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
+    }
+
+    /// Returns the size of this type in bytes.
+    ///
+    /// # Failures
+    ///
+    /// * this type is a dependent type
+    /// * this type is an incomplete type
+    /// * this type is a variable size type
+    pub fn get_sizeof(&self) -> Result<usize, SizeofError> {
+        let sizeof_ = unsafe { ffi::clang_Type_getSizeOf(self.raw) };
+        SizeofError::from_error(sizeof_).map(|_| sizeof_ as usize)
     }
 
     /// Returns the argument types for this function or method type, if applicable.
@@ -3118,11 +1915,6 @@ impl<'tu> Type<'tu> {
         unsafe { ffi::clang_getTypeDeclaration(self.raw).map(|e| Entity::from_raw(e, self.tu)) }
     }
 
-    /// Returns the display name of this type.
-    pub fn get_display_name(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_getTypeSpelling(self.raw)) }
-    }
-
     /// Returns the element type for this array, complex, or vector type, if applicable.
     pub fn get_element_type(&self) -> Option<Type<'tu>> {
         unsafe { ffi::clang_getElementType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
@@ -3143,24 +1935,6 @@ impl<'tu> Type<'tu> {
         } else {
             None
         }
-    }
-
-    /// Returns the offset of the field with the supplied name in this record type in bits.
-    ///
-    /// # Failures
-    ///
-    /// * this record type is a dependent type
-    /// * this record record type is an incomplete type
-    /// * this record type does not contain a field with the supplied name
-    pub fn get_offsetof<F: AsRef<str>>(&self, field: F) -> Result<usize, OffsetofError> {
-        let field = utility::from_string(field);
-        let offsetof_ = unsafe { ffi::clang_Type_getOffsetOf(self.raw, field.as_ptr()) };
-        OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
-    }
-
-    /// Returns the kind of this type.
-    pub fn get_kind(&self) -> TypeKind {
-        unsafe { mem::transmute(self.raw.kind) }
     }
 
     /// Returns the pointee type for this pointer type, if applicable.
@@ -3192,18 +1966,6 @@ impl<'tu> Type<'tu> {
         } else {
             None
         }
-    }
-
-    /// Returns the size of this type in bytes.
-    ///
-    /// # Failures
-    ///
-    /// * this type is a dependent type
-    /// * this type is an incomplete type
-    /// * this type is a variable size type
-    pub fn get_sizeof(&self) -> Result<usize, SizeofError> {
-        let sizeof_ = unsafe { ffi::clang_Type_getSizeOf(self.raw) };
-        SizeofError::from_error(sizeof_).map(|_| sizeof_ as usize)
     }
 
     /// Returns the template argument types for this template class specialization type, if
@@ -3299,14 +2061,6 @@ impl<'tu> Type<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for Type<'tu> { }
-
-impl<'tu> cmp::PartialEq for Type<'tu> {
-    fn eq(&self, other: &Type<'tu>) -> bool {
-        unsafe { ffi::clang_equalTypes(self.raw, other.raw) != 0 }
-    }
-}
-
 impl<'tu> fmt::Debug for Type<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.debug_struct("Type")
@@ -3315,6 +2069,14 @@ impl<'tu> fmt::Debug for Type<'tu> {
             .finish()
     }
 }
+
+impl<'tu> cmp::PartialEq for Type<'tu> {
+    fn eq(&self, other: &Type<'tu>) -> bool {
+        unsafe { ffi::clang_equalTypes(self.raw, other.raw) != 0 }
+    }
+}
+
+impl<'tu> cmp::Eq for Type<'tu> { }
 
 // Unsaved _______________________________________
 
@@ -3434,41 +2196,7 @@ impl Version {
 // Functions
 //================================================
 
-fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
-    where F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
-          G: Fn(ffi::CXCursorAndRangeVisitor) -> ffi::CXResult
-{
-    trait Callback<'tu> {
-        fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool;
-    }
-
-    impl<'tu, F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool> Callback<'tu> for F {
-        fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool {
-            self(entity, range)
-        }
-    }
-
-    extern fn visit(
-        data: ffi::CXClientData, cursor: ffi::CXCursor, range: ffi::CXSourceRange
-    ) -> ffi::CXVisitorResult {
-        unsafe {
-            let &mut (tu, ref mut callback):
-                &mut (&TranslationUnit, Box<Callback>) =
-                    &mut *(data as *mut (&TranslationUnit, Box<Callback>));
-
-            if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
-                ffi::CXVisitorResult::Continue
-            } else {
-                ffi::CXVisitorResult::Break
-            }
-        }
-    }
-
-    let mut data = (tu, Box::new(f) as Box<Callback>);
-
-    let visitor = ffi::CXCursorAndRangeVisitor {
-        context: unsafe { mem::transmute(&mut data) }, visit: visit
-    };
-
-    g(visitor) == ffi::CXResult::VisitBreak
+/// Returns the version string for the version of `libclang` in use.
+pub fn get_version() -> String {
+    unsafe { utility::to_string(ffi::clang_getClangVersion()) }
 }
