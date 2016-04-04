@@ -79,7 +79,7 @@
 ### Changed
 - Bumped `clang-sys` version to `0.4.0`
 
-## [0.6.0] - 2014-4-2
+## [0.6.0] - 2016-4-2
 
 ### Added
 - Added preprocessor definition finding to `sonar` module
@@ -87,7 +87,7 @@
 ### Changed
 - Changed `sonar` interface
 
-## [0.7.0] - UNRELEASED
+## [0.7.0] - 2016-4-3
 
 ### Changed
 - Major refactoring
