@@ -94,7 +94,7 @@
 - Bumped `clang-sys` version to `0.4.1`
 - Bumped `libc` version to `0.2.9`
 
-## [0.7.1] - UNRELEASED
+## [0.7.1] - 2016-4-4
 
 ### Fixed
 - Fixed panic in `sonar` module when encountering certain kinds of typedefs
