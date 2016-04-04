@@ -101,5 +101,8 @@
 
 ## [0.7.2] - UNRELEASED
 
+### Fixed
+- Removed `println!` in `sonar` module
+
 ### Changed
 - Changed `Parser::arguments` parameter type

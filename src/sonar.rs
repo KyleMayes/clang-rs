@@ -151,7 +151,6 @@ fn visit<'tu, F: FnMut(Declaration<'tu>)>(
             let name = entity.get_name().unwrap();
 
             if is(underlying, prefix) && !seen.contains(&name) {
-                println!("{:?}", entity);
                 let declaration = underlying.get_declaration().unwrap();
                 f(Declaration::new(entity.get_name().unwrap(), declaration, Some(*entity)));
                 seen.insert(name);
