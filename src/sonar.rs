@@ -118,7 +118,7 @@ impl<'tu> Definition<'tu> {
 //================================================
 
 fn is(type_: Type, prefix: &str) -> bool {
-    type_.get_display_name().starts_with(prefix) && !is_function(type_) && !is_pointer(type_)
+    type_.get_kind() == TypeKind::Unexposed && type_.get_display_name().starts_with(prefix)
 }
 
 fn is_alias(type_: Type, name: &str) -> bool {
@@ -131,15 +131,6 @@ fn is_alias(type_: Type, name: &str) -> bool {
     }
 
     false
-}
-
-fn is_function(type_: Type) -> bool {
-    let kind = type_.get_kind();
-    kind == TypeKind::FunctionPrototype || kind == TypeKind::FunctionNoPrototype
-}
-
-fn is_pointer(type_: Type) -> bool {
-    type_.get_kind() == TypeKind::Pointer
 }
 
 fn visit<'tu, F: FnMut(Declaration<'tu>)>(
@@ -158,9 +149,10 @@ fn visit<'tu, F: FnMut(Declaration<'tu>)>(
         } else if entity.get_kind() == EntityKind::TypedefDecl {
             let underlying = entity.get_typedef_underlying_type().unwrap();
             let name = entity.get_name().unwrap();
-            let declaration = underlying.get_declaration().unwrap();
 
             if is(underlying, prefix) && !seen.contains(&name) {
+                println!("{:?}", entity);
+                let declaration = underlying.get_declaration().unwrap();
                 f(Declaration::new(entity.get_name().unwrap(), declaration, Some(*entity)));
                 seen.insert(name);
             }

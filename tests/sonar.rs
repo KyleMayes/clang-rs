@@ -160,11 +160,15 @@ pub fn test(clang: &Clang) {
         union U { int us; float uf; };
         typedef union U Union;
         typedef Union UnionTypedef;
+
+        typedef enum E EArray[4];
+        typedef struct S SArray[4];
+        typedef union U UArray[4];
     ";
 
     super::with_entity(&clang, source, |e| {
         let typedefs = sonar::find_typedefs(&e.get_children()[..]);
-        assert_eq!(typedefs.len(), 12);
+        assert_eq!(typedefs.len(), 15);
 
         assert_declaration_eq!(&typedefs[0], "Integer", SAME);
         assert_declaration_eq!(&typedefs[1], "IntegerTypedef", SAME);
@@ -178,6 +182,9 @@ pub fn test(clang: &Clang) {
         assert_declaration_eq!(&typedefs[9], "StructTypedef", SAME);
         assert_declaration_eq!(&typedefs[10], "Union", SAME);
         assert_declaration_eq!(&typedefs[11], "UnionTypedef", SAME);
+        assert_declaration_eq!(&typedefs[12], "EArray", SAME);
+        assert_declaration_eq!(&typedefs[13], "SArray", SAME);
+        assert_declaration_eq!(&typedefs[14], "UArray", SAME);
     });
 
     let source = "
@@ -213,4 +220,51 @@ pub fn test(clang: &Clang) {
         assert_declaration_eq!(&unions[2], "C", DIFFERENT);
         assert_declaration_eq!(&unions[3], "D", SAME);
     });
+
+    #[cfg(target_os="linux")]
+    fn test_headers(clang: &Clang) {
+        fn test(clang: &Clang, header: &str) {
+            let index = Index::new(clang, false, false);
+            let tu = index.parser(header).detailed_preprocessing_record(true).parse();
+            if let Ok(tu) = tu {
+                let entities = tu.get_entity().get_children();
+                let _ = sonar::find_definitions(&entities);
+                let _ = sonar::find_enums(&entities);
+                let _ = sonar::find_functions(&entities);
+                let _ = sonar::find_structs(&entities);
+                let _ = sonar::find_typedefs(&entities);
+                let _ = sonar::find_unions(&entities);
+            }
+        }
+
+        test(clang, "/usr/include/assert.h");
+        test(clang, "/usr/include/complex.h");
+        test(clang, "/usr/include/ctype.h");
+        test(clang, "/usr/include/errno.h");
+        test(clang, "/usr/include/fenv.h");
+        test(clang, "/usr/include/float.h");
+        test(clang, "/usr/include/inttypes.h");
+        test(clang, "/usr/include/limits.h");
+        test(clang, "/usr/include/locale.h");
+        test(clang, "/usr/include/math.h");
+        test(clang, "/usr/include/setjmp.h");
+        test(clang, "/usr/include/signal.h");
+        test(clang, "/usr/include/stdarg.h");
+        test(clang, "/usr/include/stdbool.h");
+        test(clang, "/usr/include/stddef.h");
+        test(clang, "/usr/include/stdint.h");
+        test(clang, "/usr/include/stdio.h");
+        test(clang, "/usr/include/stdlib.h");
+        test(clang, "/usr/include/string.h");
+        test(clang, "/usr/include/tgmath.h");
+        test(clang, "/usr/include/time.h");
+        test(clang, "/usr/include/uchar.h");
+        test(clang, "/usr/include/wchar.h");
+        test(clang, "/usr/include/wctype.h");
+    }
+
+    #[cfg(not(target_os="linux"))]
+    fn test_headers(_: &Clang) { }
+
+    test_headers(clang);
 }
