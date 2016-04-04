@@ -117,6 +117,8 @@ mod sonar_test;
 
 #[test]
 fn test() {
+    println!("libclang: {}", get_version());
+
     let clang = Clang::new().unwrap();
 
     completion_test::test(&clang);
@@ -129,17 +131,6 @@ fn test() {
     // Entity ____________________________________
 
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
-        #[cfg(feature="gte_clang_3_6")]
-        fn test_get_mangled_name<'tu>(entity: Entity<'tu>) {
-            assert_eq!(entity.get_mangled_name(), None);
-
-            let children = entity.get_children();
-            assert_eq!(children[0].get_mangled_name(), Some("a".into()));
-        }
-
-        #[cfg(not(feature="gte_clang_3_6"))]
-        fn test_get_mangled_name<'tu>(_: Entity<'tu>) { }
-
         let file = tu.get_file(f).unwrap();
 
         let entity = tu.get_entity();
@@ -171,8 +162,6 @@ fn test() {
             CompletionChunk::ResultType("int".into()),
             CompletionChunk::TypedText("a".into()),
         ]);
-
-        test_get_mangled_name(entity);
     });
 
     let source = "
