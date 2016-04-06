@@ -34,7 +34,7 @@ libc = "0.2.9"
 
 [dependencies.clippy]
 
-version = "0.0.60"
+version = "0.0.61"
 optional = true
 
 [[test]]
