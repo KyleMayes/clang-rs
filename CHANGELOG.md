@@ -99,7 +99,7 @@
 ### Fixed
 - Fixed panic in `sonar` module when encountering certain kinds of typedefs
 
-## [0.7.2] - UNRELEASED
+## [0.7.2] - 2015-4-5
 
 ### Fixed
 - Removed `println!` in `sonar` module
