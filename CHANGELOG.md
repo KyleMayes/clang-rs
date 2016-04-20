@@ -106,3 +106,9 @@
 
 ### Changed
 - Changed `Parser::arguments` parameter type
+
+## [0.7.3] - UNRELEASED
+
+### Changed
+- Bumped `clang-sys` version to `0.4.2`
+- Bumped `libc` version to `0.2.10`
