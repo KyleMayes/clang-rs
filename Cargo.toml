@@ -29,7 +29,7 @@ gte_clang_3_8 = []
 [dependencies]
 
 clang-sys = "0.4.2"
-lazy_static = "0.1.15"
+lazy_static = "0.2.0"
 libc = "0.2.10"
 
 [dependencies.clippy]
