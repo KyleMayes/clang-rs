@@ -109,6 +109,9 @@
 
 ## [0.7.3] - UNRELEASED
 
+### Fixed
+- Fixed `sonar` module handling of record typedefs
+
 ### Changed
 - Bumped `clang-sys` version to `0.4.2`
 - Bumped `lazy_static` version to `0.2.0`

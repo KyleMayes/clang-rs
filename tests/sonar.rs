@@ -74,6 +74,8 @@ pub fn test(clang: &Clang) {
         };
 
         typedef enum D D;
+
+        typedef enum E* OpaqueE;
     ";
 
     super::with_entity(&clang, source, |e| {
@@ -127,6 +129,8 @@ pub fn test(clang: &Clang) {
         };
 
         typedef struct D D;
+
+        typedef struct E* OpaqueE;
     ";
 
     super::with_entity(&clang, source, |e| {
@@ -164,11 +168,19 @@ pub fn test(clang: &Clang) {
         typedef enum E EArray[4];
         typedef struct S SArray[4];
         typedef union U UArray[4];
+
+        typedef enum Enum_* OpaqueEnum;
+        typedef struct Struct_* OpaqueStruct;
+        typedef Union_* OpaqueUnion;
     ";
 
     super::with_entity(&clang, source, |e| {
+        assert_eq!(sonar::find_enums(&e.get_children()[..]).len(), 1);
+        assert_eq!(sonar::find_structs(&e.get_children()[..]).len(), 1);
+        assert_eq!(sonar::find_unions(&e.get_children()[..]).len(), 1);
+
         let typedefs = sonar::find_typedefs(&e.get_children()[..]);
-        assert_eq!(typedefs.len(), 15);
+        assert_eq!(typedefs.len(), 18);
 
         assert_declaration_eq!(&typedefs[0], "Integer", SAME);
         assert_declaration_eq!(&typedefs[1], "IntegerTypedef", SAME);
@@ -185,6 +197,9 @@ pub fn test(clang: &Clang) {
         assert_declaration_eq!(&typedefs[12], "EArray", SAME);
         assert_declaration_eq!(&typedefs[13], "SArray", SAME);
         assert_declaration_eq!(&typedefs[14], "UArray", SAME);
+        assert_declaration_eq!(&typedefs[15], "OpaqueEnum", SAME);
+        assert_declaration_eq!(&typedefs[16], "OpaqueStruct", SAME);
+        assert_declaration_eq!(&typedefs[17], "OpaqueUnion", SAME);
     });
 
     let source = "
@@ -209,6 +224,8 @@ pub fn test(clang: &Clang) {
         };
 
         typedef union D D;
+
+        typedef union E* OpaqueE;
     ";
 
     super::with_entity(&clang, source, |e| {

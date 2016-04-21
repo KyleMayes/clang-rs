@@ -142,7 +142,10 @@ fn visit<'tu, F: FnMut(Declaration<'tu>)>(
         if entity.get_kind() == kind {
             if let Some(name) = entity.get_name() {
                 if !seen.contains(&name) {
-                    f(Declaration::new(entity.get_name().unwrap(), *entity, None));
+                    if entity.get_type().map_or(false, |t| t.get_sizeof().is_ok()) {
+                        f(Declaration::new(entity.get_name().unwrap(), *entity, None));
+                    }
+
                     seen.insert(name);
                 }
             }
@@ -152,7 +155,15 @@ fn visit<'tu, F: FnMut(Declaration<'tu>)>(
 
             if is(underlying, prefix) && !seen.contains(&name) {
                 let declaration = underlying.get_declaration().unwrap();
-                f(Declaration::new(entity.get_name().unwrap(), declaration, Some(*entity)));
+
+                let complete = declaration.get_type().map_or(false, |t| t.get_sizeof().is_ok());
+                let anonymous = declaration.get_display_name().is_none();
+                let same = entity.get_display_name() == declaration.get_display_name();
+
+                if complete && (anonymous || same) {
+                    f(Declaration::new(entity.get_name().unwrap(), declaration, Some(*entity)));
+                }
+
                 seen.insert(name);
             }
         }
