@@ -99,7 +99,7 @@
 ### Fixed
 - Fixed panic in `sonar` module when encountering certain kinds of typedefs
 
-## [0.7.2] - 2015-4-5
+## [0.7.2] - 2016-4-5
 
 ### Fixed
 - Removed `println!` in `sonar` module
@@ -107,7 +107,7 @@
 ### Changed
 - Changed `Parser::arguments` parameter type
 
-## [0.7.3] - UNRELEASED
+## [0.7.3] - 2016-4-21
 
 ### Fixed
 - Fixed `sonar` module handling of record typedefs
