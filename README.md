@@ -12,16 +12,18 @@ Released under the Apache License 2.0.
 
 ### Dependencies
 
-This crate depends on `libclang.dll` (Windows), `libclang.so` (Linux), or `libclang.dylib` (OS X).
+This crate depends on `libclang.so` (Linux), `libclang.dylib` (OS X), or `libclang.dll` (Windows).
 These binaries can be either be installed as a part of Clang or downloaded
 [here](http://llvm.org/releases/download.html).
 
-The `libclang` binary will be looked for in likely places (e.g., `/usr/lib` on Linux), but you can
-specify the directory the `libclang` binary is in with the `LIBCLANG_PATH` environment variable.
+The `libclang` binary will be searched for first by calling `llvm-config --libdir`. If this fails,
+the `libclang` binary will be searched for in likely places (e.g., `/usr/local/lib/` on Linux). If
+neither of these approaches is successful, you can specify the directory the `libclang` binary can
+be found in with the `LIBCLANG_PATH` environment variable.
 
-If you want to link to `libclang` statically, set the `LIBCLANG_STATIC` environment variable or
-enable the `static` feature. You can specify the directory the various LLVM and Clang static
-libraries are searched for with the `LIBCLANG_STATIC_PATH` environment variable.
+If you want to link to `libclang` statically, enable the `static` feature. You can specify the
+directory the various LLVM and Clang static libraries can be found in with the
+`LIBCLANG_STATIC_PATH` environment variable.
 
 ### Supported Versions
 
