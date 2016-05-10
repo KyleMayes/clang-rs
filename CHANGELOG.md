@@ -117,7 +117,7 @@
 - Bumped `lazy_static` version to `0.2.0`
 - Bumped `libc` version to `0.2.10`
 
-## [0.8.0] - UNRELEASED
+## [0.8.0] - 2016-5-10
 
 ### Changed
 - Bumped `clang-sys` version to `0.5.0`
