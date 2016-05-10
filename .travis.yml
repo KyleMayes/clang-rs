@@ -7,9 +7,9 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
             - llvm-toolchain-precise
             - llvm-toolchain-precise-3.5
+            - ubuntu-toolchain-r-test
           packages:
             - libclang-3.5-dev
             - llvm-3.5-dev
@@ -18,9 +18,9 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
             - llvm-toolchain-precise
             - llvm-toolchain-precise-3.6
+            - ubuntu-toolchain-r-test
           packages:
             - libclang-3.6-dev
             - llvm-3.6-dev
@@ -29,9 +29,9 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
             - llvm-toolchain-precise
             - llvm-toolchain-precise-3.7
+            - ubuntu-toolchain-r-test
           packages:
             - libclang-3.7-dev
             - llvm-3.7-dev
@@ -40,9 +40,31 @@ matrix:
       addons:
         apt:
           sources:
-            - ubuntu-toolchain-r-test
             - llvm-toolchain-precise
             - llvm-toolchain-precise-3.8
+            - ubuntu-toolchain-r-test
+          packages:
+            - libclang-3.8-dev
+            - llvm-3.8-dev
+    - rust: beta
+      env: CLANG_VERSION=clang_3_8 LIBCLANG_PATH=/usr/lib/llvm-3.8/lib
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-precise
+            - llvm-toolchain-precise-3.8
+            - ubuntu-toolchain-r-test
+          packages:
+            - libclang-3.8-dev
+            - llvm-3.8-dev
+    - rust: nightly
+      env: CLANG_VERSION=clang_3_8 LIBCLANG_PATH=/usr/lib/llvm-3.8/lib
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-precise
+            - llvm-toolchain-precise-3.8
+            - ubuntu-toolchain-r-test
           packages:
             - libclang-3.8-dev
             - llvm-3.8-dev
