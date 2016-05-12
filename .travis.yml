@@ -70,9 +70,6 @@ matrix:
             - llvm-3.8-dev
     - os: osx
       rust: stable
-      env: LLVM_VERSION=devtools
-    - os: osx
-      rust: stable
       env: LLVM_VERSION=3.5 CLANG_VERSION=clang_3_5
     - os: osx
       rust: stable
@@ -86,7 +83,7 @@ matrix:
 
 before_install:
   -
-    if [ "${TRAVIS_OS_NAME}" == "osx" ] && [ "${LLVM_VERSION}" != "devtools" ]; then
+    if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
       brew update >/dev/null;
       brew install llvm3${LLVM_VERSION#3.};
     fi
@@ -94,19 +91,13 @@ before_install:
 before_script:
   -
     if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-      if [ "${LLVM_VERSION}" != "devtools" ]; then
-        export LLVM_CONFIG_PATH=`brew --prefix llvm3${LLVM_VERSION#3.}`/lib/llvm-${LLVM_VERSION}/bin/llvm-config;
-      fi
+      export LLVM_CONFIG_PATH=`brew --prefix llvm3${LLVM_VERSION#3.}`/lib/llvm-${LLVM_VERSION}/bin/llvm-config;
     fi
 
 script:
   -
-    if [ "${LLVM_VERSION}" == "devtools" ]; then
-        RUST_BACKTRACE=1 cargo test --verbose;
-    else
-        RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION;
-        if [ "${CLANG_VERSION}" != "clang_3_8" ]; then
-            cargo clean;
-            RUST_BACKTRACE=1 cargo test --verbose --features "$CLANG_VERSION static";
-        fi
+    RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION;
+    if [ "${CLANG_VERSION}" != "clang_3_8" ]; then
+        cargo clean;
+        RUST_BACKTRACE=1 cargo test --verbose --features "$CLANG_VERSION static";
     fi
