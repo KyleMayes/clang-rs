@@ -128,3 +128,8 @@
 
 ### Changed
 - Bumped `clang-sys` version to `0.5.1`
+
+## [0.8.2] - UNRELEASED
+
+### Changed
+- Bumped `clang-sys` version to `0.5.2`
