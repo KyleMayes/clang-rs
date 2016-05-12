@@ -3,7 +3,7 @@ language: rust
 matrix:
   include:
     - rust: stable
-      env: CLANG_VERSION=clang_3_5 LIBCLANG_PATH=/usr/lib/llvm-3.5/lib
+      env: CLANG_VERSION=clang_3_5 LLVM_CONFIG_PATH=/usr/lib/llvm-3.5/bin/llvm-config
       addons:
         apt:
           sources:
@@ -14,7 +14,7 @@ matrix:
             - libclang-3.5-dev
             - llvm-3.5-dev
     - rust: stable
-      env: CLANG_VERSION=clang_3_6 LIBCLANG_PATH=/usr/lib/llvm-3.6/lib
+      env: CLANG_VERSION=clang_3_6 LLVM_CONFIG_PATH=/usr/lib/llvm-3.6/bin/llvm-config
       addons:
         apt:
           sources:
@@ -25,7 +25,7 @@ matrix:
             - libclang-3.6-dev
             - llvm-3.6-dev
     - rust: stable
-      env: CLANG_VERSION=clang_3_7 LIBCLANG_PATH=/usr/lib/llvm-3.7/lib
+      env: CLANG_VERSION=clang_3_7 LLVM_CONFIG_PATH=/usr/lib/llvm-3.7/bin/llvm-config
       addons:
         apt:
           sources:
@@ -36,7 +36,7 @@ matrix:
             - libclang-3.7-dev
             - llvm-3.7-dev
     - rust: stable
-      env: CLANG_VERSION=clang_3_8 LIBCLANG_PATH=/usr/lib/llvm-3.8/lib
+      env: CLANG_VERSION=clang_3_8 LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
       addons:
         apt:
           sources:
@@ -47,7 +47,7 @@ matrix:
             - libclang-3.8-dev
             - llvm-3.8-dev
     - rust: beta
-      env: CLANG_VERSION=clang_3_8 LIBCLANG_PATH=/usr/lib/llvm-3.8/lib
+      env: CLANG_VERSION=clang_3_8 LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
       addons:
         apt:
           sources:
@@ -58,7 +58,7 @@ matrix:
             - libclang-3.8-dev
             - llvm-3.8-dev
     - rust: nightly
-      env: CLANG_VERSION=clang_3_8 LIBCLANG_PATH=/usr/lib/llvm-3.8/lib
+      env: CLANG_VERSION=clang_3_8 LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
       addons:
         apt:
           sources:
@@ -68,6 +68,45 @@ matrix:
           packages:
             - libclang-3.8-dev
             - llvm-3.8-dev
+    - os: osx
+      rust: stable
+      env: LLVM_VERSION=devtools
+    - os: osx
+      rust: stable
+      env: LLVM_VERSION=3.5 CLANG_VERSION=clang_3_5
+    - os: osx
+      rust: stable
+      env: LLVM_VERSION=3.6 CLANG_VERSION=clang_3_6
+    - os: osx
+      rust: stable
+      env: LLVM_VERSION=3.7 CLANG_VERSION=clang_3_7
+    - os: osx
+      rust: stable
+      env: LLVM_VERSION=3.8 CLANG_VERSION=clang_3_8
+
+before_install:
+  -
+    if [ "${TRAVIS_OS_NAME}" == "osx" ] && [ "${LLVM_VERSION}" != "devtools" ]; then
+      brew update >/dev/null;
+      brew install llvm3${LLVM_VERSION#3.};
+    fi
+
+before_script:
+  -
+    if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
+      if [ "${LLVM_VERSION}" != "devtools" ]; then
+        export LLVM_CONFIG_PATH=`brew --prefix llvm3${LLVM_VERSION#3.}`/lib/llvm-${LLVM_VERSION}/bin/llvm-config;
+      fi
+    fi
 
 script:
-  - RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION
+  -
+    if [ "${LLVM_VERSION}" == "devtools" ]; then
+        RUST_BACKTRACE=1 cargo test --verbose;
+    else
+        RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION;
+        if [ "${CLANG_VERSION}" != "clang_3_8" ]; then
+            cargo clean;
+            RUST_BACKTRACE=1 cargo test --verbose --features "$CLANG_VERSION static";
+        fi
+    fi
