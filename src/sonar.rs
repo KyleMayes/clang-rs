@@ -14,6 +14,7 @@
 
 //! Finding C declarations.
 
+use std::vec;
 use std::collections::{HashSet};
 use std::str::{FromStr};
 
@@ -113,6 +114,194 @@ impl<'tu> Definition<'tu> {
     }
 }
 
+// Definitions ___________________________________
+
+/// An iterator over preprocessor definition declarations.
+#[allow(missing_debug_implementations)]
+pub struct Definitions<'tu> {
+    entities: vec::IntoIter<Entity<'tu>>,
+    seen: HashSet<String>,
+}
+
+impl<'tu> Definitions<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(entities: vec::IntoIter<Entity<'tu>>) -> Definitions<'tu> {
+        Definitions { entities: entities, seen: HashSet::new() }
+    }
+}
+
+impl<'tu> Iterator for Definitions<'tu> {
+    type Item = Definition<'tu>;
+
+    fn next(&mut self) -> Option<Definition<'tu>> {
+        for entity in &mut self.entities {
+            if entity.get_kind() == EntityKind::MacroDefinition {
+                let name = entity.get_name().unwrap();
+                if !self.seen.contains(&name) {
+                    if let Some(value) = DefinitionValue::from_entity(entity) {
+                        self.seen.insert(name.clone());
+                        return Some(Definition::new(name, value, entity));
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+// Enums _________________________________________
+
+/// An iterator over enum declarations.
+#[allow(missing_debug_implementations)]
+pub struct Enums<'tu> {
+    entities: vec::IntoIter<Entity<'tu>>,
+    seen: HashSet<String>,
+}
+
+impl<'tu> Enums<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(entities: vec::IntoIter<Entity<'tu>>) -> Enums<'tu> {
+        Enums { entities: entities, seen: HashSet::new() }
+    }
+}
+
+impl<'tu> Iterator for Enums<'tu> {
+    type Item = Declaration<'tu>;
+
+    fn next(&mut self) -> Option<Declaration<'tu>> {
+        next(&mut self.entities, &mut self.seen, EntityKind::EnumDecl, "enum ")
+    }
+}
+
+// Functions _____________________________________
+
+/// An iterator over function declarations.
+#[allow(missing_debug_implementations)]
+pub struct Functions<'tu> {
+    entities: vec::IntoIter<Entity<'tu>>,
+    seen: HashSet<String>,
+}
+
+impl<'tu> Functions<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(entities: vec::IntoIter<Entity<'tu>>) -> Functions<'tu> {
+        Functions { entities: entities, seen: HashSet::new() }
+    }
+}
+
+impl<'tu> Iterator for Functions<'tu> {
+    type Item = Declaration<'tu>;
+
+    fn next(&mut self) -> Option<Declaration<'tu>> {
+        for entity in &mut self.entities {
+            if entity.get_kind() == EntityKind::FunctionDecl {
+                let name = entity.get_name().unwrap();
+                if !self.seen.contains(&name) {
+                    self.seen.insert(name.clone());
+                    return Some(Declaration::new(name, entity, None));
+                }
+            }
+        }
+        None
+    }
+}
+
+// Structs _______________________________________
+
+/// An iterator over struct declarations.
+#[allow(missing_debug_implementations)]
+pub struct Structs<'tu> {
+    entities: vec::IntoIter<Entity<'tu>>,
+    seen: HashSet<String>,
+}
+
+impl<'tu> Structs<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(entities: vec::IntoIter<Entity<'tu>>) -> Structs<'tu> {
+        Structs { entities: entities, seen: HashSet::new() }
+    }
+}
+
+impl<'tu> Iterator for Structs<'tu> {
+    type Item = Declaration<'tu>;
+
+    fn next(&mut self) -> Option<Declaration<'tu>> {
+        next(&mut self.entities, &mut self.seen, EntityKind::StructDecl, "struct ")
+    }
+}
+
+// Typedefs ______________________________________
+
+/// An iterator over typedef declarations.
+#[allow(missing_debug_implementations)]
+pub struct Typedefs<'tu> {
+    entities: vec::IntoIter<Entity<'tu>>,
+    seen: HashSet<String>,
+}
+
+impl<'tu> Typedefs<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(entities: vec::IntoIter<Entity<'tu>>) -> Typedefs<'tu> {
+        Typedefs { entities: entities, seen: HashSet::new() }
+    }
+}
+
+impl<'tu> Iterator for Typedefs<'tu> {
+    type Item = Declaration<'tu>;
+
+    fn next(&mut self) -> Option<Declaration<'tu>> {
+        for entity in &mut self.entities {
+            if entity.get_kind() == EntityKind::TypedefDecl {
+                let name = entity.get_name().unwrap();
+                if !self.seen.contains(&name) {
+                    let underlying = entity.get_typedef_underlying_type().unwrap();
+                    let display = entity.get_type().unwrap().get_display_name();
+
+                    let typedef = underlying.get_kind() != TypeKind::Unexposed ||
+                        underlying.get_result_type().is_some() ||
+                        is_alias(underlying, &display);
+
+                    if typedef {
+                        self.seen.insert(name.clone());
+                        return Some(Declaration::new(name, entity, None));
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+// Unions ________________________________________
+
+/// An iterator over struct declarations.
+#[allow(missing_debug_implementations)]
+pub struct Unions<'tu> {
+    entities: vec::IntoIter<Entity<'tu>>,
+    seen: HashSet<String>,
+}
+
+impl<'tu> Unions<'tu> {
+    //- Constructors -----------------------------
+
+    fn new(entities: vec::IntoIter<Entity<'tu>>) -> Unions<'tu> {
+        Unions { entities: entities, seen: HashSet::new() }
+    }
+}
+
+impl<'tu> Iterator for Unions<'tu> {
+    type Item = Declaration<'tu>;
+
+    fn next(&mut self) -> Option<Declaration<'tu>> {
+        next(&mut self.entities, &mut self.seen, EntityKind::UnionDecl, "union ")
+    }
+}
+
 //================================================
 // Functions
 //================================================
@@ -133,20 +322,20 @@ fn is_alias(type_: Type, name: &str) -> bool {
     false
 }
 
-fn visit<'tu, F: FnMut(Declaration<'tu>)>(
-    entities: &[Entity<'tu>], mut f: F, kind: EntityKind, prefix: &str
-) -> () {
-    let mut seen = Seen::new();
-
+fn next<'tu>(
+    entities: &mut vec::IntoIter<Entity<'tu>>,
+    seen: &mut HashSet<String>,
+    kind: EntityKind,
+    prefix: &str,
+) -> Option<Declaration<'tu>> {
     for entity in entities {
         if entity.get_kind() == kind {
             if let Some(name) = entity.get_name() {
                 if !seen.contains(&name) {
-                    if entity.get_type().map_or(false, |t| t.get_sizeof().is_ok()) {
-                        f(Declaration::new(entity.get_name().unwrap(), *entity, None));
-                    }
-
                     seen.insert(name);
+                    if entity.get_type().map_or(false, |t| t.get_sizeof().is_ok()) {
+                        return Some(Declaration::new(entity.get_name().unwrap(), entity, None));
+                    }
                 }
             }
         } else if entity.get_kind() == EntityKind::TypedefDecl {
@@ -160,156 +349,58 @@ fn visit<'tu, F: FnMut(Declaration<'tu>)>(
                 let anonymous = declaration.get_display_name().is_none();
                 let same = entity.get_display_name() == declaration.get_display_name();
 
-                if complete && (anonymous || same) {
-                    f(Declaration::new(entity.get_name().unwrap(), declaration, Some(*entity)));
-                }
-
                 seen.insert(name);
+                if complete && (anonymous || same) {
+                    let name = entity.get_name().unwrap();
+                    return Some(Declaration::new(name, declaration, Some(entity)));
+                }
             }
         }
     }
+    None
 }
 
-/// Visits the simple preprocessor definitions in the supplied entities.
+/// Returns an iterator over the simple preprocessor definitions in the supplied entities.
 ///
 /// Simple preprocessor definitions are those that consist only of a single integer or floating
 /// point literal, optionally negated.
 ///
-/// If a preprocessor definition is encountered multiple times, only the first instance is visited.
-#[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_definitions<'tu, F: FnMut(Definition<'tu>)>(entities: &[Entity<'tu>], mut f: F) {
-    let mut seen = Seen::new();
-
-    for entity in entities.iter().filter(|e| e.get_kind() == EntityKind::MacroDefinition) {
-        let name = entity.get_name().unwrap();
-        let range = entity.get_range().unwrap();
-
-        if !seen.contains(&name) && !range.get_start().is_in_system_header() {
-            if let Some(value) = DefinitionValue::from_entity(*entity) {
-                f(Definition::new(name.clone(), value, *entity));
-                seen.insert(name);
-            }
-        }
-    }
+/// If a preprocessor definition is encountered multiple times, only the first instance is included.
+pub fn find_definitions<'tu, E: Into<Vec<Entity<'tu>>>>(entities: E) -> Definitions<'tu> {
+    Definitions::new(entities.into().into_iter())
 }
 
-/// Finds the simple preprocessor definitions in the supplied entities.
+/// Returns an iterator over the enums in the supplied entities.
 ///
-/// See `visit_definitions` for more information.
-pub fn find_definitions<'tu>(entities: &[Entity<'tu>]) -> Vec<Definition<'tu>> {
-    let mut definitions = vec![];
-    visit_definitions(entities, |d| definitions.push(d));
-    definitions
+/// If an enum is encountered multiple times, only the first instance is included.
+pub fn find_enums<'tu, E: Into<Vec<Entity<'tu>>>>(entities: E) -> Enums<'tu> {
+    Enums::new(entities.into().into_iter())
 }
 
-/// Returns the enums in the supplied entities.
+/// Returns an iterator over the functions in the supplied entities.
 ///
-/// If an enum is encountered multiple times, only the first instance is collected.
-pub fn find_enums<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
-    let mut enums = vec![];
-    visit_enums(entities, |e| enums.push(e));
-    enums
+/// If a function is encountered multiple times, only the first instance is included.
+pub fn find_functions<'tu, E: Into<Vec<Entity<'tu>>>>(entities: E) -> Functions<'tu> {
+    Functions::new(entities.into().into_iter())
 }
 
-/// Visits the enums in the supplied entities.
+/// Returns an iterator over the structs in the supplied entities.
 ///
-/// If an enum is encountered multiple times, only the first instance is visited.
-#[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_enums<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], f: F) {
-    visit(entities, f, EntityKind::EnumDecl, "enum ");
+/// If a struct is encountered multiple times, only the first instance is included.
+pub fn find_structs<'tu, E: Into<Vec<Entity<'tu>>>>(entities: E) -> Structs<'tu> {
+    Structs::new(entities.into().into_iter())
 }
 
-/// Returns the functions in the supplied entities.
+/// Returns an iterator over the typedefs in the supplied entities.
 ///
-/// If a function is encountered multiple times, only the first instance is collected.
-pub fn find_functions<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
-    let mut functions = vec![];
-    visit_functions(entities, |e| functions.push(e));
-    functions
+/// If a typedef is encountered multiple times, only the first instance is included.
+pub fn find_typedefs<'tu, E: Into<Vec<Entity<'tu>>>>(entities: E) -> Typedefs<'tu> {
+    Typedefs::new(entities.into().into_iter())
 }
 
-/// Visits the functions in the supplied entities.
+/// Returns an iterator over the unions in the supplied entities.
 ///
-/// If a function is encountered multiple times, only the first instance is visited.
-#[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_functions<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], mut f: F) {
-    let mut seen = Seen::new();
-
-    for entity in entities.iter().filter(|e| e.get_kind() == EntityKind::FunctionDecl) {
-        let name = entity.get_name().unwrap();
-
-        if !seen.contains(&name) {
-            f(Declaration::new(name.clone(), *entity, None));
-            seen.insert(name);
-        }
-    }
-}
-
-/// Returns the structs in the supplied entities.
-///
-/// If a struct is encountered multiple times, only the first instance is collected.
-pub fn find_structs<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
-    let mut structs = vec![];
-    visit_structs(entities, |e| structs.push(e));
-    structs
-}
-
-/// Visits the structs in the supplied entities.
-///
-/// If a struct is encountered multiple times, only the first instance is visited.
-#[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_structs<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], f: F) {
-    visit(entities, f, EntityKind::StructDecl, "struct ");
-}
-
-/// Returns the typedefs in the supplied entities.
-///
-/// If a typedef is encountered multiple times, only the first instance is collected.
-pub fn find_typedefs<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
-    let mut typedefs = vec![];
-    visit_typedefs(entities, |e| typedefs.push(e));
-    typedefs
-}
-
-/// Visits the typedefs in the supplied entities.
-///
-/// If a typedef is encountered multiple times, only the first instance is visited.
-#[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_typedefs<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], mut f: F) {
-    let mut seen = Seen::new();
-
-    for entity in entities.iter().filter(|e| e.get_kind() == EntityKind::TypedefDecl) {
-        let name = entity.get_name().unwrap();
-
-        if !seen.contains(&name) {
-            let underlying = entity.get_typedef_underlying_type().unwrap();
-            let display = entity.get_type().unwrap().get_display_name();
-
-            let typedef = underlying.get_kind() != TypeKind::Unexposed ||
-                underlying.get_result_type().is_some() ||
-                is_alias(underlying, &display);
-
-            if typedef {
-                f(Declaration::new(name.clone(), *entity, None));
-                seen.insert(name);
-            }
-        }
-    }
-}
-
-/// Returns the unions in the supplied entities.
-///
-/// If a union is encountered multiple times, only the first instance is collected.
-pub fn find_unions<'tu>(entities: &[Entity<'tu>]) -> Vec<Declaration<'tu>> {
-    let mut unions = vec![];
-    visit_unions(entities, |e| unions.push(e));
-    unions
-}
-
-/// Visits the unions in the supplied entities.
-///
-/// If a union is encountered multiple times, only the first instance is visited.
-#[cfg_attr(feature="clippy", allow(needless_lifetimes))]
-pub fn visit_unions<'tu, F: FnMut(Declaration<'tu>)>(entities: &[Entity<'tu>], f: F) {
-    visit(entities, f, EntityKind::UnionDecl, "union ");
+/// If a union is encountered multiple times, only the first instance is included.
+pub fn find_unions<'tu, E: Into<Vec<Entity<'tu>>>>(entities: E) -> Unions<'tu> {
+    Unions::new(entities.into().into_iter())
 }

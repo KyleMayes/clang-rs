@@ -138,3 +138,6 @@
 
 ### Added
 - Added location functions to `Entity` struct
+
+### Changed
+- Changed `sonar` module interface to use iterators

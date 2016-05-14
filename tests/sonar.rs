@@ -30,7 +30,9 @@ pub fn test(clang: &Clang) {
         let index = Index::new(&clang, false, false);
         let tu = index.parser(f).detailed_preprocessing_record(true).parse().unwrap();
 
-        let definitions = sonar::find_definitions(&tu.get_entity().get_children()[..]);
+        let definitions = sonar::find_definitions(tu.get_entity().get_children()).filter(|d| {
+            !d.entity.is_in_system_header()
+        }).collect::<Vec<_>>();
         assert_eq!(definitions.len(), 4);
 
         macro_rules! assert_definition_eq {
@@ -79,7 +81,9 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
-        let enums = sonar::find_enums(&e.get_children()[..]);
+        let enums = sonar::find_enums(e.get_children()).filter(|e| {
+            !e.entity.is_in_system_header()
+        }).collect::<Vec<_>>();
         assert_eq!(enums.len(), 4);
 
         assert_declaration_eq!(&enums[0], "A", SAME);
@@ -101,7 +105,9 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
-        let functions = sonar::find_functions(&e.get_children()[..]);
+        let functions = sonar::find_functions(e.get_children()).filter(|f| {
+            !f.entity.is_in_system_header()
+        }).collect::<Vec<_>>();
         assert_eq!(functions.len(), 5);
 
         assert_declaration_eq!(&functions[0], "multiple", SAME);
@@ -134,7 +140,9 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
-        let structs = sonar::find_structs(&e.get_children()[..]);
+        let structs = sonar::find_structs(e.get_children()).filter(|s| {
+            !s.entity.is_in_system_header()
+        }).collect::<Vec<_>>();
         assert_eq!(structs.len(), 4);
 
         assert_declaration_eq!(&structs[0], "A", SAME);
@@ -175,11 +183,13 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
-        assert_eq!(sonar::find_enums(&e.get_children()[..]).len(), 1);
-        assert_eq!(sonar::find_structs(&e.get_children()[..]).len(), 1);
-        assert_eq!(sonar::find_unions(&e.get_children()[..]).len(), 1);
+        assert_eq!(sonar::find_enums(e.get_children()).count(), 1);
+        assert_eq!(sonar::find_structs(e.get_children()).count(), 1);
+        assert_eq!(sonar::find_unions(e.get_children()).count(), 1);
 
-        let typedefs = sonar::find_typedefs(&e.get_children()[..]);
+        let typedefs = sonar::find_typedefs(e.get_children()).filter(|t| {
+            !t.entity.is_in_system_header()
+        }).collect::<Vec<_>>();
         assert_eq!(typedefs.len(), 18);
 
         assert_declaration_eq!(&typedefs[0], "Integer", SAME);
@@ -229,7 +239,9 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
-        let unions = sonar::find_unions(&e.get_children()[..]);
+        let unions = sonar::find_unions(e.get_children()).filter(|u| {
+            !u.entity.is_in_system_header()
+        }).collect::<Vec<_>>();
         assert_eq!(unions.len(), 4);
 
         assert_declaration_eq!(&unions[0], "A", SAME);
@@ -245,12 +257,12 @@ pub fn test(clang: &Clang) {
             let tu = index.parser(header).detailed_preprocessing_record(true).parse();
             if let Ok(tu) = tu {
                 let entities = tu.get_entity().get_children();
-                let _ = sonar::find_definitions(&entities);
-                let _ = sonar::find_enums(&entities);
-                let _ = sonar::find_functions(&entities);
-                let _ = sonar::find_structs(&entities);
-                let _ = sonar::find_typedefs(&entities);
-                let _ = sonar::find_unions(&entities);
+                let _ = sonar::find_definitions(&entities[..]);
+                let _ = sonar::find_enums(&entities[..]);
+                let _ = sonar::find_functions(&entities[..]);
+                let _ = sonar::find_structs(&entities[..]);
+                let _ = sonar::find_typedefs(&entities[..]);
+                let _ = sonar::find_unions(&entities[..]);
             }
         }
 
