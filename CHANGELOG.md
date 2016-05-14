@@ -1,4 +1,4 @@
-## [0.9.0] - UNRELEASED
+## [0.9.0] - 2016-5-14
 
 ### Added
 - Added location functions to `Entity` struct
