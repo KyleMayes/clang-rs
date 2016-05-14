@@ -1417,6 +1417,18 @@ impl<'tu> Entity<'tu> {
     pub fn is_unexposed(&self) -> bool {
         unsafe { ffi::clang_isUnexposed(self.raw.kind) != 0 }
     }
+
+    //- Location ---------------------------------
+
+    /// Returns whether this AST entity is in a main file.
+    pub fn is_in_main_file(&self) -> bool {
+        self.get_range().map_or(false, |r| r.is_in_main_file())
+    }
+
+    /// Returns whether this AST entity is in a system header.
+    pub fn is_in_system_header(&self) -> bool {
+        self.get_range().map_or(false, |r| r.is_in_system_header())
+    }
 }
 
 impl<'tu> fmt::Debug for Entity<'tu> {

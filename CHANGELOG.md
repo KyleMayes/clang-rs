@@ -133,3 +133,8 @@
 
 ### Changed
 - Bumped `clang-sys` version to `0.5.2`
+
+## [0.9.0] - UNRELEASED
+
+### Added
+- Added location functions to `Entity` struct
