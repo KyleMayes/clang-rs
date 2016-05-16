@@ -96,6 +96,7 @@ before_script:
 
 script:
   -
+    set -e;
     RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION;
     if [ "${CLANG_VERSION}" != "clang_3_8" ]; then
         cargo clean;
