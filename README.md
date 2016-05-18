@@ -10,17 +10,23 @@ Supported on the stable, beta, and nightly Rust channels.
 
 Released under the Apache License 2.0.
 
+### Supported Versions
+
+To target a version of `libclang`, enable one of the following Cargo features:
+
+* `clang_3_5` - requires `libclang` 3.5 or later
+  ([Documentation](https://kylemayes.github.io/clang-rs/3_5/clang))
+* `clang_3_6` - requires `libclang` 3.6 or later
+  ([Documentation](https://kylemayes.github.io/clang-rs/3_6/clang))
+* `clang_3_7` - requires `libclang` 3.7 or later
+  ([Documentation](https://kylemayes.github.io/clang-rs/3_7/clang))
+* `clang_3_8` - requires `libclang` 3.8 or later
+  ([Documentation](https://kylemayes.github.io/clang-rs/3_8/clang))
+
+If you do not enable one of these features, the API provided by `libclang` 3.5 will be available by
+default.
+
 ### Dependencies
 
 See [here](https://github.com/KyleMayes/clang-sys#dependencies) for information on this crate's
 dependencies.
-
-### Supported Versions
-
-* 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
-* 3.6.x - [Documentation](https://kylemayes.github.io/clang-rs/3_6/clang)
-* 3.7.x - [Documentation](https://kylemayes.github.io/clang-rs/3_7/clang)
-* 3.8.x - [Documentation](https://kylemayes.github.io/clang-rs/3_8/clang)
-
-If you do not select a specific version, a common subset API will be availabile. The documentation
-for this API is [here](https://kylemayes.github.io/clang-rs/all/clang).
