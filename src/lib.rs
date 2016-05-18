@@ -14,15 +14,12 @@
 
 //! An idiomatic Rust wrapper for libclang.
 //!
-//! ## Version Specific Documentation
+//! ## Supported Versions
 //!
-//! * 3.5.x - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
-//! * 3.6.x - [Documentation](https://kylemayes.github.io/clang-rs/3_6/clang)
-//! * 3.7.x - [Documentation](https://kylemayes.github.io/clang-rs/3_7/clang)
-//! * 3.8.x - [Documentation](https://kylemayes.github.io/clang-rs/3_8/clang)
-//!
-//! The documentation for the non-version specific API is
-//! [here](https://kylemayes.github.io/clang-rs/all/clang).
+//! * 3.5 - [Documentation](https://kylemayes.github.io/clang-sys/3_5/clang_sys)
+//! * 3.6 - [Documentation](https://kylemayes.github.io/clang-sys/3_6/clang_sys)
+//! * 3.7 - [Documentation](https://kylemayes.github.io/clang-sys/3_7/clang_sys)
+//! * 3.8 - [Documentation](https://kylemayes.github.io/clang-sys/3_8/clang_sys)
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
