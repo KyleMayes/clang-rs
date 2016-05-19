@@ -10,7 +10,7 @@ license = "Apache-2.0"
 
 description = "An idiomatic Rust wrapper for libclang."
 
-documentation = "https://kylemayes.github.io/clang-rs/all/clang"
+documentation = "https://kylemayes.github.io/clang-rs/3_5/clang"
 repository = "https://github.com/KyleMayes/clang-rs"
 
 [features]
