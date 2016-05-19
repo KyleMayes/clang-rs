@@ -1049,7 +1049,7 @@ impl<'tu> Entity<'tu> {
                     false
                 } else {
                     let range = ffi::clang_getRangeStart(*r);
-                    let mut file = mem::uninitialized();
+                    let mut file = ffi::CXFile::default();
                     let null = ptr::null_mut();
                     ffi::clang_getSpellingLocation(range, &mut file, null, null, null);
                     !file.0.is_null()
@@ -1127,7 +1127,7 @@ impl<'tu> Entity<'tu> {
     /// Returns the methods that were overridden by this method, if applicable.
     pub fn get_overridden_methods(&self) -> Option<Vec<Entity<'tu>>> {
         unsafe {
-            let (mut raw, mut count) = mem::uninitialized();
+            let (mut raw, mut count) = (ptr::null_mut(), 0);
             ffi::clang_getOverriddenCursors(self.raw, &mut raw, &mut count);
 
             if !raw.is_null() {
@@ -1149,7 +1149,7 @@ impl<'tu> Entity<'tu> {
         }
 
         unsafe {
-            let mut buffer: [ffi::CXPlatformAvailability; 32] = mem::uninitialized();
+            let mut buffer: [ffi::CXPlatformAvailability; 32] = [ffi::CXPlatformAvailability::default(); 32];
 
             let count = ffi::clang_getCursorPlatformAvailability(
                 self.raw,
@@ -1639,7 +1639,7 @@ impl<'tu> Parser<'tu> {
         let arguments = self.arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
         let unsaved = self.unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
         unsafe {
-            let mut ptr = mem::uninitialized();
+            let mut ptr = ffi::CXTranslationUnit::default();
             let code = ffi::clang_parseTranslationUnit2(
                 self.index.ptr,
                 utility::from_path(&self.file).as_ptr(),
@@ -1767,7 +1767,7 @@ impl<'i> TranslationUnit<'i> {
     /// Returns the AST entities which correspond to the supplied tokens, if any.
     pub fn annotate(&'i self, tokens: &[Token<'i>]) -> Vec<Option<Entity<'i>>> {
         unsafe {
-            let mut raws = vec![mem::uninitialized(); tokens.len()];
+            let mut raws = vec![ffi::CXCursor::default(); tokens.len()];
             let ptr = mem::transmute(tokens.as_ptr());
             ffi::clang_annotateTokens(self.ptr, ptr, tokens.len() as c_uint, raws.as_mut_ptr());
             raws.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
