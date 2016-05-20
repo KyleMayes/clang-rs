@@ -22,7 +22,7 @@ use std::cmp::{self, Ordering};
 use std::marker::{PhantomData};
 use std::path::{PathBuf};
 
-use clang_sys as ffi;
+use clang_sys::*;
 
 use libc::{c_uint};
 
@@ -156,7 +156,7 @@ impl<'tu> Completer<'tu> {
         tu: &'tu TranslationUnit<'tu>, file: F, line: u32, column: u32
     ) -> Completer<'tu> {
         let file = file.into();
-        let flags = unsafe { ffi::clang_defaultCodeCompleteOptions() };
+        let flags = unsafe { clang_defaultCodeCompleteOptions() };
         Completer {  tu: tu, file: file, line: line, column: column, unsaved: vec![], flags: flags }
     }
 
@@ -173,7 +173,7 @@ impl<'tu> Completer<'tu> {
     /// Runs code completion.
     pub fn complete(&self) -> CompletionResults {
         unsafe {
-            let ptr = ffi::clang_codeCompleteAt(
+            let ptr = clang_codeCompleteAt(
                 self.tu.ptr,
                 utility::from_path(&self.file).as_ptr(),
                 self.line as c_uint,
@@ -256,7 +256,7 @@ pub struct CompletionResult<'r> {
 impl<'r> CompletionResult<'r> {
     //- Constructors -----------------------------
 
-    fn from_raw(raw: ffi::CXCompletionResult) -> CompletionResult<'r> {
+    fn from_raw(raw: CXCompletionResult) -> CompletionResult<'r> {
         let kind = unsafe { mem::transmute(raw.CursorKind) };
         CompletionResult { kind: kind, string: CompletionString::from_raw(raw.CompletionString) }
     }
@@ -278,13 +278,13 @@ impl<'r> cmp::Ord for CompletionResult<'r> {
 
 /// A set of code completion results.
 pub struct CompletionResults {
-    ptr: *mut ffi::CXCodeCompleteResults,
+    ptr: *mut CXCodeCompleteResults,
 }
 
 impl CompletionResults {
     //- Constructors -----------------------------
 
-    fn from_ptr(ptr: *mut ffi::CXCodeCompleteResults) -> CompletionResults {
+    fn from_ptr(ptr: *mut CXCodeCompleteResults) -> CompletionResults {
         CompletionResults { ptr: ptr }
     }
 
@@ -301,9 +301,9 @@ impl CompletionResults {
 
     /// Returns the code completion context for this set of code completion results, if any.
     pub fn get_context(&self) -> Option<CompletionContext> {
-        let bits = unsafe { ffi::clang_codeCompleteGetContexts(self.ptr) as c_uint };
-        if bits != 0 && bits != ffi::CXCompletionContext_Unknown.bits() {
-            Some(CompletionContext::from(ffi::CXCompletionContext::from_bits_truncate(bits)))
+        let bits = unsafe { clang_codeCompleteGetContexts(self.ptr) as c_uint };
+        if bits != 0 && bits != CXCompletionContext_Unknown.bits() {
+            Some(CompletionContext::from(CXCompletionContext::from_bits_truncate(bits)))
         } else {
             None
         }
@@ -314,8 +314,8 @@ impl CompletionResults {
     pub fn get_container_kind(&self) -> Option<(EntityKind, bool)> {
         unsafe {
             let mut incomplete = mem::uninitialized();
-            match ffi::clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
-                ffi::CXCursorKind::InvalidCode => None,
+            match clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
+                CXCursorKind::InvalidCode => None,
                 other => Some((mem::transmute(other), incomplete != 0)),
             }
         }
@@ -324,14 +324,13 @@ impl CompletionResults {
     /// Returns the selector or partial selector that has been entered this far for the Objective-C
     /// message send context for this set of code completion results.
     pub fn get_objc_selector(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_codeCompleteGetObjCSelector(self.ptr)) }
+        unsafe { utility::to_string_option(clang_codeCompleteGetObjCSelector(self.ptr)) }
     }
 
     /// Returns the USR for the entity that contains the code completion context for this set of
     /// code completion results, if applicable.
     pub fn get_usr(&self) -> Option<Usr> {
-        let usr = unsafe { ffi::clang_codeCompleteGetContainerUSR(self.ptr) };
-        utility::to_string_option(usr).map(Usr)
+        unsafe { utility::to_string_option(clang_codeCompleteGetContainerUSR(self.ptr)).map(Usr) }
     }
 
     /// Returns the code completion results in this set of code completion results.
@@ -345,7 +344,7 @@ impl CompletionResults {
 
 impl Drop for CompletionResults {
     fn drop(&mut self) {
-        unsafe { ffi::clang_disposeCodeCompleteResults(self.ptr); }
+        unsafe { clang_disposeCodeCompleteResults(self.ptr); }
     }
 }
 
@@ -362,7 +361,7 @@ impl fmt::Debug for CompletionResults {
 /// A semantic string that describes a code completion result.
 #[derive(Copy, Clone)]
 pub struct CompletionString<'r> {
-    raw: ffi::CXCompletionString,
+    raw: CXCompletionString,
     _marker: PhantomData<&'r CompletionResults>
 }
 
@@ -370,7 +369,7 @@ impl<'r> CompletionString<'r> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_raw(raw: ffi::CXCompletionString) -> CompletionString<'r> {
+    pub fn from_raw(raw: CXCompletionString) -> CompletionString<'r> {
         CompletionString { raw: raw, _marker: PhantomData }
     }
 
@@ -379,7 +378,7 @@ impl<'r> CompletionString<'r> {
     /// Returns an integer that represents how likely a user is to select this completion string as
     /// determined by internal heuristics. Smaller values indicate higher priorities.
     pub fn get_priority(&self) -> usize {
-        unsafe { ffi::clang_getCompletionPriority(self.raw) as usize }
+        unsafe { clang_getCompletionPriority(self.raw) as usize }
     }
 
     /// Returns the annotations associated with this completion string.
@@ -392,20 +391,19 @@ impl<'r> CompletionString<'r> {
 
     /// Returns the availability of this completion string.
     pub fn get_availability(&self) -> Availability {
-        unsafe { mem::transmute(ffi::clang_getCompletionAvailability(self.raw)) }
+        unsafe { mem::transmute(clang_getCompletionAvailability(self.raw)) }
     }
 
     /// Returns the documentation comment brief associated with the declaration this completion
     /// string refers to, if applicable.
     pub fn get_comment_brief(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_getCompletionBriefComment(self.raw)) }
+        unsafe { utility::to_string_option(clang_getCompletionBriefComment(self.raw)) }
     }
 
     /// Returns the name of the semantic parent of the declaration this completion string refers to,
     /// if applicable.
     pub fn get_parent_name(&self) -> Option<String> {
-        let name = unsafe { ffi::clang_getCompletionParent(self.raw, ptr::null_mut()) };
-        utility::to_string_option(name)
+        unsafe { utility::to_string_option(clang_getCompletionParent(self.raw, ptr::null_mut())) }
     }
 
     /// Returns the text of the typed text chunk for this completion string, if any.
@@ -426,35 +424,35 @@ impl<'r> CompletionString<'r> {
         ).enumerate().map(|(i, k)| {
             macro_rules! text {
                 ($variant:ident) => ({
-                    let text = unsafe { ffi::clang_getCompletionChunkText(self.raw, i as c_uint) };
+                    let text = unsafe { clang_getCompletionChunkText(self.raw, i as c_uint) };
                     CompletionChunk::$variant(utility::to_string(text))
                 });
             }
 
             match k {
-                ffi::CXCompletionChunkKind::Colon => CompletionChunk::Colon,
-                ffi::CXCompletionChunkKind::Comma => CompletionChunk::Comma,
-                ffi::CXCompletionChunkKind::Equal => CompletionChunk::Equals,
-                ffi::CXCompletionChunkKind::SemiColon => CompletionChunk::Semicolon,
-                ffi::CXCompletionChunkKind::LeftAngle => CompletionChunk::LeftAngleBracket,
-                ffi::CXCompletionChunkKind::RightAngle => CompletionChunk::RightAngleBracket,
-                ffi::CXCompletionChunkKind::LeftBrace => CompletionChunk::LeftBrace,
-                ffi::CXCompletionChunkKind::RightBrace => CompletionChunk::RightBrace,
-                ffi::CXCompletionChunkKind::LeftParen => CompletionChunk::LeftParenthesis,
-                ffi::CXCompletionChunkKind::RightParen => CompletionChunk::RightParenthesis,
-                ffi::CXCompletionChunkKind::LeftBracket => CompletionChunk::LeftSquareBracket,
-                ffi::CXCompletionChunkKind::RightBracket => CompletionChunk::RightSquareBracket,
-                ffi::CXCompletionChunkKind::HorizontalSpace => text!(HorizontalSpace),
-                ffi::CXCompletionChunkKind::VerticalSpace => text!(VerticalSpace),
-                ffi::CXCompletionChunkKind::CurrentParameter => text!(CurrentParameter),
-                ffi::CXCompletionChunkKind::TypedText => text!(TypedText),
-                ffi::CXCompletionChunkKind::Text => text!(Text),
-                ffi::CXCompletionChunkKind::Placeholder => text!(Placeholder),
-                ffi::CXCompletionChunkKind::Informative => text!(Informative),
-                ffi::CXCompletionChunkKind::ResultType => text!(ResultType),
-                ffi::CXCompletionChunkKind::Optional => {
+                CXCompletionChunkKind::Colon => CompletionChunk::Colon,
+                CXCompletionChunkKind::Comma => CompletionChunk::Comma,
+                CXCompletionChunkKind::Equal => CompletionChunk::Equals,
+                CXCompletionChunkKind::SemiColon => CompletionChunk::Semicolon,
+                CXCompletionChunkKind::LeftAngle => CompletionChunk::LeftAngleBracket,
+                CXCompletionChunkKind::RightAngle => CompletionChunk::RightAngleBracket,
+                CXCompletionChunkKind::LeftBrace => CompletionChunk::LeftBrace,
+                CXCompletionChunkKind::RightBrace => CompletionChunk::RightBrace,
+                CXCompletionChunkKind::LeftParen => CompletionChunk::LeftParenthesis,
+                CXCompletionChunkKind::RightParen => CompletionChunk::RightParenthesis,
+                CXCompletionChunkKind::LeftBracket => CompletionChunk::LeftSquareBracket,
+                CXCompletionChunkKind::RightBracket => CompletionChunk::RightSquareBracket,
+                CXCompletionChunkKind::HorizontalSpace => text!(HorizontalSpace),
+                CXCompletionChunkKind::VerticalSpace => text!(VerticalSpace),
+                CXCompletionChunkKind::CurrentParameter => text!(CurrentParameter),
+                CXCompletionChunkKind::TypedText => text!(TypedText),
+                CXCompletionChunkKind::Text => text!(Text),
+                CXCompletionChunkKind::Placeholder => text!(Placeholder),
+                CXCompletionChunkKind::Informative => text!(Informative),
+                CXCompletionChunkKind::ResultType => text!(ResultType),
+                CXCompletionChunkKind::Optional => {
                     let i = i as c_uint;
-                    let raw = unsafe { ffi::clang_getCompletionChunkCompletionString(self.raw, i) };
+                    let raw = unsafe { clang_getCompletionChunkCompletionString(self.raw, i) };
                     CompletionChunk::Optional(CompletionString::from_raw(raw))
                 },
             }

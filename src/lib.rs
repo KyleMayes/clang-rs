@@ -56,7 +56,7 @@ use std::marker::{PhantomData};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{self, AtomicBool};
 
-use clang_sys as ffi;
+use clang_sys::*;
 
 use libc::{c_int, c_uint, c_ulong};
 
@@ -849,14 +849,14 @@ impl Drop for Clang {
 /// An AST entity.
 #[derive(Copy, Clone)]
 pub struct Entity<'tu> {
-    raw: ffi::CXCursor,
+    raw: CXCursor,
     tu: &'tu TranslationUnit<'tu>,
 }
 
 impl<'tu> Entity<'tu> {
     //- Constructors -----------------------------
 
-    fn from_raw(raw: ffi::CXCursor, tu: &'tu TranslationUnit<'tu>) -> Entity<'tu> {
+    fn from_raw(raw: CXCursor, tu: &'tu TranslationUnit<'tu>) -> Entity<'tu> {
         Entity { raw: raw, tu: tu }
     }
 
@@ -864,7 +864,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the categorization of this AST entity.
     pub fn get_kind(&self) -> EntityKind {
-        unsafe { mem::transmute(ffi::clang_getCursorKind(self.raw)) }
+        unsafe { mem::transmute(clang_getCursorKind(self.raw)) }
     }
 
     /// Returns the display name of this AST entity, if any.
@@ -872,27 +872,24 @@ impl<'tu> Entity<'tu> {
     /// The display name of an entity contains additional information that helps identify the
     /// entity.
     pub fn get_display_name(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_getCursorDisplayName(self.raw)) }
+        unsafe { utility::to_string_option(clang_getCursorDisplayName(self.raw)) }
     }
 
     /// Returns the source location of this AST entity, if any.
     pub fn get_location(&self) -> Option<SourceLocation<'tu>> {
-        unsafe {
-            let location = ffi::clang_getCursorLocation(self.raw);
-            location.map(|l| SourceLocation::from_raw(l, self.tu))
-        }
+        unsafe { clang_getCursorLocation(self.raw).map(|l| SourceLocation::from_raw(l, self.tu)) }
     }
 
     /// Returns the source range of this AST entity, if any.
     pub fn get_range(&self) -> Option<SourceRange<'tu>> {
-        unsafe { ffi::clang_getCursorExtent(self.raw).map(|r| SourceRange::from_raw(r, self.tu)) }
+        unsafe { clang_getCursorExtent(self.raw).map(|r| SourceRange::from_raw(r, self.tu)) }
     }
 
     /// Returns the accessibility of this declaration or base class specifier, if applicable.
     pub fn get_accessibility(&self) -> Option<Accessibility> {
         unsafe {
-            match ffi::clang_getCXXAccessSpecifier(self.raw) {
-                ffi::CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier => None,
+            match clang_getCXXAccessSpecifier(self.raw) {
+                CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -908,14 +905,13 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the availability of this AST entity.
     pub fn get_availability(&self) -> Availability {
-        unsafe { mem::transmute(ffi::clang_getCursorAvailability(self.raw)) }
+        unsafe { mem::transmute(clang_getCursorAvailability(self.raw)) }
     }
 
     /// Returns the width of this bit field, if applicable.
     pub fn get_bit_field_width(&self) -> Option<usize> {
         unsafe {
-            let width = ffi::clang_getFieldDeclBitWidth(self.raw);
-
+            let width = clang_getFieldDeclBitWidth(self.raw);
             if width >= 0 {
                 Some(width as usize)
             } else {
@@ -929,53 +925,50 @@ impl<'tu> Entity<'tu> {
     /// In the C family of languages, some types of entities can be declared multiple times. When
     /// there are multiple declarations of the same entity, only one will be considered canonical.
     pub fn get_canonical_entity(&self) -> Entity<'tu> {
-        unsafe { Entity::from_raw(ffi::clang_getCanonicalCursor(self.raw), self.tu) }
+        unsafe { Entity::from_raw(clang_getCanonicalCursor(self.raw), self.tu) }
     }
 
     /// Returns the comment associated with this AST entity, if any.
     pub fn get_comment(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_Cursor_getRawCommentText(self.raw)) }
+        unsafe { utility::to_string_option(clang_Cursor_getRawCommentText(self.raw)) }
     }
 
     /// Returns the brief of the comment associated with this AST entity, if any.
     pub fn get_comment_brief(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_Cursor_getBriefCommentText(self.raw)) }
+        unsafe { utility::to_string_option(clang_Cursor_getBriefCommentText(self.raw)) }
     }
 
     /// Returns the source range of the comment associated with this AST entity, if any.
     pub fn get_comment_range(&self) -> Option<SourceRange<'tu>> {
-        let range = unsafe { ffi::clang_Cursor_getCommentRange(self.raw) };
-        range.map(|r| SourceRange::from_raw(r, self.tu))
+        unsafe { clang_Cursor_getCommentRange(self.raw).map(|r| SourceRange::from_raw(r, self.tu)) }
     }
 
     /// Returns a completion string for this declaration or macro definition, if applicable.
     pub fn get_completion_string(&self) -> Option<CompletionString> {
-        unsafe { ffi::clang_getCursorCompletionString(self.raw).map(CompletionString::from_raw) }
+        unsafe { clang_getCursorCompletionString(self.raw).map(CompletionString::from_raw) }
     }
 
     /// Returns the children of this AST entity.
     pub fn get_children(&self) -> Vec<Entity<'tu>> {
         let mut children = vec![];
-
         self.visit_children(|c, _| {
             children.push(c);
             EntityVisitResult::Continue
         });
-
         children
     }
 
     /// Returns the AST entity that describes the definition of this AST entity, if any.
     pub fn get_definition(&self) -> Option<Entity<'tu>> {
-        unsafe { ffi::clang_getCursorDefinition(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
+        unsafe { clang_getCursorDefinition(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
     }
 
     /// Returns the value of this enum constant declaration, if applicable.
     pub fn get_enum_constant_value(&self) -> Option<(i64, u64)> {
         unsafe {
             if self.get_kind() == EntityKind::EnumConstantDecl {
-                let signed = ffi::clang_getEnumConstantDeclValue(self.raw);
-                let unsigned = ffi::clang_getEnumConstantDeclUnsignedValue(self.raw);
+                let signed = clang_getEnumConstantDeclValue(self.raw);
+                let unsigned = clang_getEnumConstantDeclUnsignedValue(self.raw);
                 Some((signed, unsigned))
             } else {
                 None
@@ -985,19 +978,19 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the underlying type of this enum declaration, if applicable.
     pub fn get_enum_underlying_type(&self) -> Option<Type<'tu>> {
-        unsafe { ffi::clang_getEnumDeclIntegerType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+        unsafe { clang_getEnumDeclIntegerType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the file included by this inclusion directive, if applicable.
     pub fn get_file(&self) -> Option<File<'tu>> {
-        unsafe { ffi::clang_getIncludedFile(self.raw).map(|f| File::from_ptr(f, self.tu)) }
+        unsafe { clang_getIncludedFile(self.raw).map(|f| File::from_ptr(f, self.tu)) }
     }
 
     /// Returns the language used by this declaration, if applicable.
     pub fn get_language(&self) -> Option<Language> {
         unsafe {
-            match ffi::clang_getCursorLanguage(self.raw) {
-                ffi::CXLanguageKind::Invalid => None,
+            match clang_getCursorLanguage(self.raw) {
+                CXLanguageKind::Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1005,15 +998,14 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the lexical parent of this AST entity, if any.
     pub fn get_lexical_parent(&self) -> Option<Entity<'tu>> {
-        let parent = unsafe { ffi::clang_getCursorLexicalParent(self.raw) };
-        parent.map(|p| Entity::from_raw(p, self.tu))
+        unsafe { clang_getCursorLexicalParent(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
     }
 
     /// Returns the linkage of this AST entity, if any.
     pub fn get_linkage(&self) -> Option<Linkage> {
         unsafe {
-            match ffi::clang_getCursorLinkage(self.raw) {
-                ffi::CXLinkageKind::Invalid => None,
+            match clang_getCursorLinkage(self.raw) {
+                CXLinkageKind::Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1022,36 +1014,36 @@ impl<'tu> Entity<'tu> {
     /// Returns the mangled name of this AST entity, if any.
     #[cfg(feature="gte_clang_3_6")]
     pub fn get_mangled_name(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_Cursor_getMangling(self.raw)) }
+        unsafe { utility::to_string_option(clang_Cursor_getMangling(self.raw)) }
     }
 
     /// Returns the mangled names of this C++ constructor or destructor, if applicable.
     #[cfg(feature="gte_clang_3_8")]
     pub fn get_mangled_names(&self) -> Option<Vec<String>> {
-        unsafe { utility::to_string_set_option(ffi::clang_Cursor_getCXXManglings(self.raw)) }
+        unsafe { utility::to_string_set_option(clang_Cursor_getCXXManglings(self.raw)) }
     }
 
     /// Returns the module imported by this module import declaration, if applicable.
     pub fn get_module(&self) -> Option<Module<'tu>> {
-        unsafe { ffi::clang_Cursor_getModule(self.raw).map(|m| Module::from_ptr(m, self.tu)) }
+        unsafe { clang_Cursor_getModule(self.raw).map(|m| Module::from_ptr(m, self.tu)) }
     }
 
     /// Returns the name of this AST entity, if any.
     pub fn get_name(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_getCursorSpelling(self.raw)) }
+        unsafe { utility::to_string_option(clang_getCursorSpelling(self.raw)) }
     }
 
     /// Returns the source ranges of the name of this AST entity.
     pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
         unsafe {
-            (0..).map(|i| ffi::clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
-                if ffi::clang_Range_isNull(*r) != 0 {
+            (0..).map(|i| clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
+                if clang_Range_isNull(*r) != 0 {
                     false
                 } else {
-                    let range = ffi::clang_getRangeStart(*r);
-                    let mut file = ffi::CXFile::default();
+                    let range = clang_getRangeStart(*r);
+                    let mut file = CXFile::default();
                     let null = ptr::null_mut();
-                    ffi::clang_getSpellingLocation(range, &mut file, null, null, null);
+                    clang_getSpellingLocation(range, &mut file, null, null, null);
                     !file.0.is_null()
                 }
             }).map(|r| SourceRange::from_raw(r, self.tu)).collect()
@@ -1060,8 +1052,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns which attributes were applied to this Objective-C property, if applicable.
     pub fn get_objc_attributes(&self) -> Option<ObjCAttributes> {
-        let attributes = unsafe { ffi::clang_Cursor_getObjCPropertyAttributes(self.raw, 0) };
-
+        let attributes = unsafe { clang_Cursor_getObjCPropertyAttributes(self.raw, 0) };
         if attributes.bits() != 0 {
             Some(ObjCAttributes::from(attributes))
         } else {
@@ -1071,20 +1062,17 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the element type for this Objective-C `iboutletcollection` attribute, if applicable.
     pub fn get_objc_ib_outlet_collection_type(&self) -> Option<Type<'tu>> {
-        unsafe {
-            ffi::clang_getIBOutletCollectionType(self.raw).map(|t| Type::from_raw(t, self.tu))
-        }
+        unsafe { clang_getIBOutletCollectionType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the type of the receiver of this Objective-C message, if applicable.
     pub fn get_objc_receiver_type(&self) -> Option<Type<'tu>> {
-        unsafe { ffi::clang_Cursor_getReceiverType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+        unsafe { clang_Cursor_getReceiverType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the selector index for this Objective-C selector identifier, if applicable.
     pub fn get_objc_selector_index(&self) -> Option<usize> {
-        let index = unsafe { ffi::clang_Cursor_getObjCSelectorIndex(self.raw) };
-
+        let index = unsafe { clang_Cursor_getObjCSelectorIndex(self.raw) };
         if index >= 0 {
             Some(index as usize)
         } else {
@@ -1094,14 +1082,13 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the type encoding for this Objective-C declaration, if applicable.
     pub fn get_objc_type_encoding(&self) -> Option<String> {
-        unsafe { utility::to_string_option(ffi::clang_getDeclObjCTypeEncoding(self.raw)) }
+        unsafe { utility::to_string_option(clang_getDeclObjCTypeEncoding(self.raw)) }
     }
 
     /// Returns which qualifiers were applied to this Objective-C method return or parameter type,
     /// if applicable.
     pub fn get_objc_qualifiers(&self) -> Option<ObjCQualifiers> {
-        let qualifiers = unsafe { ffi::clang_Cursor_getObjCDeclQualifiers(self.raw) };
-
+        let qualifiers = unsafe { clang_Cursor_getObjCDeclQualifiers(self.raw) };
         if qualifiers.bits() != 0 {
             Some(ObjCQualifiers::from(qualifiers))
         } else {
@@ -1116,7 +1103,6 @@ impl<'tu> Entity<'tu> {
             clang_getNumOverloadedDecls(self.raw),
             clang_getOverloadedDecl(self.raw),
         ).map(|e| Entity::from_raw(e, self.tu)).collect::<Vec<_>>();
-
         if !declarations.is_empty() {
             Some(declarations)
         } else {
@@ -1128,12 +1114,11 @@ impl<'tu> Entity<'tu> {
     pub fn get_overridden_methods(&self) -> Option<Vec<Entity<'tu>>> {
         unsafe {
             let (mut raw, mut count) = (ptr::null_mut(), 0);
-            ffi::clang_getOverriddenCursors(self.raw, &mut raw, &mut count);
-
+            clang_getOverriddenCursors(self.raw, &mut raw, &mut count);
             if !raw.is_null() {
                 let raws = slice::from_raw_parts(raw, count as usize);
                 let methods = raws.iter().map(|e| Entity::from_raw(*e, self.tu)).collect();
-                ffi::clang_disposeOverriddenCursors(raw);
+                clang_disposeOverriddenCursors(raw);
                 Some(methods)
             } else {
                 None
@@ -1149,9 +1134,8 @@ impl<'tu> Entity<'tu> {
         }
 
         unsafe {
-            let mut buffer: [ffi::CXPlatformAvailability; 32] = [ffi::CXPlatformAvailability::default(); 32];
-
-            let count = ffi::clang_getCursorPlatformAvailability(
+            let mut buffer: [CXPlatformAvailability; 32] = [CXPlatformAvailability::default(); 32];
+            let count = clang_getCursorPlatformAvailability(
                 self.raw,
                 ptr::null_mut(),
                 ptr::null_mut(),
@@ -1160,19 +1144,18 @@ impl<'tu> Entity<'tu> {
                 (&mut buffer).as_mut_ptr(),
                 buffer.len() as c_int,
             );
-
             Some((0..count as usize).map(|i| PlatformAvailability::from_raw(buffer[i])).collect())
         }
     }
 
     /// Returns the AST entity referred to by this AST entity, if any.
     pub fn get_reference(&self) -> Option<Entity<'tu>> {
-        unsafe { ffi::clang_getCursorReferenced(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
+        unsafe { clang_getCursorReferenced(self.raw).map(|p| Entity::from_raw(p, self.tu)) }
     }
 
     /// Returns the semantic parent of this AST entity, if any.
     pub fn get_semantic_parent(&self) -> Option<Entity<'tu>> {
-        let parent = unsafe { ffi::clang_getCursorSemanticParent(self.raw) };
+        let parent = unsafe { clang_getCursorSemanticParent(self.raw) };
         parent.map(|p| Entity::from_raw(p, self.tu))
     }
 
@@ -1180,8 +1163,8 @@ impl<'tu> Entity<'tu> {
     #[cfg(feature="gte_clang_3_6")]
     pub fn get_storage_class(&self) -> Option<StorageClass> {
         unsafe {
-            match ffi::clang_Cursor_getStorageClass(self.raw) {
-                ffi::CX_StorageClass::Invalid => None,
+            match clang_Cursor_getStorageClass(self.raw) {
+                CX_StorageClass::Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1190,16 +1173,16 @@ impl<'tu> Entity<'tu> {
     /// Returns the template declaration this template specialization was instantiated from, if
     /// applicable.
     pub fn get_template(&self) -> Option<Entity<'tu>> {
-        let parent = unsafe { ffi::clang_getSpecializedCursorTemplate(self.raw) };
+        let parent = unsafe { clang_getSpecializedCursorTemplate(self.raw) };
         parent.map(|p| Entity::from_raw(p, self.tu))
     }
 
     /// Returns the template arguments for this template function specialization, if applicable.
     #[cfg(feature="gte_clang_3_6")]
     pub fn get_template_arguments(&self) -> Option<Vec<TemplateArgument<'tu>>> {
-        let get_type = &ffi::clang_Cursor_getTemplateArgumentType;
-        let get_signed = &ffi::clang_Cursor_getTemplateArgumentValue;
-        let get_unsigned = &ffi::clang_Cursor_getTemplateArgumentUnsignedValue;
+        let get_type = &clang_Cursor_getTemplateArgumentType;
+        let get_signed = &clang_Cursor_getTemplateArgumentValue;
+        let get_unsigned = &clang_Cursor_getTemplateArgumentUnsignedValue;
 
         iter_option!(
             clang_Cursor_getNumTemplateArguments(self.raw),
@@ -1207,23 +1190,23 @@ impl<'tu> Entity<'tu> {
         ).map(|i| {
             i.enumerate().map(|(i, t)| {
                 match t {
-                    ffi::CXTemplateArgumentKind::Null => TemplateArgument::Null,
-                    ffi::CXTemplateArgumentKind::Type => {
+                    CXTemplateArgumentKind::Null => TemplateArgument::Null,
+                    CXTemplateArgumentKind::Type => {
                         let type_ = unsafe { get_type(self.raw, i as c_uint) };
                         TemplateArgument::Type(Type::from_raw(type_, self.tu))
                     },
-                    ffi::CXTemplateArgumentKind::Declaration => TemplateArgument::Declaration,
-                    ffi::CXTemplateArgumentKind::NullPtr => TemplateArgument::Nullptr,
-                    ffi::CXTemplateArgumentKind::Integral => {
+                    CXTemplateArgumentKind::Declaration => TemplateArgument::Declaration,
+                    CXTemplateArgumentKind::NullPtr => TemplateArgument::Nullptr,
+                    CXTemplateArgumentKind::Integral => {
                         let signed = unsafe { get_signed(self.raw, i as c_uint) };
                         let unsigned = unsafe { get_unsigned(self.raw, i as c_uint) };
                         TemplateArgument::Integral(signed as i64, unsigned as u64)
                     },
-                    ffi::CXTemplateArgumentKind::Template => TemplateArgument::Template,
-                    ffi::CXTemplateArgumentKind::TemplateExpansion =>
+                    CXTemplateArgumentKind::Template => TemplateArgument::Template,
+                    CXTemplateArgumentKind::TemplateExpansion =>
                         TemplateArgument::TemplateExpansion,
-                    ffi::CXTemplateArgumentKind::Expression => TemplateArgument::Expression,
-                    ffi::CXTemplateArgumentKind::Pack => TemplateArgument::Pack,
+                    CXTemplateArgumentKind::Expression => TemplateArgument::Expression,
+                    CXTemplateArgumentKind::Pack => TemplateArgument::Pack,
                     _ => unreachable!(),
                 }
             }).collect()
@@ -1234,8 +1217,8 @@ impl<'tu> Entity<'tu> {
     /// instantiating this template declaration, if applicable.
     pub fn get_template_kind(&self) -> Option<EntityKind> {
         unsafe {
-            match ffi::clang_getTemplateCursorKind(self.raw) {
-                ffi::CXCursorKind::NoDeclFound => None,
+            match clang_getTemplateCursorKind(self.raw) {
+                CXCursorKind::NoDeclFound => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1248,26 +1231,25 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the type of this AST entity, if any.
     pub fn get_type(&self) -> Option<Type<'tu>> {
-        unsafe { ffi::clang_getCursorType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+        unsafe { clang_getCursorType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the underlying type of this typedef declaration, if applicable.
     pub fn get_typedef_underlying_type(&self) -> Option<Type<'tu>> {
-        let type_ = unsafe { ffi::clang_getTypedefDeclUnderlyingType(self.raw) };
-        type_.map(|t| Type::from_raw(t, self.tu))
+        unsafe { clang_getTypedefDeclUnderlyingType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the USR for this AST entity, if any.
     pub fn get_usr(&self) -> Option<Usr> {
-        unsafe { utility::to_string_option(ffi::clang_getCursorUSR(self.raw)).map(Usr) }
+        unsafe { utility::to_string_option(clang_getCursorUSR(self.raw)).map(Usr) }
     }
 
     /// Returns the linker visibility for this AST entity, if any.
     #[cfg(feature="gte_clang_3_8")]
     pub fn get_visibility(&self) -> Option<Visibility> {
         unsafe {
-            match ffi::clang_getCursorVisibility(self.raw) {
-                ffi::CXVisibilityKind::Invalid => None,
+            match clang_getCursorVisibility(self.raw) {
+                CXVisibilityKind::Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1276,23 +1258,23 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is an anonymous record declaration.
     #[cfg(feature="gte_clang_3_7")]
     pub fn is_anonymous(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isAnonymous(self.raw) != 0 }
+        unsafe { clang_Cursor_isAnonymous(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a bit field.
     pub fn is_bit_field(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isBitField(self.raw) != 0 }
+        unsafe { clang_Cursor_isBitField(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a const method.
     pub fn is_const_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isConst(self.raw) != 0 }
+        unsafe { clang_CXXMethod_isConst(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a declaration and also the definition of that
     /// declaration.
     pub fn is_definition(&self) -> bool {
-        unsafe { ffi::clang_isCursorDefinition(self.raw) != 0 }
+        unsafe { clang_isCursorDefinition(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a dynamic call.
@@ -1300,44 +1282,44 @@ impl<'tu> Entity<'tu> {
     /// A dynamic call is either a call to a C++ virtual method or an Objective-C message where the
     /// receiver is an object instance, not `super` or a specific class.
     pub fn is_dynamic_call(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isDynamicCall(self.raw) != 0 }
+        unsafe { clang_Cursor_isDynamicCall(self.raw) != 0 }
     }
 
     #[cfg(feature="gte_clang_3_8")]
     /// Returns whether this AST entity is a mutable field in a C++ struct or class.
     pub fn is_mutable(&self) -> bool {
-        unsafe { ffi::clang_CXXField_isMutable(self.raw) != 0 }
+        unsafe { clang_CXXField_isMutable(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an Objective-C method or property declaration with the
     /// `@optional` attribute applied to it.
     pub fn is_objc_optional(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isObjCOptional(self.raw) != 0 }
+        unsafe { clang_Cursor_isObjCOptional(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a pure virtual method.
     pub fn is_pure_virtual_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isPureVirtual(self.raw) != 0 }
+        unsafe { clang_CXXMethod_isPureVirtual(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a static method.
     pub fn is_static_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isStatic(self.raw) != 0 }
+        unsafe { clang_CXXMethod_isStatic(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a variadic function or method.
     pub fn is_variadic(&self) -> bool {
-        unsafe { ffi::clang_Cursor_isVariadic(self.raw) != 0 }
+        unsafe { clang_Cursor_isVariadic(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a virtual base class specifier.
     pub fn is_virtual_base(&self) -> bool {
-        unsafe { ffi::clang_isVirtualBase(self.raw) != 0 }
+        unsafe { clang_isVirtualBase(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a virtual method.
     pub fn is_virtual_method(&self) -> bool {
-        unsafe { ffi::clang_CXXMethod_isVirtual(self.raw) != 0 }
+        unsafe { clang_CXXMethod_isVirtual(self.raw) != 0 }
     }
 
     /// Visits the children of this AST entity recursively and returns whether visitation was ended
@@ -1361,8 +1343,8 @@ impl<'tu> Entity<'tu> {
         }
 
         extern fn visit(
-            cursor: ffi::CXCursor, parent: ffi::CXCursor, data: ffi::CXClientData
-        ) -> ffi::CXChildVisitResult {
+            cursor: CXCursor, parent: CXCursor, data: CXClientData
+        ) -> CXChildVisitResult {
             unsafe {
                 let &mut (tu, ref mut callback):
                     &mut (&TranslationUnit, Box<EntityCallback>) =
@@ -1375,44 +1357,44 @@ impl<'tu> Entity<'tu> {
         }
 
         let mut data = (self.tu, Box::new(f) as Box<EntityCallback>);
-        unsafe { ffi::clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
+        unsafe { clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
     }
 
     //- Categorization ---------------------------
 
     /// Returns whether this AST entity is categorized as an attribute.
     pub fn is_attribute(&self) -> bool {
-        unsafe { ffi::clang_isAttribute(self.raw.kind) != 0 }
+        unsafe { clang_isAttribute(self.raw.kind) != 0 }
     }
 
     /// Returns whether this AST entity is categorized as a declaration.
     pub fn is_declaration(&self) -> bool {
-        unsafe { ffi::clang_isDeclaration(self.raw.kind) != 0 }
+        unsafe { clang_isDeclaration(self.raw.kind) != 0 }
     }
 
     /// Returns whether this AST entity is categorized as an expression.
     pub fn is_expression(&self) -> bool {
-        unsafe { ffi::clang_isExpression(self.raw.kind) != 0 }
+        unsafe { clang_isExpression(self.raw.kind) != 0 }
     }
 
     /// Returns whether this AST entity is categorized as a preprocessing entity.
     pub fn is_preprocessing(&self) -> bool {
-        unsafe { ffi::clang_isPreprocessing(self.raw.kind) != 0 }
+        unsafe { clang_isPreprocessing(self.raw.kind) != 0 }
     }
 
     /// Returns whether this AST entity is categorized as a reference.
     pub fn is_reference(&self) -> bool {
-        unsafe { ffi::clang_isReference(self.raw.kind) != 0 }
+        unsafe { clang_isReference(self.raw.kind) != 0 }
     }
 
     /// Returns whether this AST entity is categorized as a statement.
     pub fn is_statement(&self) -> bool {
-        unsafe { ffi::clang_isStatement(self.raw.kind) != 0 }
+        unsafe { clang_isStatement(self.raw.kind) != 0 }
     }
 
     /// Returns whether the categorization of this AST entity is unexposed.
     pub fn is_unexposed(&self) -> bool {
-        unsafe { ffi::clang_isUnexposed(self.raw.kind) != 0 }
+        unsafe { clang_isUnexposed(self.raw.kind) != 0 }
     }
 
     //- Location ---------------------------------
@@ -1440,7 +1422,7 @@ impl<'tu> fmt::Debug for Entity<'tu> {
 
 impl<'tu> cmp::PartialEq for Entity<'tu> {
     fn eq(&self, other: &Entity<'tu>) -> bool {
-        unsafe { ffi::clang_equalCursors(self.raw, other.raw) != 0 }
+        unsafe { clang_equalCursors(self.raw, other.raw) != 0 }
     }
 }
 
@@ -1449,7 +1431,7 @@ impl<'tu> cmp::Eq for Entity<'tu> { }
 impl<'tu> hash::Hash for Entity<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
         unsafe {
-            let integer = ffi::clang_hashCursor(self.raw);
+            let integer = clang_hashCursor(self.raw);
             let slice = slice::from_raw_parts(mem::transmute(&integer), mem::size_of_val(&integer));
             hasher.write(slice);
         }
@@ -1460,14 +1442,14 @@ impl<'tu> hash::Hash for Entity<'tu> {
 
 /// A collection of translation units.
 pub struct Index<'c> {
-    ptr: ffi::CXIndex,
+    ptr: CXIndex,
     _marker: PhantomData<&'c Clang>,
 }
 
 impl<'c> Index<'c> {
     //- Constructors -----------------------------
 
-    fn from_ptr(ptr: ffi::CXIndex) -> Index<'c> {
+    fn from_ptr(ptr: CXIndex) -> Index<'c> {
         Index { ptr: ptr, _marker: PhantomData }
     }
 
@@ -1476,7 +1458,7 @@ impl<'c> Index<'c> {
     /// `exclude` determines whether declarations from precompiled headers are excluded and
     /// `diagnostics` determines whether diagnostics are printed while parsing source files.
     pub fn new(_: &'c Clang, exclude: bool, diagnostics: bool) -> Index<'c> {
-        unsafe { Index::from_ptr(ffi::clang_createIndex(exclude as c_int, diagnostics as c_int)) }
+        unsafe { Index::from_ptr(clang_createIndex(exclude as c_int, diagnostics as c_int)) }
     }
 
     //- Accessors --------------------------------
@@ -1488,20 +1470,20 @@ impl<'c> Index<'c> {
 
     /// Returns the thread options for this index.
     pub fn get_thread_options(&self) -> ThreadOptions {
-        unsafe { ThreadOptions::from(ffi::clang_CXIndex_getGlobalOptions(self.ptr)) }
+        unsafe { ThreadOptions::from(clang_CXIndex_getGlobalOptions(self.ptr)) }
     }
 
     //- Mutators ---------------------------------
 
     /// Sets the thread options for this index.
     pub fn set_thread_options(&mut self, options: ThreadOptions) {
-        unsafe { ffi::clang_CXIndex_setGlobalOptions(self.ptr, options.into()); }
+        unsafe { clang_CXIndex_setGlobalOptions(self.ptr, options.into()); }
     }
 }
 
 impl<'c> Drop for Index<'c> {
     fn drop(&mut self) {
-        unsafe { ffi::clang_disposeIndex(self.ptr); }
+        unsafe { clang_disposeIndex(self.ptr); }
     }
 }
 
@@ -1600,7 +1582,7 @@ impl<'tu> Parser<'tu> {
     //- Constructors -----------------------------
 
     fn new<F: Into<PathBuf>>(index: &'tu Index<'tu>, file: F) -> Parser<'tu> {
-        let flags = ffi::CXTranslationUnit_Flags::empty();
+        let flags = CXTranslationUnit_Flags::empty();
         Parser { index: index, file: file.into(), arguments: vec![], unsaved: vec![], flags: flags }
     }
 
@@ -1639,8 +1621,8 @@ impl<'tu> Parser<'tu> {
         let arguments = self.arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
         let unsaved = self.unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
         unsafe {
-            let mut ptr = ffi::CXTranslationUnit::default();
-            let code = ffi::clang_parseTranslationUnit2(
+            let mut ptr = CXTranslationUnit::default();
+            let code = clang_parseTranslationUnit2(
                 self.index.ptr,
                 utility::from_path(&self.file).as_ptr(),
                 arguments.as_ptr(),
@@ -1677,7 +1659,7 @@ pub struct PlatformAvailability {
 impl PlatformAvailability {
     //- Constructors -----------------------------
 
-    fn from_raw(mut raw: ffi::CXPlatformAvailability) -> PlatformAvailability {
+    fn from_raw(mut raw: CXPlatformAvailability) -> PlatformAvailability {
         let availability = PlatformAvailability {
             platform: utility::to_string(raw.Platform),
             unavailable: raw.Unavailable != 0,
@@ -1686,8 +1668,7 @@ impl PlatformAvailability {
             obsoleted: raw.Obsoleted.map(Version::from_raw),
             message: utility::to_string_option(raw.Message),
         };
-
-        unsafe { ffi::clang_disposeCXPlatformAvailability(&mut raw); }
+        unsafe { clang_disposeCXPlatformAvailability(&mut raw); }
         availability
     }
 }
@@ -1709,14 +1690,14 @@ options! {
 
 /// A preprocessed and parsed source file.
 pub struct TranslationUnit<'i> {
-    ptr: ffi::CXTranslationUnit,
+    ptr: CXTranslationUnit,
     _marker: PhantomData<&'i Index<'i>>,
 }
 
 impl<'i> TranslationUnit<'i> {
     //- Constructors -----------------------------
 
-    fn from_ptr(ptr: ffi::CXTranslationUnit) -> TranslationUnit<'i> {
+    fn from_ptr(ptr: CXTranslationUnit) -> TranslationUnit<'i> {
         TranslationUnit{ ptr: ptr, _marker: PhantomData }
     }
 
@@ -1729,7 +1710,7 @@ impl<'i> TranslationUnit<'i> {
         index: &'i Index, file: F
     ) -> Result<TranslationUnit<'i>, ()> {
         let path = utility::from_path(file);
-        let ptr = unsafe { ffi::clang_createTranslationUnit(index.ptr, path.as_ptr()) };
+        let ptr = unsafe { clang_createTranslationUnit(index.ptr, path.as_ptr()) };
         ptr.map(TranslationUnit::from_ptr).ok_or(())
     }
 
@@ -1744,22 +1725,22 @@ impl<'i> TranslationUnit<'i> {
 
     /// Returns the entity for this translation unit.
     pub fn get_entity(&'i self) -> Entity<'i> {
-        unsafe { Entity::from_raw(ffi::clang_getTranslationUnitCursor(self.ptr), self) }
+        unsafe { Entity::from_raw(clang_getTranslationUnitCursor(self.ptr), self) }
     }
 
     /// Returns the file at the supplied path in this translation unit, if any.
     pub fn get_file<F: AsRef<Path>>(&'i self, file: F) -> Option<File<'i>> {
-        let file = unsafe { ffi::clang_getFile(self.ptr, utility::from_path(file).as_ptr()) };
+        let file = unsafe { clang_getFile(self.ptr, utility::from_path(file).as_ptr()) };
         file.map(|f| File::from_ptr(f, self))
     }
 
     /// Returns the memory usage of this translation unit.
     pub fn get_memory_usage(&self) -> HashMap<MemoryUsage, usize> {
         unsafe {
-            let raw = ffi::clang_getCXTUResourceUsage(self.ptr);
+            let raw = clang_getCXTUResourceUsage(self.ptr);
             let raws = slice::from_raw_parts(raw.entries, raw.numEntries as usize);
             let usage = raws.iter().map(|u| (mem::transmute(u.kind), u.amount as usize)).collect();
-            ffi::clang_disposeCXTUResourceUsage(raw);
+            clang_disposeCXTUResourceUsage(raw);
             usage
         }
     }
@@ -1767,9 +1748,9 @@ impl<'i> TranslationUnit<'i> {
     /// Returns the AST entities which correspond to the supplied tokens, if any.
     pub fn annotate(&'i self, tokens: &[Token<'i>]) -> Vec<Option<Entity<'i>>> {
         unsafe {
-            let mut raws = vec![ffi::CXCursor::default(); tokens.len()];
+            let mut raws = vec![CXCursor::default(); tokens.len()];
             let ptr = mem::transmute(tokens.as_ptr());
-            ffi::clang_annotateTokens(self.ptr, ptr, tokens.len() as c_uint, raws.as_mut_ptr());
+            clang_annotateTokens(self.ptr, ptr, tokens.len() as c_uint, raws.as_mut_ptr());
             raws.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
         }
     }
@@ -1787,8 +1768,8 @@ impl<'i> TranslationUnit<'i> {
     /// * an unknown error occurs
     pub fn save<F: AsRef<Path>>(&self, file: F) -> Result<(), SaveError> {
         let file = utility::from_path(file);
-        let flags = ffi::CXSaveTranslationUnit_None;
-        let code = unsafe { ffi::clang_saveTranslationUnit(self.ptr, file.as_ptr(), flags) };
+        let flags = CXSaveTranslationUnit_None;
+        let code = unsafe { clang_saveTranslationUnit(self.ptr, file.as_ptr(), flags) };
         SaveError::from_error(code)
     }
 
@@ -1804,15 +1785,13 @@ impl<'i> TranslationUnit<'i> {
     /// * an unknown error occurs
     pub fn reparse(self, unsaved: &[Unsaved]) -> Result<TranslationUnit<'i>, SourceError> {
         let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
-
         unsafe {
-            let code = ffi::clang_reparseTranslationUnit(
+            let code = clang_reparseTranslationUnit(
                 self.ptr,
                 unsaved.len() as c_uint,
                 mem::transmute(unsaved.as_ptr()),
-                ffi::CXReparse_None,
+                CXReparse_None,
             );
-
             SourceError::from_error(code).map(|_| self)
         }
     }
@@ -1820,14 +1799,13 @@ impl<'i> TranslationUnit<'i> {
 
 impl<'i> Drop for TranslationUnit<'i> {
     fn drop(&mut self) {
-        unsafe { ffi::clang_disposeTranslationUnit(self.ptr); }
+        unsafe { clang_disposeTranslationUnit(self.ptr); }
     }
 }
 
 impl<'i> fmt::Debug for TranslationUnit<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let spelling = unsafe { ffi::clang_getTranslationUnitSpelling(self.ptr) };
-
+        let spelling = unsafe { clang_getTranslationUnitSpelling(self.ptr) };
         formatter.debug_struct("TranslationUnit")
             .field("spelling", &utility::to_string(spelling))
             .finish()
@@ -1839,14 +1817,14 @@ impl<'i> fmt::Debug for TranslationUnit<'i> {
 /// The type of an AST entity.
 #[derive(Copy, Clone)]
 pub struct Type<'tu> {
-    raw: ffi::CXType,
+    raw: CXType,
     tu: &'tu TranslationUnit<'tu>,
 }
 
 impl<'tu> Type<'tu> {
     //- Constructors -----------------------------
 
-    fn from_raw(raw: ffi::CXType, tu: &'tu TranslationUnit<'tu>) -> Type<'tu> {
+    fn from_raw(raw: CXType, tu: &'tu TranslationUnit<'tu>) -> Type<'tu> {
         Type { raw: raw, tu: tu }
     }
 
@@ -1859,7 +1837,7 @@ impl<'tu> Type<'tu> {
 
     /// Returns the display name of this type.
     pub fn get_display_name(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_getTypeSpelling(self.raw)) }
+        unsafe { utility::to_string(clang_getTypeSpelling(self.raw)) }
     }
 
     /// Returns the alignment of this type in bytes.
@@ -1869,7 +1847,7 @@ impl<'tu> Type<'tu> {
     /// * this type is a dependent type
     /// * this type is an incomplete type
     pub fn get_alignof(&self) -> Result<usize, AlignofError> {
-        let alignof_ = unsafe { ffi::clang_Type_getAlignOf(self.raw) };
+        let alignof_ = unsafe { clang_Type_getAlignOf(self.raw) };
         AlignofError::from_error(alignof_).map(|_| alignof_ as usize)
     }
 
@@ -1882,7 +1860,7 @@ impl<'tu> Type<'tu> {
     /// * this record type does not contain a field with the supplied name
     pub fn get_offsetof<F: AsRef<str>>(&self, field: F) -> Result<usize, OffsetofError> {
         let field = utility::from_string(field);
-        let offsetof_ = unsafe { ffi::clang_Type_getOffsetOf(self.raw, field.as_ptr()) };
+        let offsetof_ = unsafe { clang_Type_getOffsetOf(self.raw, field.as_ptr()) };
         OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
     }
 
@@ -1894,7 +1872,7 @@ impl<'tu> Type<'tu> {
     /// * this type is an incomplete type
     /// * this type is a variable size type
     pub fn get_sizeof(&self) -> Result<usize, SizeofError> {
-        let sizeof_ = unsafe { ffi::clang_Type_getSizeOf(self.raw) };
+        let sizeof_ = unsafe { clang_Type_getSizeOf(self.raw) };
         SizeofError::from_error(sizeof_).map(|_| sizeof_ as usize)
     }
 
@@ -1909,8 +1887,8 @@ impl<'tu> Type<'tu> {
     /// Returns the calling convention specified for this function type, if applicable.
     pub fn get_calling_convention(&self) -> Option<CallingConvention> {
         unsafe {
-            match ffi::clang_getFunctionTypeCallingConv(self.raw) {
-                ffi::CXCallingConv::Invalid => None,
+            match clang_getFunctionTypeCallingConv(self.raw) {
+                CXCallingConv::Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1920,22 +1898,22 @@ impl<'tu> Type<'tu> {
     ///
     /// The canonical type is the underlying type with all "sugar" removed (e.g., typedefs).
     pub fn get_canonical_type(&self) -> Type<'tu> {
-        unsafe { Type::from_raw(ffi::clang_getCanonicalType(self.raw), self.tu) }
+        unsafe { Type::from_raw(clang_getCanonicalType(self.raw), self.tu) }
     }
 
     /// Returns the class type for this member pointer type, if applicable.
     pub fn get_class_type(&self) -> Option<Type<'tu>> {
-        unsafe { ffi::clang_Type_getClassType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+        unsafe { clang_Type_getClassType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the AST entity that declared this type, if any.
     pub fn get_declaration(&self) -> Option<Entity<'tu>> {
-        unsafe { ffi::clang_getTypeDeclaration(self.raw).map(|e| Entity::from_raw(e, self.tu)) }
+        unsafe { clang_getTypeDeclaration(self.raw).map(|e| Entity::from_raw(e, self.tu)) }
     }
 
     /// Returns the element type for this array, complex, or vector type, if applicable.
     pub fn get_element_type(&self) -> Option<Type<'tu>> {
-        unsafe { ffi::clang_getElementType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+        unsafe { clang_getElementType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the fields in this record type, if applicable.
@@ -1943,12 +1921,10 @@ impl<'tu> Type<'tu> {
     pub fn get_fields(&self) -> Option<Vec<Entity<'tu>>> {
         if self.get_kind() == TypeKind::Record {
             let mut fields = vec![];
-
             self.visit_fields(|e| {
                 fields.push(e);
                 true
             });
-
             Some(fields)
         } else {
             None
@@ -1957,14 +1933,14 @@ impl<'tu> Type<'tu> {
 
     /// Returns the pointee type for this pointer type, if applicable.
     pub fn get_pointee_type(&self) -> Option<Type<'tu>> {
-        unsafe { ffi::clang_getPointeeType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+        unsafe { clang_getPointeeType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the ref qualifier for this C++ function or method type, if applicable.
     pub fn get_ref_qualifier(&self) -> Option<RefQualifier> {
         unsafe {
-            match ffi::clang_Type_getCXXRefQualifier(self.raw) {
-                ffi::CXRefQualifierKind::None => None,
+            match clang_Type_getCXXRefQualifier(self.raw) {
+                CXRefQualifierKind::None => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1972,13 +1948,12 @@ impl<'tu> Type<'tu> {
 
     /// Returns the result type for this function or method type, if applicable.
     pub fn get_result_type(&self) -> Option<Type<'tu>> {
-        unsafe { ffi::clang_getResultType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+        unsafe { clang_getResultType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the size of this constant array or vector type, if applicable.
     pub fn get_size(&self) -> Option<usize> {
-        let size = unsafe { ffi::clang_getNumElements(self.raw) };
-
+        let size = unsafe { clang_getNumElements(self.raw) };
         if size >= 0 {
             Some(size as usize)
         } else {
@@ -1997,27 +1972,27 @@ impl<'tu> Type<'tu> {
 
     /// Returns whether this type is qualified with const.
     pub fn is_const_qualified(&self) -> bool {
-        unsafe { ffi::clang_isConstQualifiedType(self.raw) != 0 }
+        unsafe { clang_isConstQualifiedType(self.raw) != 0 }
     }
 
     /// Returns whether this type is plain old data (POD).
     pub fn is_pod(&self) -> bool {
-        unsafe { ffi::clang_isPODType(self.raw) != 0 }
+        unsafe { clang_isPODType(self.raw) != 0 }
     }
 
     /// Returns whether this type is qualified with restrict.
     pub fn is_restrict_qualified(&self) -> bool {
-        unsafe { ffi::clang_isRestrictQualifiedType(self.raw) != 0 }
+        unsafe { clang_isRestrictQualifiedType(self.raw) != 0 }
     }
 
     /// Returns whether this type is a variadic function type.
     pub fn is_variadic(&self) -> bool {
-        unsafe { ffi::clang_isFunctionTypeVariadic(self.raw) != 0 }
+        unsafe { clang_isFunctionTypeVariadic(self.raw) != 0 }
     }
 
     /// Returns whether this type is qualified with volatile.
     pub fn is_volatile_qualified(&self) -> bool {
-        unsafe { ffi::clang_isVolatileQualifiedType(self.raw) != 0 }
+        unsafe { clang_isVolatileQualifiedType(self.raw) != 0 }
     }
 
     /// Visits the fields in this record type, returning `None` if this type is not a record type
@@ -2039,25 +2014,24 @@ impl<'tu> Type<'tu> {
             }
         }
 
-        extern fn visit(cursor: ffi::CXCursor, data: ffi::CXClientData) -> ffi::CXVisitorResult {
+        extern fn visit(cursor: CXCursor, data: CXClientData) -> CXVisitorResult {
             unsafe {
                 let &mut (tu, ref mut callback):
                     &mut (&TranslationUnit, Box<Callback>) =
                         mem::transmute(data);
 
                 if callback.call(Entity::from_raw(cursor, tu)) {
-                    ffi::CXVisitorResult::Continue
+                    CXVisitorResult::Continue
                 } else {
-                    ffi::CXVisitorResult::Break
+                    CXVisitorResult::Break
                 }
             }
         }
 
         let mut data = (self.tu, Box::new(f) as Box<Callback>);
-
         unsafe {
             let data = mem::transmute(&mut data);
-            Some(ffi::clang_Type_visitFields(self.raw, visit, data) == ffi::CXVisitorResult::Break)
+            Some(clang_Type_visitFields(self.raw, visit, data) == CXVisitorResult::Break)
         }
     }
 
@@ -2065,17 +2039,17 @@ impl<'tu> Type<'tu> {
 
     /// Returns whether this type is an integer type.
     pub fn is_integer(&self) -> bool {
-        self.raw.kind >= ffi::CXTypeKind::Bool && self.raw.kind <= ffi::CXTypeKind::Int128
+        self.raw.kind >= CXTypeKind::Bool && self.raw.kind <= CXTypeKind::Int128
     }
 
     /// Returns whether this type is a signed integer type.
     pub fn is_signed_integer(&self) -> bool {
-        self.raw.kind >= ffi::CXTypeKind::Char_S && self.raw.kind <= ffi::CXTypeKind::Int128
+        self.raw.kind >= CXTypeKind::Char_S && self.raw.kind <= CXTypeKind::Int128
     }
 
     /// Returns whether this type is an unsigned integer type.
     pub fn is_unsigned_integer(&self) -> bool {
-        self.raw.kind >= ffi::CXTypeKind::Bool && self.raw.kind <= ffi::CXTypeKind::UInt128
+        self.raw.kind >= CXTypeKind::Bool && self.raw.kind <= CXTypeKind::UInt128
     }
 }
 
@@ -2090,7 +2064,7 @@ impl<'tu> fmt::Debug for Type<'tu> {
 
 impl<'tu> cmp::PartialEq for Type<'tu> {
     fn eq(&self, other: &Type<'tu>) -> bool {
-        unsafe { ffi::clang_equalTypes(self.raw, other.raw) != 0 }
+        unsafe { clang_equalTypes(self.raw, other.raw) != 0 }
     }
 }
 
@@ -2101,8 +2075,8 @@ impl<'tu> cmp::Eq for Type<'tu> { }
 /// The path to and unsaved contents of a previously existing file.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Unsaved {
-    path: std::ffi::CString,
-    contents: std::ffi::CString,
+    path: CString,
+    contents: CString,
 }
 
 impl Unsaved {
@@ -2115,8 +2089,8 @@ impl Unsaved {
 
     //- Accessors --------------------------------
 
-    fn as_raw(&self) -> ffi::CXUnsavedFile {
-        ffi::CXUnsavedFile {
+    fn as_raw(&self) -> CXUnsavedFile {
+        CXUnsavedFile {
             Filename: self.path.as_ptr(),
             Contents: self.contents.as_ptr(),
             Length: self.contents.as_bytes().len() as c_ulong,
@@ -2140,26 +2114,21 @@ impl Usr {
     pub fn from_objc_category<C: AsRef<str>>(class: C, category: C) -> Usr {
         let class = utility::from_string(class);
         let category = utility::from_string(category);
-
-        let raw = unsafe {
-            ffi::clang_constructUSR_ObjCCategory(class.as_ptr(), category.as_ptr())
-        };
-
+        let raw = unsafe { clang_constructUSR_ObjCCategory(class.as_ptr(), category.as_ptr()) };
         Usr(utility::to_string(raw))
     }
 
     /// Constructs a new `Usr` from an Objective-C class.
     pub fn from_objc_class<C: AsRef<str>>(class: C) -> Usr {
         let class = utility::from_string(class);
-        unsafe { Usr(utility::to_string(ffi::clang_constructUSR_ObjCClass(class.as_ptr()))) }
+        unsafe { Usr(utility::to_string(clang_constructUSR_ObjCClass(class.as_ptr()))) }
     }
 
     /// Constructs a new `Usr` from an Objective-C instance variable.
     pub fn from_objc_ivar<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
-            let raw = unsafe { ffi::clang_constructUSR_ObjCIvar(name.as_ptr(), s) };
-            Usr(utility::to_string(raw))
+            unsafe { Usr(utility::to_string(clang_constructUSR_ObjCIvar(name.as_ptr(), s))) }
         })
     }
 
@@ -2168,7 +2137,7 @@ impl Usr {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
             let instance = instance as c_uint;
-            let raw = unsafe { ffi::clang_constructUSR_ObjCMethod(name.as_ptr(), instance, s) };
+            let raw = unsafe { clang_constructUSR_ObjCMethod(name.as_ptr(), instance, s) };
             Usr(utility::to_string(raw))
         })
     }
@@ -2177,15 +2146,14 @@ impl Usr {
     pub fn from_objc_property<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
-            let raw = unsafe { ffi::clang_constructUSR_ObjCProperty(name.as_ptr(), s) };
-            Usr(utility::to_string(raw))
+            unsafe { Usr(utility::to_string(clang_constructUSR_ObjCProperty(name.as_ptr(), s))) }
         })
     }
 
     /// Constructs a new `Usr` from an Objective-C protocol.
     pub fn from_objc_protocol<P: AsRef<str>>(protocol: P) -> Usr {
         let string = utility::from_string(protocol);
-        unsafe { Usr(utility::to_string(ffi::clang_constructUSR_ObjCProtocol(string.as_ptr()))) }
+        unsafe { Usr(utility::to_string(clang_constructUSR_ObjCProtocol(string.as_ptr()))) }
     }
 }
 
@@ -2205,7 +2173,7 @@ pub struct Version {
 impl Version {
     //- Constructors -----------------------------
 
-    fn from_raw(raw: ffi::CXVersion) -> Version {
+    fn from_raw(raw: CXVersion) -> Version {
         Version { x: raw.Major as i32, y: raw.Minor as i32, z: raw.Subminor as i32 }
     }
 }
@@ -2216,5 +2184,5 @@ impl Version {
 
 /// Returns the version string for the version of `libclang` in use.
 pub fn get_version() -> String {
-    unsafe { utility::to_string(ffi::clang_getClangVersion()) }
+    unsafe { utility::to_string(clang_getClangVersion()) }
 }

@@ -17,7 +17,7 @@
 use std::fmt;
 use std::mem;
 
-use clang_sys as ffi;
+use clang_sys::*;
 
 use utility;
 use super::{TranslationUnit};
@@ -68,7 +68,7 @@ pub enum Severity {
 /// A message from the compiler about an issue with a source file.
 #[derive(Copy, Clone)]
 pub struct Diagnostic<'tu> {
-    ptr: ffi::CXDiagnostic,
+    ptr: CXDiagnostic,
     tu: &'tu TranslationUnit<'tu>,
 }
 
@@ -76,7 +76,7 @@ impl<'tu> Diagnostic<'tu> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_ptr(ptr: ffi::CXDiagnostic, tu: &'tu TranslationUnit<'tu>) -> Diagnostic<'tu> {
+    pub fn from_ptr(ptr: CXDiagnostic, tu: &'tu TranslationUnit<'tu>) -> Diagnostic<'tu> {
         Diagnostic { ptr: ptr, tu: tu }
     }
 
@@ -84,17 +84,17 @@ impl<'tu> Diagnostic<'tu> {
 
     /// Returns the severity of this diagnostic.
     pub fn get_severity(&self) -> Severity {
-        unsafe { mem::transmute(ffi::clang_getDiagnosticSeverity(self.ptr)) }
+        unsafe { mem::transmute(clang_getDiagnosticSeverity(self.ptr)) }
     }
 
     /// Returns the text of this diagnostic.
     pub fn get_text(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_getDiagnosticSpelling(self.ptr)) }
+        unsafe { utility::to_string(clang_getDiagnosticSpelling(self.ptr)) }
     }
 
     /// Returns the source location of this diagnostic.
     pub fn get_location(&self) -> SourceLocation<'tu> {
-        unsafe { SourceLocation::from_raw(ffi::clang_getDiagnosticLocation(self.ptr), self.tu) }
+        unsafe { SourceLocation::from_raw(clang_getDiagnosticLocation(self.ptr), self.tu) }
     }
 
     /// Returns the source ranges of this diagnostic.
@@ -108,9 +108,9 @@ impl<'tu> Diagnostic<'tu> {
     /// Returns the fix-its for this diagnostic.
     pub fn get_fix_its(&self) -> Vec<FixIt<'tu>> {
         unsafe {
-            (0..ffi::clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
+            (0..clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
                 let mut range = mem::uninitialized();
-                let fixit = ffi::clang_getDiagnosticFixIt(self.ptr, i, &mut range);
+                let fixit = clang_getDiagnosticFixIt(self.ptr, i, &mut range);
                 let string = utility::to_string(fixit);
                 let range = SourceRange::from_raw(range, self.tu);
                 if string.is_empty() {
@@ -126,7 +126,7 @@ impl<'tu> Diagnostic<'tu> {
 
     /// Returns the child diagnostics of this diagnostic.
     pub fn get_children(&self) -> Vec<Diagnostic> {
-        let raw = unsafe { ffi::clang_getChildDiagnostics(self.ptr) };
+        let raw = unsafe { clang_getChildDiagnostics(self.ptr) };
         iter!(
             clang_getNumDiagnosticsInSet(raw),
             clang_getDiagnosticInSet(raw),
@@ -186,7 +186,7 @@ impl<'tu> DiagnosticFormatter<'tu> {
     //- Constructors -----------------------------
 
     fn new(diagnostic: Diagnostic<'tu>) -> DiagnosticFormatter<'tu> {
-        let flags = unsafe { ffi::clang_defaultDiagnosticDisplayOptions() };
+        let flags = unsafe { clang_defaultDiagnosticDisplayOptions() };
         DiagnosticFormatter { diagnostic: diagnostic, flags: flags }
     }
 
@@ -195,6 +195,6 @@ impl<'tu> DiagnosticFormatter<'tu> {
     /// Returns a formatted string.
     pub fn format(&self) -> String {
         let ptr = self.diagnostic.ptr;
-        unsafe { utility::to_string(ffi::clang_formatDiagnostic(ptr, self.flags)) }
+        unsafe { utility::to_string(clang_formatDiagnostic(ptr, self.flags)) }
     }
 }

@@ -21,7 +21,7 @@ use std::mem;
 use std::slice;
 use std::path::{Path, PathBuf};
 
-use clang_sys as ffi;
+use clang_sys::*;
 
 use libc::{c_uint, time_t};
 
@@ -38,7 +38,7 @@ use super::token::{Token};
 /// A source file.
 #[derive(Copy, Clone)]
 pub struct File<'tu> {
-    ptr: ffi::CXFile,
+    ptr: CXFile,
     tu: &'tu TranslationUnit<'tu>,
 }
 
@@ -46,7 +46,7 @@ impl<'tu> File<'tu> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_ptr(ptr: ffi::CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
+    pub fn from_ptr(ptr: CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
         File { ptr: ptr, tu: tu }
     }
 
@@ -54,26 +54,26 @@ impl<'tu> File<'tu> {
 
     /// Returns the absolute path to this file.
     pub fn get_path(&self) -> PathBuf {
-        unsafe { Path::new(&utility::to_string(ffi::clang_getFileName(self.ptr))).into() }
+        unsafe { Path::new(&utility::to_string(clang_getFileName(self.ptr))).into() }
     }
 
     /// Returns the last modification time for this file.
     pub fn get_time(&self) -> time_t {
-        unsafe { ffi::clang_getFileTime(self.ptr) }
+        unsafe { clang_getFileTime(self.ptr) }
     }
 
     /// Returns a unique identifier for this file.
     pub fn get_id(&self) -> (u64, u64, u64) {
         unsafe {
             let mut id = mem::uninitialized();
-            ffi::clang_getFileUniqueID(self.ptr, &mut id);
+            clang_getFileUniqueID(self.ptr, &mut id);
             (id.data[0] as u64, id.data[1] as u64, id.data[2] as u64)
         }
     }
 
     /// Returns the module containing this file, if any.
     pub fn get_module(&self) -> Option<Module<'tu>> {
-        let module = unsafe { ffi::clang_getModuleForFile(self.tu.ptr, self.ptr) };
+        let module = unsafe { clang_getModuleForFile(self.tu.ptr, self.ptr) };
         module.map(|m| Module::from_ptr(m, self.tu))
     }
 
@@ -83,17 +83,17 @@ impl<'tu> File<'tu> {
     /// not constructed with a detailed preprocessing record.
     pub fn get_skipped_ranges(&self) -> Vec<SourceRange<'tu>> {
         unsafe {
-            let raw = ffi::clang_getSkippedRanges(self.tu.ptr, self.ptr);
+            let raw = clang_getSkippedRanges(self.tu.ptr, self.ptr);
             let raws = slice::from_raw_parts((*raw).ranges, (*raw).count as usize);
             let ranges = raws.iter().map(|r| SourceRange::from_raw(*r, self.tu)).collect();
-            ffi::clang_disposeSourceRangeList(raw);
+            clang_disposeSourceRangeList(raw);
             ranges
         }
     }
 
     /// Returns whether this file is guarded against multiple inclusions.
     pub fn is_include_guarded(&self) -> bool {
-        unsafe { ffi::clang_isFileMultipleIncludeGuarded(self.tu.ptr, self.ptr) != 0 }
+        unsafe { clang_isFileMultipleIncludeGuarded(self.tu.ptr, self.ptr) != 0 }
     }
 
     /// Returns the source location at the supplied line and column in this file.
@@ -105,15 +105,16 @@ impl<'tu> File<'tu> {
         if line == 0 || column == 0 {
             panic!("`line` or `column` is `0`");
         }
+
         let (line, column) = (line, column) as (c_uint, c_uint);
-        let location = unsafe { ffi::clang_getLocation(self.tu.ptr, self.ptr, line, column) };
+        let location = unsafe { clang_getLocation(self.tu.ptr, self.ptr, line, column) };
         SourceLocation::from_raw(location, self.tu)
     }
 
     /// Returns the source location at the supplied character offset in this file.
     pub fn get_offset_location(&self, offset: u32) -> SourceLocation<'tu> {
         let offset = offset as c_uint;
-        let location = unsafe { ffi::clang_getLocationForOffset(self.tu.ptr, self.ptr, offset) };
+        let location = unsafe { clang_getLocationForOffset(self.tu.ptr, self.ptr, offset) };
         SourceLocation::from_raw(location, self.tu)
     }
 
@@ -140,7 +141,7 @@ impl<'tu> File<'tu> {
     /// Visits the inclusion directives in this file and returns whether visitation was ended by the
     /// callback returning `false`.
     pub fn visit_includes<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(&self, f: F) -> bool {
-        visit(self.tu, f, |v| unsafe { ffi::clang_findIncludesInFile(self.tu.ptr, self.ptr, v) })
+        visit(self.tu, f, |v| unsafe { clang_findIncludesInFile(self.tu.ptr, self.ptr, v) })
     }
 
     /// Visits the references to the supplied entity in this file and returns whether visitation was
@@ -148,7 +149,7 @@ impl<'tu> File<'tu> {
     pub fn visit_references<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(
         &self, entity: Entity<'tu>, f: F
     ) -> bool {
-        visit(self.tu, f, |v| unsafe { ffi::clang_findReferencesInFile(entity.raw, self.ptr, v) })
+        visit(self.tu, f, |v| unsafe { clang_findReferencesInFile(entity.raw, self.ptr, v) })
     }
 }
 
@@ -192,7 +193,7 @@ pub struct Location<'tu> {
 /// A collection of headers.
 #[derive(Copy, Clone)]
 pub struct Module<'tu> {
-    ptr: ffi::CXModule,
+    ptr: CXModule,
     tu: &'tu TranslationUnit<'tu>,
 }
 
@@ -200,7 +201,7 @@ impl<'tu> Module<'tu> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_ptr(ptr: ffi::CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
+    pub fn from_ptr(ptr: CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
         Module { ptr: ptr, tu: tu }
     }
 
@@ -208,23 +209,22 @@ impl<'tu> Module<'tu> {
 
     /// Returns the name of this module (e.g., `vector` for the `std.vector` module).
     pub fn get_name(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_Module_getName(self.ptr)) }
+        unsafe { utility::to_string(clang_Module_getName(self.ptr)) }
     }
 
     /// Returns the full name of this module (e.g., `std.vector` for the `std.vector` module).
     pub fn get_full_name(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_Module_getFullName(self.ptr)) }
+        unsafe { utility::to_string(clang_Module_getFullName(self.ptr)) }
     }
 
     /// Returns the parent of this module, if any.
     pub fn get_parent(&self) -> Option<Module<'tu>> {
-        unsafe { ffi::clang_Module_getParent(self.ptr).map(|p| Module::from_ptr(p, self.tu)) }
+        unsafe { clang_Module_getParent(self.ptr).map(|p| Module::from_ptr(p, self.tu)) }
     }
 
     /// Returns the AST file this module came from.
     pub fn get_file(&self) -> File<'tu> {
-        let ptr = unsafe { ffi::clang_Module_getASTFile(self.ptr) };
-        File::from_ptr(ptr, self.tu)
+        unsafe { File::from_ptr(clang_Module_getASTFile(self.ptr), self.tu) }
     }
 
     /// Returns the top-level headers in this module.
@@ -237,7 +237,7 @@ impl<'tu> Module<'tu> {
 
     /// Returns whether this module is a system module.
     pub fn is_system(&self) -> bool {
-        unsafe { ffi::clang_Module_isSystem(self.ptr) != 0 }
+        unsafe { clang_Module_isSystem(self.ptr) != 0 }
     }
 }
 
@@ -263,7 +263,7 @@ impl<'tu> cmp::Eq for Module<'tu> { }
 macro_rules! location {
     ($function:ident, $location:expr, $tu:expr) => ({
         let (mut file, mut line, mut column, mut offset) = mem::uninitialized();
-        ffi::$function($location, &mut file, &mut line, &mut column, &mut offset);
+        $function($location, &mut file, &mut line, &mut column, &mut offset);
         let file = File::from_ptr(file, $tu);
         Location { file: file, line: line as u32, column: column as u32, offset: offset as u32 }
     });
@@ -272,7 +272,7 @@ macro_rules! location {
 /// A location in a source file.
 #[derive(Copy, Clone)]
 pub struct SourceLocation<'tu> {
-    raw: ffi::CXSourceLocation,
+    raw: CXSourceLocation,
     tu: &'tu TranslationUnit<'tu>,
 }
 
@@ -280,9 +280,7 @@ impl<'tu> SourceLocation<'tu> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_raw(
-        raw: ffi::CXSourceLocation, tu: &'tu TranslationUnit<'tu>
-    ) -> SourceLocation<'tu> {
+    pub fn from_raw(raw: CXSourceLocation, tu: &'tu TranslationUnit<'tu>) -> SourceLocation<'tu> {
         SourceLocation { raw: raw, tu: tu }
     }
 
@@ -310,7 +308,7 @@ impl<'tu> SourceLocation<'tu> {
     pub fn get_presumed_location(&self) -> (String, u32, u32) {
         unsafe {
             let (mut file, mut line, mut column) = mem::uninitialized();
-            ffi::clang_getPresumedLocation(self.raw, &mut file, &mut line, &mut column);
+            clang_getPresumedLocation(self.raw, &mut file, &mut line, &mut column);
             (utility::to_string(file), line as u32, column as u32)
         }
     }
@@ -322,17 +320,17 @@ impl<'tu> SourceLocation<'tu> {
 
     /// Returns the AST entity at this source location, if any.
     pub fn get_entity(&self) -> Option<Entity<'tu>> {
-        unsafe { ffi::clang_getCursor(self.tu.ptr, self.raw).map(|c| Entity::from_raw(c, self.tu)) }
+        unsafe { clang_getCursor(self.tu.ptr, self.raw).map(|c| Entity::from_raw(c, self.tu)) }
     }
 
     /// Returns whether this source location is in the main file of its translation unit.
     pub fn is_in_main_file(&self) -> bool {
-        unsafe { ffi::clang_Location_isFromMainFile(self.raw) != 0 }
+        unsafe { clang_Location_isFromMainFile(self.raw) != 0 }
     }
 
     /// Returns whether this source location is in a system header.
     pub fn is_in_system_header(&self) -> bool {
-        unsafe { ffi::clang_Location_isInSystemHeader(self.raw) != 0 }
+        unsafe { clang_Location_isInSystemHeader(self.raw) != 0 }
     }
 }
 
@@ -350,7 +348,7 @@ impl<'tu> fmt::Debug for SourceLocation<'tu> {
 
 impl<'tu> cmp::PartialEq for SourceLocation<'tu> {
     fn eq(&self, other: &SourceLocation<'tu>) -> bool {
-        unsafe { ffi::clang_equalLocations(self.raw, other.raw) != 0 }
+        unsafe { clang_equalLocations(self.raw, other.raw) != 0 }
     }
 }
 
@@ -367,7 +365,7 @@ impl<'tu> hash::Hash for SourceLocation<'tu> {
 /// A half-open range in a source file.
 #[derive(Copy, Clone)]
 pub struct SourceRange<'tu> {
-    raw: ffi::CXSourceRange,
+    raw: CXSourceRange,
     tu: &'tu TranslationUnit<'tu>,
 }
 
@@ -375,25 +373,25 @@ impl<'tu> SourceRange<'tu> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_raw(raw: ffi::CXSourceRange, tu: &'tu TranslationUnit<'tu>) -> SourceRange<'tu> {
+    pub fn from_raw(raw: CXSourceRange, tu: &'tu TranslationUnit<'tu>) -> SourceRange<'tu> {
         SourceRange { raw: raw, tu: tu }
     }
 
     /// Constructs a new `SourceRange` that spans [`start`, `end`).
     pub fn new(start: SourceLocation<'tu>, end: SourceLocation<'tu>) -> SourceRange<'tu> {
-        unsafe { SourceRange::from_raw(ffi::clang_getRange(start.raw, end.raw), start.tu) }
+        unsafe { SourceRange::from_raw(clang_getRange(start.raw, end.raw), start.tu) }
     }
 
     //- Accessors --------------------------------
 
     /// Returns the inclusive start of this source range.
     pub fn get_start(&self) -> SourceLocation<'tu> {
-        unsafe { SourceLocation::from_raw(ffi::clang_getRangeStart(self.raw), self.tu) }
+        unsafe { SourceLocation::from_raw(clang_getRangeStart(self.raw), self.tu) }
     }
 
     /// Returns the exclusive end of this source range.
     pub fn get_end(&self) -> SourceLocation<'tu> {
-        unsafe { SourceLocation::from_raw(ffi::clang_getRangeEnd(self.raw), self.tu) }
+        unsafe { SourceLocation::from_raw(clang_getRangeEnd(self.raw), self.tu) }
     }
 
     /// Returns whether this source range is in the main file of its translation unit.
@@ -410,10 +408,10 @@ impl<'tu> SourceRange<'tu> {
     pub fn tokenize(&self) -> Vec<Token<'tu>> {
         unsafe {
             let (mut raw, mut count) = mem::uninitialized();
-            ffi::clang_tokenize(self.tu.ptr, self.raw, &mut raw, &mut count);
+            clang_tokenize(self.tu.ptr, self.raw, &mut raw, &mut count);
             let raws = slice::from_raw_parts(raw, count as usize);
             let tokens = raws.iter().map(|t| Token::from_raw(*t, self.tu)).collect();
-            ffi::clang_disposeTokens(self.tu.ptr, raw, count);
+            clang_disposeTokens(self.tu.ptr, raw, count);
             tokens
         }
     }
@@ -430,7 +428,7 @@ impl<'tu> fmt::Debug for SourceRange<'tu> {
 
 impl<'tu> cmp::PartialEq for SourceRange<'tu> {
     fn eq(&self, other: &SourceRange<'tu>) -> bool {
-        unsafe { ffi::clang_equalRanges(self.raw, other.raw) != 0 }
+        unsafe { clang_equalRanges(self.raw, other.raw) != 0 }
     }
 }
 
@@ -449,7 +447,7 @@ impl<'tu> hash::Hash for SourceRange<'tu> {
 
 fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     where F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
-          G: Fn(ffi::CXCursorAndRangeVisitor) -> ffi::CXResult
+          G: Fn(CXCursorAndRangeVisitor) -> CXResult
 {
     trait Callback<'tu> {
         fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool;
@@ -461,24 +459,22 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
         }
     }
 
-    extern fn visit(
-        data: ffi::CXClientData, cursor: ffi::CXCursor, range: ffi::CXSourceRange
-    ) -> ffi::CXVisitorResult {
+    extern fn visit(data: CXClientData, cursor: CXCursor, range: CXSourceRange) -> CXVisitorResult {
         unsafe {
             let &mut (tu, ref mut callback):
                 &mut (&TranslationUnit, Box<Callback>) =
                     &mut *(data as *mut (&TranslationUnit, Box<Callback>));
 
             if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
-                ffi::CXVisitorResult::Continue
+                CXVisitorResult::Continue
             } else {
-                ffi::CXVisitorResult::Break
+                CXVisitorResult::Break
             }
         }
     }
 
     let mut data = (tu, Box::new(f) as Box<Callback>);
     let context = unsafe { mem::transmute(&mut data) };
-    let visitor = ffi::CXCursorAndRangeVisitor { context: context, visit: visit };
-    g(visitor) == ffi::CXResult::VisitBreak
+    let visitor = CXCursorAndRangeVisitor { context: context, visit: visit };
+    g(visitor) == CXResult::VisitBreak
 }

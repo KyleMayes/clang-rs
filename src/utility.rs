@@ -16,7 +16,7 @@ use std::mem;
 use std::ffi::{CStr, CString};
 use std::path::{Path};
 
-use clang_sys as ffi;
+use clang_sys::*;
 
 //================================================
 // Macros
@@ -56,13 +56,13 @@ macro_rules! builder {
 /// Returns an iterator over the values returned by `get_argument`.
 macro_rules! iter {
     ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
-        let count = unsafe { ffi::$num($($num_argument), *) };
-        (0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i) })
+        let count = unsafe { $num($($num_argument), *) };
+        (0..count).map(|i| unsafe { $get($($get_argument), *, i) })
     });
 
     ($num:ident($($num_argument:expr), *), $($get:ident($($get_argument:expr), *)), *,) => ({
-        let count = unsafe { ffi::$num($($num_argument), *) };
-        (0..count).map(|i| unsafe { ($(ffi::$get($($get_argument), *, i)), *) })
+        let count = unsafe { $num($($num_argument), *) };
+        (0..count).map(|i| unsafe { ($($get($($get_argument), *, i)), *) })
     });
 }
 
@@ -71,10 +71,9 @@ macro_rules! iter {
 /// Returns an optional iterator over the values returned by `get_argument`.
 macro_rules! iter_option {
     ($num:ident($($num_argument:expr), *), $get:ident($($get_argument:expr), *),) => ({
-        let count = unsafe { ffi::$num($($num_argument), *) };
-
+        let count = unsafe { $num($($num_argument), *) };
         if count >= 0 {
-            Some((0..count).map(|i| unsafe { ffi::$get($($get_argument), *, i as c_uint) }))
+            Some((0..count).map(|i| unsafe { $get($($get_argument), *, i as c_uint) }))
         } else {
             None
         }
@@ -130,8 +129,8 @@ pub trait Nullable: Sized {
 
 macro_rules! nullable {
     ($name:ident) => (
-        impl Nullable for ffi::$name {
-            fn map<U, F: FnOnce(ffi::$name) -> U>(self, f: F) -> Option<U> {
+        impl Nullable for $name {
+            fn map<U, F: FnOnce($name) -> U>(self, f: F) -> Option<U> {
                 if !self.0.is_null() {
                     Some(f(self))
                 } else {
@@ -160,12 +159,11 @@ nullable!(CXModule);
 nullable!(CXRemapping);
 nullable!(CXTranslationUnit);
 
-impl Nullable for ffi::CXCursor {
-    fn map<U, F: FnOnce(ffi::CXCursor) -> U>(self, f: F) -> Option<U> {
+impl Nullable for CXCursor {
+    fn map<U, F: FnOnce(CXCursor) -> U>(self, f: F) -> Option<U> {
         unsafe {
-            let null = ffi::clang_equalCursors(self, ffi::clang_getNullCursor()) != 0;
-
-            if !null && ffi::clang_isInvalid(self.kind) == 0 {
+            let null = clang_getNullCursor();
+            if clang_equalCursors(self, null) == 0 && clang_isInvalid(self.kind) == 0 {
                 Some(f(self))
             } else {
                 None
@@ -174,10 +172,10 @@ impl Nullable for ffi::CXCursor {
     }
 }
 
-impl Nullable for ffi::CXSourceLocation {
-    fn map<U, F: FnOnce(ffi::CXSourceLocation) -> U>(self, f: F) -> Option<U> {
+impl Nullable for CXSourceLocation {
+    fn map<U, F: FnOnce(CXSourceLocation) -> U>(self, f: F) -> Option<U> {
         unsafe {
-            if ffi::clang_equalLocations(self, ffi::clang_getNullLocation()) == 0 {
+            if clang_equalLocations(self, clang_getNullLocation()) == 0 {
                 Some(f(self))
             } else {
                 None
@@ -186,10 +184,10 @@ impl Nullable for ffi::CXSourceLocation {
     }
 }
 
-impl Nullable for ffi::CXSourceRange {
-    fn map<U, F: FnOnce(ffi::CXSourceRange) -> U>(self, f: F) -> Option<U> {
+impl Nullable for CXSourceRange {
+    fn map<U, F: FnOnce(CXSourceRange) -> U>(self, f: F) -> Option<U> {
         unsafe {
-            if ffi::clang_Range_isNull(self) == 0 {
+            if clang_Range_isNull(self) == 0 {
                 Some(f(self))
             } else {
                 None
@@ -198,8 +196,8 @@ impl Nullable for ffi::CXSourceRange {
     }
 }
 
-impl Nullable for ffi::CXString {
-    fn map<U, F: FnOnce(ffi::CXString) -> U>(self, f: F) -> Option<U> {
+impl Nullable for CXString {
+    fn map<U, F: FnOnce(CXString) -> U>(self, f: F) -> Option<U> {
         if !self.data.is_null() {
             Some(f(self))
         } else {
@@ -208,9 +206,9 @@ impl Nullable for ffi::CXString {
     }
 }
 
-impl Nullable for ffi::CXType {
-    fn map<U, F: FnOnce(ffi::CXType) -> U>(self, f: F) -> Option<U> {
-        if self.kind != ffi::CXTypeKind::Invalid {
+impl Nullable for CXType {
+    fn map<U, F: FnOnce(CXType) -> U>(self, f: F) -> Option<U> {
+        if self.kind != CXTypeKind::Invalid {
             Some(f(self))
         } else {
             None
@@ -218,8 +216,8 @@ impl Nullable for ffi::CXType {
     }
 }
 
-impl Nullable for ffi::CXVersion {
-    fn map<U, F: FnOnce(ffi::CXVersion) -> U>(self, f: F) -> Option<U> {
+impl Nullable for CXVersion {
+    fn map<U, F: FnOnce(CXVersion) -> U>(self, f: F) -> Option<U> {
         if self.Major != -1 && self.Minor != -1 && self.Subminor != -1 {
             Some(f(self))
         } else {
@@ -240,16 +238,16 @@ pub fn from_string<S: AsRef<str>>(string: S) -> CString {
     CString::new(string.as_ref()).expect("invalid C string")
 }
 
-pub fn to_string(clang: ffi::CXString) -> String {
+pub fn to_string(clang: CXString) -> String {
     unsafe {
-        let c = CStr::from_ptr(ffi::clang_getCString(clang));
+        let c = CStr::from_ptr(clang_getCString(clang));
         let rust = c.to_str().expect("invalid Rust string").into();
-        ffi::clang_disposeString(clang);
+        clang_disposeString(clang);
         rust
     }
 }
 
-pub fn to_string_option(clang: ffi::CXString) -> Option<String> {
+pub fn to_string_option(clang: CXString) -> Option<String> {
     clang.map(to_string).and_then(|s| {
         if !s.is_empty() {
             Some(s)
@@ -260,25 +258,22 @@ pub fn to_string_option(clang: ffi::CXString) -> Option<String> {
 }
 
 #[cfg(feature="gte_clang_3_8")]
-pub fn to_string_set_option(clang: *mut ffi::CXStringSet) -> Option<Vec<String>> {
+pub fn to_string_set_option(clang: *mut CXStringSet) -> Option<Vec<String>> {
     unsafe {
         if clang.is_null() || (*clang).Count == 0 {
             return None;
         }
 
         let c = ::std::slice::from_raw_parts((*clang).Strings, (*clang).Count as usize);
-
         let rust = c.iter().map(|c| {
-            let c = CStr::from_ptr(ffi::clang_getCString(*c));
-            c.to_str().expect("invalid Rust string").into()
+            CStr::from_ptr(clang_getCString(*c)).to_str().expect("invalid Rust string").into()
         }).collect();
-
-        ffi::clang_disposeStringSet(clang);
+        clang_disposeStringSet(clang);
         Some(rust)
     }
 }
 
-pub fn with_string<S: AsRef<str>, T, F: FnOnce(ffi::CXString) -> T>(string: S, f: F) -> T {
+pub fn with_string<S: AsRef<str>, T, F: FnOnce(CXString) -> T>(string: S, f: F) -> T {
     let string = from_string(string);
-    unsafe { f(ffi::CXString { data: mem::transmute(string.as_ptr()), private_flags: 0 }) }
+    unsafe { f(CXString { data: mem::transmute(string.as_ptr()), private_flags: 0 }) }
 }

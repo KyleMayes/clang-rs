@@ -15,7 +15,7 @@
 use std::error::{Error};
 use std::fmt;
 
-use clang_sys as ffi;
+use clang_sys::*;
 
 use libc::{c_longlong};
 
@@ -105,11 +105,11 @@ error! {
 
 error! {
     /// Indicates the type of error that prevented the saving of a translation unit to an AST file.
-    pub enum SaveError: ffi::CXSaveError {
+    pub enum SaveError: CXSaveError {
         /// Errors in the translation unit prevented saving.
-        Errors = (ffi::CXSaveError::InvalidTU, "errors in the translation unit prevented saving"),
+        Errors = (CXSaveError::InvalidTU, "errors in the translation unit prevented saving"),
         /// An unknown error occurred.
-        Unknown = (ffi::CXSaveError::Unknown, "an unknown error occurred"),
+        Unknown = (CXSaveError::Unknown, "an unknown error occurred"),
     }
 }
 
@@ -132,12 +132,12 @@ error! {
 error! {
     /// Indicates the type of error that prevented the loading of a translation unit from a source
     /// file.
-    pub enum SourceError: ffi::CXErrorCode {
+    pub enum SourceError: CXErrorCode {
         /// An error occurred while deserializing an AST file.
-        AstDeserialization = (ffi::CXErrorCode::ASTReadError, "AST deserialization failed"),
+        AstDeserialization = (CXErrorCode::ASTReadError, "AST deserialization failed"),
         /// `libclang` crashed.
-        Crash = (ffi::CXErrorCode::Crashed, "`libclang` crashed"),
+        Crash = (CXErrorCode::Crashed, "`libclang` crashed"),
         /// An unknown error occurred.
-        Unknown = (ffi::CXErrorCode::Failure, "an unknown error occurred"),
+        Unknown = (CXErrorCode::Failure, "an unknown error occurred"),
     }
 }

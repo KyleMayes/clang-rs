@@ -3,7 +3,7 @@
 use std::fmt;
 use std::mem;
 
-use clang_sys as ffi;
+use clang_sys::*;
 
 use utility;
 use super::{TranslationUnit};
@@ -40,7 +40,7 @@ pub enum TokenKind {
 /// A lexed piece of a source file.
 #[derive(Copy, Clone)]
 pub struct Token<'tu> {
-    raw: ffi::CXToken,
+    raw: CXToken,
     tu: &'tu TranslationUnit<'tu>,
 }
 
@@ -48,7 +48,7 @@ impl<'tu> Token<'tu> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_raw(raw: ffi::CXToken, tu: &'tu TranslationUnit<'tu>) -> Token<'tu> {
+    pub fn from_raw(raw: CXToken, tu: &'tu TranslationUnit<'tu>) -> Token<'tu> {
         Token{ raw: raw, tu: tu }
     }
 
@@ -56,23 +56,22 @@ impl<'tu> Token<'tu> {
 
     /// Returns the categorization of this token.
     pub fn get_kind(&self) -> TokenKind {
-        unsafe { mem::transmute(ffi::clang_getTokenKind(self.raw)) }
+        unsafe { mem::transmute(clang_getTokenKind(self.raw)) }
     }
 
     /// Returns the textual representation of this token.
     pub fn get_spelling(&self) -> String {
-        unsafe { utility::to_string(ffi::clang_getTokenSpelling(self.tu.ptr, self.raw)) }
+        unsafe { utility::to_string(clang_getTokenSpelling(self.tu.ptr, self.raw)) }
     }
 
     /// Returns the source location of this token.
     pub fn get_location(&self) -> SourceLocation<'tu> {
-        let raw = unsafe { ffi::clang_getTokenLocation(self.tu.ptr, self.raw) };
-        SourceLocation::from_raw(raw, self.tu)
+        unsafe { SourceLocation::from_raw(clang_getTokenLocation(self.tu.ptr, self.raw), self.tu) }
     }
 
     /// Returns the source range of this token.
     pub fn get_range(&self) -> SourceRange<'tu> {
-        unsafe { SourceRange::from_raw(ffi::clang_getTokenExtent(self.tu.ptr, self.raw), self.tu) }
+        unsafe { SourceRange::from_raw(clang_getTokenExtent(self.tu.ptr, self.raw), self.tu) }
     }
 }
 
