@@ -4,7 +4,7 @@ clang-rs
 [![crates.io](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
 [![Travis CI](https://travis-ci.org/KyleMayes/clang-rs.svg?branch=master)](https://travis-ci.org/KyleMayes/clang-rs)
 
-An idiomatic Rust wrapper for libclang.
+A somewhat idiomatic Rust wrapper for `libclang`.
 
 Supported on the stable, beta, and nightly Rust channels.
 
