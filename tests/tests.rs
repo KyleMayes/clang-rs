@@ -360,7 +360,6 @@ fn test() {
     with_entity(&clang, source, |e| {
         #[cfg(all(feature="gte_clang_3_8", target_os="macos"))]
         fn test_get_mangled_names<'tu>(children: &[Entity<'tu>]) {
-            let names = children[0].get_mangled_names().unwrap();
             assert_eq!(children[0].get_mangled_names(), Some(vec![
                 "__ZN1AC2Ev".into(), "__ZN1AC1Ev".into()
             ]));
