@@ -16,6 +16,7 @@
 
 use std::fmt;
 use std::mem;
+use std::cmp::{self, Ordering};
 
 use clang_sys::*;
 
@@ -43,7 +44,7 @@ pub enum FixIt<'tu> {
 // Severity ______________________________________
 
 /// Indicates the severity of a diagnostic.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(C)]
 pub enum Severity {
     /// The diagnostic has been suppressed (e.g., by a command-line option).
@@ -136,6 +137,20 @@ impl<'tu> Diagnostic<'tu> {
     /// Returns a diagnostic formatter that builds a formatted string from this diagnostic.
     pub fn formatter(&self) -> DiagnosticFormatter<'tu> {
         DiagnosticFormatter::new(*self)
+    }
+}
+
+#[doc(hidden)]
+impl<'tu> cmp::PartialEq for Diagnostic<'tu> {
+    fn eq(&self, other: &Diagnostic<'tu>) -> bool {
+        self.ptr.0 == other.ptr.0
+    }
+}
+
+/// Orders by severity.
+impl<'tu> cmp::PartialOrd for Diagnostic<'tu> {
+    fn partial_cmp(&self, other: &Diagnostic<'tu>) -> Option<Ordering> {
+        Some(self.get_severity().cmp(&other.get_severity()))
     }
 }
 
