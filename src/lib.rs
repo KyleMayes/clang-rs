@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An idiomatic Rust wrapper for libclang.
+//! A somewhat idiomatic Rust wrapper for libclang.
 //!
 //! ## Supported Versions
 //!
