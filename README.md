@@ -1,5 +1,4 @@
-clang-rs
-========
+# clang-rs
 
 [![crates.io](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
 [![Travis CI](https://travis-ci.org/KyleMayes/clang-rs.svg?branch=master)](https://travis-ci.org/KyleMayes/clang-rs)
@@ -10,7 +9,7 @@ Supported on the stable, beta, and nightly Rust channels.
 
 Released under the Apache License 2.0.
 
-### Supported Versions
+## Supported Versions
 
 To target a version of `libclang`, enable one of the following Cargo features:
 
@@ -26,7 +25,7 @@ To target a version of `libclang`, enable one of the following Cargo features:
 If you do not enable one of these features, the API provided by `libclang` 3.5 will be available by
 default.
 
-### Dependencies
+## Dependencies
 
 See [here](https://github.com/KyleMayes/clang-sys#dependencies) for information on this crate's
 dependencies.
