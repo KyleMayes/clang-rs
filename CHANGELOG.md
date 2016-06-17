@@ -4,7 +4,7 @@
 - Added implementation of `std::cmp::PartialOrd` for `Diagnostic` struct
 
 ### Changed
-- Bumped `clang-sys` version to `0.7.0`
+- Bumped `clang-sys` version to `0.7.2`
 
 ## [0.9.3] - 2016-5-26
 
