@@ -1,73 +1,26 @@
 language: rust
 
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-5
+
 matrix:
   include:
     - rust: stable
-      env: CLANG_VERSION=clang_3_5 LLVM_CONFIG_PATH=/usr/lib/llvm-3.5/bin/llvm-config
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-precise
-            - llvm-toolchain-precise-3.5
-            - ubuntu-toolchain-r-test
-          packages:
-            - libclang-3.5-dev
-            - llvm-3.5-dev
+      env: LLVM_VERSION=3.5.2 CLANG_VERSION=clang_3_5
     - rust: stable
-      env: CLANG_VERSION=clang_3_6 LLVM_CONFIG_PATH=/usr/lib/llvm-3.6/bin/llvm-config
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-precise
-            - llvm-toolchain-precise-3.6
-            - ubuntu-toolchain-r-test
-          packages:
-            - libclang-3.6-dev
-            - llvm-3.6-dev
+      env: LLVM_VERSION=3.6.2 CLANG_VERSION=clang_3_6
     - rust: stable
-      env: CLANG_VERSION=clang_3_7 LLVM_CONFIG_PATH=/usr/lib/llvm-3.7/bin/llvm-config
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-precise
-            - llvm-toolchain-precise-3.7
-            - ubuntu-toolchain-r-test
-          packages:
-            - libclang-3.7-dev
-            - llvm-3.7-dev
+      env: LLVM_VERSION=3.7.1 CLANG_VERSION=clang_3_7
     - rust: stable
-      env: CLANG_VERSION=clang_3_8 LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-precise
-            - llvm-toolchain-precise-3.8
-            - ubuntu-toolchain-r-test
-          packages:
-            - libclang-3.8-dev
-            - llvm-3.8-dev
+      env: LLVM_VERSION=3.8.0 CLANG_VERSION=clang_3_8
     - rust: beta
-      env: CLANG_VERSION=clang_3_8 LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-precise
-            - llvm-toolchain-precise-3.8
-            - ubuntu-toolchain-r-test
-          packages:
-            - libclang-3.8-dev
-            - llvm-3.8-dev
+      env: LLVM_VERSION=3.8.0 CLANG_VERSION=clang_3_8
     - rust: nightly
-      env: CLANG_VERSION=clang_3_8 LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-precise
-            - llvm-toolchain-precise-3.8
-            - ubuntu-toolchain-r-test
-          packages:
-            - libclang-3.8-dev
-            - llvm-3.8-dev
+      env: LLVM_VERSION=3.8.0 CLANG_VERSION=clang_3_8
     - os: osx
       rust: stable
       env: LLVM_VERSION=3.5 CLANG_VERSION=clang_3_5
@@ -83,22 +36,24 @@ matrix:
 
 before_install:
   -
+    set -e;
     if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
       brew update >/dev/null;
       brew install llvm3${LLVM_VERSION#3.};
-    fi
-
-before_script:
-  -
-    if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
       export LLVM_CONFIG_PATH=`brew --prefix llvm3${LLVM_VERSION#3.}`/lib/llvm-${LLVM_VERSION}/bin/llvm-config;
+    else
+      export LLVM=clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-14.04;
+      wget http://llvm.org/releases/${LLVM_VERSION}/${LLVM}.tar.xz ;
+      mkdir llvm;
+      tar -xf ${LLVM}.tar.xz -C llvm --strip-components=1;
+      export LLVM_CONFIG_PATH=`pwd`/llvm/bin/llvm-config;
     fi
 
 script:
   -
     set -e;
     RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION;
-    if [ "${CLANG_VERSION}" != "clang_3_8" ]; then
+    if [ "${CLANG_VERSION}" != "clang_3_7" ] && [ "${CLANG_VERSION}" != "clang_3_8" ] ; then
         cargo clean;
         RUST_BACKTRACE=1 cargo test --verbose --features "$CLANG_VERSION static";
     fi
