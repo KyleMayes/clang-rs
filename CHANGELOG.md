@@ -1,4 +1,4 @@
-## [0.9.4] - UNRELEASED
+## [0.9.4] - 2016-6-17
 
 ### Added
 - Added implementation of `std::cmp::PartialOrd` for `Diagnostic` struct
