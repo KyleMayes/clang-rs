@@ -474,7 +474,6 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     }
 
     let mut data = (tu, Box::new(f) as Box<Callback>);
-    let context = unsafe { mem::transmute(&mut data) };
-    let visitor = CXCursorAndRangeVisitor { context: context, visit: visit };
+    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit: visit };
     g(visitor) == CXResult::VisitBreak
 }

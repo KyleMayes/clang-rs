@@ -342,6 +342,11 @@ fn next<'tu>(
             let underlying = entity.get_typedef_underlying_type().unwrap();
             let name = entity.get_name().unwrap();
 
+            println!("{:?}", underlying.get_kind());
+            println!("{:?}", TypeKind::Unexposed);
+            println!("{:?}", unsafe { ::std::mem::transmute::<_, ::libc::c_int>(underlying.get_kind()) });
+            println!("{:?}", unsafe { ::std::mem::transmute::<_, ::libc::c_int>(TypeKind::Unexposed) });
+
             if is(underlying, prefix) && !seen.contains(&name) {
                 let declaration = underlying.get_declaration().unwrap();
 

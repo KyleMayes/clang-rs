@@ -26,7 +26,6 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", warn(clippy))]
-#![cfg_attr(feature="clippy", allow(if_not_else, similar_names))]
 
 #[macro_use]
 extern crate lazy_static;
@@ -1357,7 +1356,7 @@ impl<'tu> Entity<'tu> {
         }
 
         let mut data = (self.tu, Box::new(f) as Box<EntityCallback>);
-        unsafe { clang_visitChildren(self.raw, visit, mem::transmute(&mut data)) != 0 }
+        unsafe { clang_visitChildren(self.raw, visit, utility::addressof(&mut data)) != 0 }
     }
 
     //- Categorization ---------------------------
@@ -1432,7 +1431,8 @@ impl<'tu> hash::Hash for Entity<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
         unsafe {
             let integer = clang_hashCursor(self.raw);
-            let slice = slice::from_raw_parts(mem::transmute(&integer), mem::size_of_val(&integer));
+            let bytes = (&integer as *const c_uint) as *const u8;
+            let slice = slice::from_raw_parts(bytes, mem::size_of_val(&integer));
             hasher.write(slice);
         }
     }

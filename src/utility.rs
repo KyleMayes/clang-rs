@@ -18,6 +18,8 @@ use std::path::{Path};
 
 use clang_sys::*;
 
+use libc::{c_void};
+
 //================================================
 // Macros
 //================================================
@@ -229,6 +231,10 @@ impl Nullable for CXVersion {
 //================================================
 // Functions
 //================================================
+
+pub fn addressof<T>(value: &mut T) -> *mut c_void {
+    (value as *mut T) as *mut c_void
+}
 
 pub fn from_path<P: AsRef<Path>>(path: P) -> CString {
     from_string(path.as_ref().as_os_str().to_str().expect("invalid C string"))
