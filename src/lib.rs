@@ -1345,9 +1345,8 @@ impl<'tu> Entity<'tu> {
             cursor: CXCursor, parent: CXCursor, data: CXClientData
         ) -> CXChildVisitResult {
             unsafe {
-                let &mut (tu, ref mut callback):
-                    &mut (&TranslationUnit, Box<EntityCallback>) =
-                        &mut *(data as *mut (&TranslationUnit, Box<EntityCallback>));
+                let &mut (tu, ref mut callback) =
+                    &mut *(data as *mut (&TranslationUnit, Box<EntityCallback>));
 
                 let entity = Entity::from_raw(cursor, tu);
                 let parent = Entity::from_raw(parent, tu);
@@ -2016,9 +2015,8 @@ impl<'tu> Type<'tu> {
 
         extern fn visit(cursor: CXCursor, data: CXClientData) -> CXVisitorResult {
             unsafe {
-                let &mut (tu, ref mut callback):
-                    &mut (&TranslationUnit, Box<Callback>) =
-                        mem::transmute(data);
+                let &mut (tu, ref mut callback) =
+                    &mut *(data as *mut (&TranslationUnit, Box<Callback>));
 
                 if callback.call(Entity::from_raw(cursor, tu)) {
                     CXVisitorResult::Continue
@@ -2030,7 +2028,7 @@ impl<'tu> Type<'tu> {
 
         let mut data = (self.tu, Box::new(f) as Box<Callback>);
         unsafe {
-            let data = mem::transmute(&mut data);
+            let data = utility::addressof(&mut data);
             Some(clang_Type_visitFields(self.raw, visit, data) == CXVisitorResult::Break)
         }
     }
