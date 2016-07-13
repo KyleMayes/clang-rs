@@ -14,9 +14,12 @@
 
 //! Finding C declarations.
 
+use std::mem;
 use std::vec;
 use std::collections::{HashSet};
 use std::str::{FromStr};
+
+use libc::{c_int};
 
 use super::{Entity, EntityKind, Type, TypeKind};
 
@@ -307,7 +310,9 @@ impl<'tu> Iterator for Unions<'tu> {
 //================================================
 
 fn is(type_: Type, prefix: &str) -> bool {
-    type_.get_kind() == TypeKind::Unexposed && type_.get_display_name().starts_with(prefix)
+    let raw = unsafe { mem::transmute::<_, c_int>(type_.get_kind()) };
+    let kind = type_.get_kind() == TypeKind::Unexposed || raw == 119;
+    kind && type_.get_display_name().starts_with(prefix)
 }
 
 fn is_alias(type_: Type, name: &str) -> bool {

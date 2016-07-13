@@ -350,46 +350,6 @@ fn test() {
     });
 
     let source = "
-        class A {
-            A() { }
-            ~A() { }
-            void a() { }
-        };
-    ";
-
-    with_entity(&clang, source, |e| {
-        #[cfg(all(feature="gte_clang_3_8", target_os="macos"))]
-        fn test_get_mangled_names<'tu>(children: &[Entity<'tu>]) {
-            assert_eq!(children[0].get_mangled_names(), Some(vec![
-                "__ZN1AC2Ev".into(), "__ZN1AC1Ev".into()
-            ]));
-            assert_eq!(children[1].get_mangled_names(), Some(vec![
-                "__ZN1AD2Ev".into(), "__ZN1AD1Ev".into()
-            ]));
-            assert_eq!(children[2].get_mangled_names(), None);
-        }
-
-        #[cfg(all(feature="gte_clang_3_8", not(target_os="macos")))]
-        fn test_get_mangled_names<'tu>(children: &[Entity<'tu>]) {
-            assert_eq!(children[0].get_mangled_names(), Some(vec![
-                "_ZN1AC2Ev".into(), "_ZN1AC1Ev".into()
-            ]));
-            assert_eq!(children[1].get_mangled_names(), Some(vec![
-                "_ZN1AD2Ev".into(), "_ZN1AD1Ev".into()
-            ]));
-            assert_eq!(children[2].get_mangled_names(), None);
-        }
-
-        #[cfg(not(feature="gte_clang_3_8"))]
-        fn test_get_mangled_names<'tu>(_: &[Entity<'tu>]) { }
-
-        let children = e.get_children()[0].get_children();
-        assert_eq!(children.len(), 3);
-
-        test_get_mangled_names(&children);
-    });
-
-    let source = "
         void a() { }
         static void b() { }
     ";
