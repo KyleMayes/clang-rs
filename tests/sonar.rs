@@ -81,6 +81,8 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
+        assert_eq!(sonar::find_typedefs(e.get_children()).count(), 1);
+
         let enums = sonar::find_enums(e.get_children()).filter(|e| {
             !e.entity.is_in_system_header()
         }).collect::<Vec<_>>();
@@ -140,6 +142,8 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
+        assert_eq!(sonar::find_typedefs(e.get_children()).count(), 1);
+
         let structs = sonar::find_structs(e.get_children()).filter(|s| {
             !s.entity.is_in_system_header()
         }).collect::<Vec<_>>();
@@ -239,6 +243,8 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
+        assert_eq!(sonar::find_typedefs(e.get_children()).count(), 1);
+
         let unions = sonar::find_unions(e.get_children()).filter(|u| {
             !u.entity.is_in_system_header()
         }).collect::<Vec<_>>();

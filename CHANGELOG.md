@@ -1,3 +1,8 @@
+## [0.9.6] - UNRELEASED
+
+### Fixed
+- Fixed usage of `clang` 3.9.x binaries
+
 ## [0.9.5] - 2016-7-14
 
 ### Fixed

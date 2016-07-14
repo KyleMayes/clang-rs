@@ -265,7 +265,7 @@ impl<'tu> Iterator for Typedefs<'tu> {
                     let underlying = entity.get_typedef_underlying_type().unwrap();
                     let display = entity.get_type().unwrap().get_display_name();
 
-                    let typedef = underlying.get_kind() != TypeKind::Unexposed ||
+                    let typedef = !is_elaborated(underlying) ||
                         underlying.get_result_type().is_some() ||
                         is_alias(underlying, &display);
 
@@ -310,9 +310,7 @@ impl<'tu> Iterator for Unions<'tu> {
 //================================================
 
 fn is(type_: Type, prefix: &str) -> bool {
-    let raw = unsafe { mem::transmute::<_, c_int>(type_.get_kind()) };
-    let kind = type_.get_kind() == TypeKind::Unexposed || raw == 119;
-    kind && type_.get_display_name().starts_with(prefix)
+    is_elaborated(type_) && type_.get_display_name().starts_with(prefix)
 }
 
 fn is_alias(type_: Type, name: &str) -> bool {
@@ -325,6 +323,11 @@ fn is_alias(type_: Type, name: &str) -> bool {
     }
 
     false
+}
+
+fn is_elaborated(type_: Type) -> bool {
+    let elaborated = unsafe { mem::transmute::<_, c_int>(type_.get_kind()) == 119 };
+    elaborated || type_.get_kind() == TypeKind::Unexposed
 }
 
 fn next<'tu>(
