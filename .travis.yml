@@ -7,53 +7,27 @@ addons:
     packages:
       - gcc-5
 
+os:
+  - linux
+  - osx
+
+rust: stable
+
+env:
+  - LLVM_VERSION=3.5 CLANG_VERSION=clang_3_5
+  - LLVM_VERSION=3.6 CLANG_VERSION=clang_3_6
+  - LLVM_VERSION=3.7 CLANG_VERSION=clang_3_7
+  - LLVM_VERSION=3.8 CLANG_VERSION=clang_3_8
+
 matrix:
   include:
-    - rust: stable
-      env: LLVM_VERSION=3.5.2 CLANG_VERSION=clang_3_5
-    - rust: stable
-      env: LLVM_VERSION=3.6.2 CLANG_VERSION=clang_3_6
-    - rust: stable
-      env: LLVM_VERSION=3.7.1 CLANG_VERSION=clang_3_7
-    - rust: stable
-      env: LLVM_VERSION=3.8.0 CLANG_VERSION=clang_3_8
-    - rust: beta
-      env: LLVM_VERSION=3.8.0 CLANG_VERSION=clang_3_8
-    - rust: nightly
-      env: LLVM_VERSION=3.8.0 CLANG_VERSION=clang_3_8
-    - os: osx
-      rust: stable
-      env: LLVM_VERSION=3.5 CLANG_VERSION=clang_3_5
-    - os: osx
-      rust: stable
-      env: LLVM_VERSION=3.6 CLANG_VERSION=clang_3_6
-    - os: osx
-      rust: stable
-      env: LLVM_VERSION=3.7 CLANG_VERSION=clang_3_7
-    - os: osx
-      rust: stable
+    - os: linux
+      rust: beta
+      env: LLVM_VERSION=3.8 CLANG_VERSION=clang_3_8
+    - os: linux
+      rust: nightly
       env: LLVM_VERSION=3.8 CLANG_VERSION=clang_3_8
 
-before_install:
-  -
-    set -e;
-    if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-      brew update >/dev/null;
-      brew install llvm3${LLVM_VERSION#3.};
-      export LLVM_CONFIG_PATH=`brew --prefix llvm3${LLVM_VERSION#3.}`/lib/llvm-${LLVM_VERSION}/bin/llvm-config;
-    else
-      export LLVM=clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-14.04;
-      wget http://llvm.org/releases/${LLVM_VERSION}/${LLVM}.tar.xz ;
-      mkdir llvm;
-      tar -xf ${LLVM}.tar.xz -C llvm --strip-components=1;
-      export LLVM_CONFIG_PATH=`pwd`/llvm/bin/llvm-config;
-    fi
+before_install: . ./ci/before_install.sh
 
-script:
-  -
-    set -e;
-    RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION;
-    if [ "${CLANG_VERSION}" != "clang_3_7" ] && [ "${CLANG_VERSION}" != "clang_3_8" ] ; then
-        cargo clean;
-        RUST_BACKTRACE=1 cargo test --verbose --features "$CLANG_VERSION static";
-    fi
+script: . ./ci/script.sh
