@@ -2,6 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
 [![Travis CI](https://travis-ci.org/KyleMayes/clang-rs.svg?branch=master)](https://travis-ci.org/KyleMayes/clang-rs)
+[![AppVeyor](https://ci.appveyor.com/api/projects/status/umb9enkoy1k8wvxj?svg=true)](https://ci.appveyor.com/project/KyleMayes/clang-rs)
 
 A somewhat idiomatic Rust wrapper for `libclang`.
 
