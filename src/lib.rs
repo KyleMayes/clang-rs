@@ -123,6 +123,15 @@ pub enum CallingConvention {
     /// The function type uses the x86 `vectorcall` calling convention.
     #[cfg(feature="gte_clang_3_6")]
     Vectorcall = 12,
+    /// The function type uses the calling convention for the Swift programming language.
+    #[cfg(feature="gte_clang_3_9")]
+    Swift = 13,
+    /// The function type uses a calling convention that perserves most registers.
+    #[cfg(feature="gte_clang_3_9")]
+    PreserveMost = 14,
+    /// The function type uses a calling convention that preverses nearly all registers.
+    #[cfg(feature="gte_clang_3_9")]
+    PreserveAll = 15,
     /// The function type uses the ARM AACPS calling convention.
     Aapcs = 6,
     /// The function type uses the ARM AACPS-VFP calling convention.
@@ -306,7 +315,7 @@ pub enum EntityKind {
     TypeidExpr = 129,
     /// A C++ boolean literal.
     BoolLiteralExpr = 130,
-    /// A C++ `nullptr` exrepssion.
+    /// A C++ `nullptr` expression.
     NullPtrLiteralExpr = 131,
     /// A C++ `this` expression.
     ThisExpr = 132,
@@ -340,7 +349,10 @@ pub enum EntityKind {
     ObjCSelfExpr = 146,
     /// An OpenMP array section expression.
     #[cfg(feature="gte_clang_3_8")]
-    OMPArraySectionExpr = 147,
+    OmpArraySectionExpr = 147,
+    /// An Objective-C availability check expression (e.g., `@available(macos 10.10, *)`).
+    #[cfg(feature="gte_clang_3_9")]
+    ObjCAvailabilityCheckExpr = 148,
     /// A statement whose specific kind is not exposed via this interface.
     UnexposedStmt = 200,
     /// A labelled statement in a function.
@@ -476,6 +488,33 @@ pub enum EntityKind {
     /// An OpenMP distribute directive.
     #[cfg(feature="gte_clang_3_8")]
     OmpDistributeDirective = 260,
+    /// An OpenMP target enter data directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpTargetEnterDataDirective = 261,
+    /// An OpenMP target exit data directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpTargetExitDataDirective = 262,
+    /// An OpenMP target parallel directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpTargetParallelDirective = 263,
+    /// An OpenMP target parallel for directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpTargetParallelForDirective = 264,
+    /// An OpenMP target update directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpTargetUpdateDirective = 265,
+    /// An OpenMP distribute parallel for directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpDistributeParallelForDirective = 266,
+    /// An OpenMP distribute parallel for SIMD directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpDistributeParallelForSimdDirective = 267,
+    /// An OpenMP distribute SIMD directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpDistributeSimdDirective = 268,
+    /// An OpenMP target parallel for SIMD directive.
+    #[cfg(feature="gte_clang_3_9")]
+    OmpTargetParallelForSimdDirective = 269,
     /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
     /// An attribute whose specific kind is not exposed via this interface.
@@ -536,6 +575,9 @@ pub enum EntityKind {
     /// A C++11 alias template declaration (e.g., `template <typename T> using M = std::map<T, T>`).
     #[cfg(feature="gte_clang_3_8")]
     TypeAliasTemplateDecl = 601,
+    /// A `static_assert` node.
+    #[cfg(feature="gte_clang_3_9")]
+    StaticAssert = 602,
     /// A single overload in a set of overloads.
     #[cfg(feature="gte_clang_3_7")]
     OverloadCandidate = 700,
@@ -553,6 +595,28 @@ pub enum EntityVisitResult {
     Continue = 1,
     /// Continue visiting sibling and child entities recursively, children first.
     Recurse = 2,
+}
+
+// EvaluationResult ______________________________
+
+/// The result of evaluating an expression.
+#[cfg(feature="gte_clang_3_9")]
+#[derive(Clone, Debug, PartialEq)]
+pub enum EvaluationResult {
+    /// An evaluation result whose specific type is not exposed via this interface.
+    Unexposed,
+    /// An integer evaluation result.
+    Integer(i64),
+    /// A floating point number evaluation result.
+    Float(f64),
+    /// A string literal evaluation result.
+    String(CString),
+    /// An Objective-C string literal evaluation result.
+    ObjCString(CString),
+    /// An Objective-C `CFString` evaluation result.
+    CFString(CString),
+    /// Any other evaluation result whose value can be represented by a string.
+    Other(CString),
 }
 
 // Language ______________________________________
@@ -752,6 +816,9 @@ pub enum TypeKind {
     ObjCClass = 28,
     /// `SEL` (Objective-C)
     ObjCSel = 29,
+    /// `__float128`
+    #[cfg(feature="gte_clang_3_9")]
+    Float128 = 30,
     /// An Objective-C interface type.
     ObjCInterface = 108,
     /// An Objective-C pointer to object type.
@@ -789,6 +856,9 @@ pub enum TypeKind {
     /// A C++11 `decltype(auto)` type.
     #[cfg(feature="gte_clang_3_8")]
     Auto = 118,
+    /// A type that was referred to using an elaborated type keyword (e.g., `struct S`).
+    #[cfg(feature="gte_clang_3_9")]
+    Elaborated = 119,
 }
 
 // Visibility ____________________________________
@@ -860,6 +930,34 @@ impl<'tu> Entity<'tu> {
     }
 
     //- Accessors --------------------------------
+
+    /// Evaluates this AST entity, if possible.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn evaluate(&self) -> Option<EvaluationResult> {
+        macro_rules! string {
+            ($eval:expr) => {
+                std::ffi::CStr::from_ptr(clang_EvalResult_getAsStr($eval)).to_owned()
+            };
+        }
+
+        unsafe {
+            clang_Cursor_Evaluate(self.raw).map(|e| {
+                let result = match clang_EvalResult_getKind(e) {
+                    CXEvalResultKind::UnExposed => EvaluationResult::Unexposed,
+                    CXEvalResultKind::Int =>
+                        EvaluationResult::Integer(clang_EvalResult_getAsInt(e) as i64),
+                    CXEvalResultKind::Float =>
+                        EvaluationResult::Float(clang_EvalResult_getAsDouble(e) as f64),
+                    CXEvalResultKind::ObjCStrLiteral => EvaluationResult::ObjCString(string!(e)),
+                    CXEvalResultKind::StrLiteral => EvaluationResult::String(string!(e)),
+                    CXEvalResultKind::CFStr => EvaluationResult::CFString(string!(e)),
+                    CXEvalResultKind::Other => EvaluationResult::Other(string!(e)),
+                };
+                clang_EvalResult_dispose(e);
+                result
+            })
+        }
+    }
 
     /// Returns the categorization of this AST entity.
     pub fn get_kind(&self) -> EntityKind {
@@ -1254,6 +1352,12 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns whether this AST entity has any attached attributes.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn has_attributes(&self) -> bool {
+        unsafe { clang_Cursor_hasAttrs(self.raw) != 0 }
+    }
+
     /// Returns whether this AST entity is an anonymous record declaration.
     #[cfg(feature="gte_clang_3_7")]
     pub fn is_anonymous(&self) -> bool {
@@ -1265,9 +1369,39 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_Cursor_isBitField(self.raw) != 0 }
     }
 
+    /// Returns whether this AST entity is a builtin macro.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_builtin_macro(&self) -> bool {
+        unsafe { clang_Cursor_isMacroBuiltin(self.raw) != 0 }
+    }
+
     /// Returns whether this AST entity is a const method.
     pub fn is_const_method(&self) -> bool {
         unsafe { clang_CXXMethod_isConst(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a C++ converting constructor.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_converting_constructor(&self) -> bool {
+        unsafe { clang_CXXConstructor_isConvertingConstructor(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a C++ copy constructor.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_copy_constructor(&self) -> bool {
+        unsafe { clang_CXXConstructor_isCopyConstructor(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a C++ default constructor.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_default_constructor(&self) -> bool {
+        unsafe { clang_CXXConstructor_isDefaultConstructor(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a C++ defaulted constructor or method.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_defaulted(&self) -> bool {
+        unsafe { clang_CXXMethod_isDefaulted(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a declaration and also the definition of that
@@ -1282,6 +1416,24 @@ impl<'tu> Entity<'tu> {
     /// receiver is an object instance, not `super` or a specific class.
     pub fn is_dynamic_call(&self) -> bool {
         unsafe { clang_Cursor_isDynamicCall(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a function-like macro.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_function_like_macro(&self) -> bool {
+        unsafe { clang_Cursor_isFunctionInlined(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an inline function.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_inline_function(&self) -> bool {
+        unsafe { clang_Cursor_isFunctionInlined(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a C++ default constructor.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn is_move_constructor(&self) -> bool {
+        unsafe { clang_CXXConstructor_isMoveConstructor(self.raw) != 0 }
     }
 
     #[cfg(feature="gte_clang_3_8")]
@@ -1523,6 +1675,9 @@ options! {
         pub strong: CXObjCPropertyAttr_strong,
         /// Indicates use of the `unsafe_retained` attribute.
         pub unsafe_retained: CXObjCPropertyAttr_unsafe_unretained,
+    }, objcattributes: #[feature="gte_clang_3_9"] {
+        /// Indicates use of the `class` attribute.
+        pub class: CXObjCPropertyAttr_class,
     }
 }
 
@@ -1574,6 +1729,9 @@ builder! {
         pub incomplete: CXTranslationUnit_Incomplete,
         /// Sets whether function and method bodies will be skipped.
         pub skip_function_bodies: CXTranslationUnit_SkipFunctionBodies,
+        /// Sets whether processing will continue after a fatal error is encountered.
+        #[cfg(feature="gte_clang_3_9")]
+        pub keep_going: CXTranslationUnit_KeepGoing,
     }
 }
 
@@ -1910,6 +2068,12 @@ impl<'tu> Type<'tu> {
         unsafe { clang_getTypeDeclaration(self.raw).map(|e| Entity::from_raw(e, self.tu)) }
     }
 
+    /// Returns the type named by this elaborated type, if applicable.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn get_elaborated_type(&self) -> Option<Type<'tu>> {
+        unsafe { clang_Type_getNamedType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
     /// Returns the element type for this array, complex, or vector type, if applicable.
     pub fn get_element_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getElementType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
@@ -1928,6 +2092,12 @@ impl<'tu> Type<'tu> {
         } else {
             None
         }
+    }
+
+    /// Returns the encoding of this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_3_9")]
+    pub fn get_objc_encoding(&self) -> Option<String> {
+        unsafe { utility::to_string_option(clang_Type_getObjCEncoding(self.raw)) }
     }
 
     /// Returns the pointee type for this pointer type, if applicable.
@@ -1972,6 +2142,17 @@ impl<'tu> Type<'tu> {
     /// Returns whether this type is qualified with const.
     pub fn is_const_qualified(&self) -> bool {
         unsafe { clang_isConstQualifiedType(self.raw) != 0 }
+    }
+
+    /// Returns whether this type is an elaborated type, if it can be determined for certain.
+    pub fn is_elaborated(&self) -> Option<bool> {
+        if unsafe { mem::transmute::<_, c_int>(self.raw.kind) } == 119 {
+            Some(true)
+        } else if cfg!(feature="gte_clang_3_9") {
+            Some(false)
+        } else {
+            None
+        }
     }
 
     /// Returns whether this type is plain old data (POD).

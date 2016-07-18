@@ -2,6 +2,7 @@
 extern crate lazy_static;
 
 extern crate clang;
+extern crate clang_sys;
 extern crate libc;
 
 use std::env;
@@ -162,6 +163,39 @@ fn test() {
             CompletionChunk::ResultType("int".into()),
             CompletionChunk::TypedText("a".into()),
         ]);
+    });
+
+    let source = r#"
+        void f() {
+            int a = 2 + 2;
+            double b = 0.25 * 2.0;
+            const char* c = "Hello, world!";
+        }
+    "#;
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="gte_clang_3_9")]
+        fn test_evaluate<'tu>(expressions: &[Entity<'tu>]) {
+            assert_eq!(expressions[0].evaluate(), Some(EvaluationResult::Integer(4)));
+            assert_eq!(expressions[1].evaluate(), Some(EvaluationResult::Float(0.5)));
+            match expressions[2].evaluate() {
+                Some(EvaluationResult::String(string)) => {
+                    assert_eq!(string.to_str(), Ok("Hello, world!"));
+                },
+                _ => unreachable!(),
+            }
+        }
+
+        #[cfg(not(feature="gte_clang_3_9"))]
+        fn test_evaluate<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children()[0].get_children();
+        let expressions = children.into_iter().map(|e| {
+            e.get_children()[0].get_children()[0]
+        }).collect::<Vec<_>>();
+        assert_eq!(expressions.len(), 3);
+
+        test_evaluate(&expressions);
     });
 
     let source = "
@@ -489,6 +523,27 @@ fn test() {
     });
 
     let source = "
+        void a();
+        [[noreturn]] void b();
+    ";
+
+    with_translation_unit(&clang, "test.cpp", source, &["--std=c++0x"], |_, _, tu| {
+        #[cfg(feature="gte_clang_3_9")]
+        fn test_attributes<'tu>(children: &[Entity<'tu>]) {
+            assert!(!children[0].has_attributes());
+            assert!(children[1].has_attributes());
+        }
+
+        #[cfg(not(feature="gte_clang_3_9"))]
+        fn test_attributes<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = tu.get_entity().get_children();
+        assert_eq!(children.len(), 2);
+
+        test_attributes(&children);
+    });
+
+    let source = "
         class Class {
             void a() const { }
             virtual void b() = 0;
@@ -514,6 +569,43 @@ fn test() {
         method!(children[1], false, true, false, true);
         method!(children[2], false, false, true, false);
         method!(children[3], false, false, false, true);
+    });
+
+    let source = "
+        class Class {
+            Class(int) { }
+            explicit Class(const Class&) = default;
+            Class() { }
+            explicit Class(Class&&) = default;
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="gte_clang_3_9")]
+        fn test_constructors<'tu>(children: &[Entity<'tu>]) {
+            macro_rules! constructor {
+                ($entity:expr, $conv:expr, $cpy:expr, $def:expr, $defed:expr, $mov:expr) => ({
+                    assert_eq!($entity.is_converting_constructor(), $conv);
+                    assert_eq!($entity.is_copy_constructor(), $cpy);
+                    assert_eq!($entity.is_default_constructor(), $def);
+                    assert_eq!($entity.is_defaulted(), $defed);
+                    assert_eq!($entity.is_move_constructor(), $mov);
+                });
+            }
+
+            constructor!(children[0], true, false, false, false, false);
+            constructor!(children[1], false, true, false, true, false);
+            constructor!(children[2], false, false, true, false, false);
+            constructor!(children[3], false, false, false, true, true);
+        }
+
+        #[cfg(not(feature="gte_clang_3_9"))]
+        fn test_constructors<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 4);
+
+        test_constructors(&children);
     });
 
     let source = "
@@ -715,6 +807,24 @@ fn test() {
         let types = e.get_children().iter().map(|e| e.get_type().unwrap()).collect::<Vec<_>>();
         assert_eq!(types[0].get_declaration(), Some(e.get_children()[0]));
         assert_eq!(types[1].get_declaration(), Some(e.get_children()[0]));
+    });
+
+    let source = "
+        class A { };
+        int A;
+        class A a;
+    ";
+
+    with_types(&clang, source, |ts| {
+        #[cfg(feature="gte_clang_3_9")]
+        fn test_get_elaborated_type<'tu>(types: &[Type<'tu>]) {
+            assert_eq!(types[2].get_elaborated_type(), Some(types[0]));
+        }
+
+        #[cfg(not(feature="gte_clang_3_9"))]
+        fn test_get_elaborated_type<'tu>(_: &[Type<'tu>]) { }
+
+        test_get_elaborated_type(&ts);
     });
 
     let source = "

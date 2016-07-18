@@ -1,7 +1,11 @@
-## [0.9.6] - UNRELEASED
+## [0.10.0] - UNRELEASED
 
-### Fixed
-- Fixed usage of `clang` 3.9.x binaries
+### Added
+- Added support for `clang` 3.9.x
+
+### Changed
+- Bumped `clang-sys` version to `0.8.0`
+- Bumped `libc` version to `0.2.14`
 
 ## [0.9.5] - 2016-7-14
 

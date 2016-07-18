@@ -109,6 +109,35 @@ macro_rules! options {
             }
         }
     );
+
+    ($(#[$attribute:meta])* options $name:ident: $underlying:ident {
+        $($(#[$fattribute:meta])* pub $option:ident: $flag:ident), +,
+    }, $fname:ident: #[$feature:meta] {
+        $($(#[$ffattribute:meta])* pub $foption:ident: $fflag:ident), +,
+    }) => (
+        #[cfg($feature)]
+        mod $fname {
+            options! {
+                $(#[$attribute])*
+                options $name: $underlying {
+                    $($(#[$fattribute])* pub $option: $flag), +,
+                    $($(#[$ffattribute])* pub $foption: $fflag), +,
+                }
+            }
+        }
+
+        #[cfg(not($feature))]
+        mod $fname {
+            options! {
+                $(#[$attribute])*
+                options $name: $underlying {
+                    $($(#[$fattribute])* pub $option: $flag), +,
+                }
+            }
+        }
+
+        pub use $fname::{$name};
+    );
 }
 
 //================================================
@@ -150,6 +179,8 @@ nullable!(CXCompletionString);
 nullable!(CXCursorSet);
 nullable!(CXDiagnostic);
 nullable!(CXDiagnosticSet);
+#[cfg(feature="clang_3_9")]
+nullable!(CXEvalResult);
 nullable!(CXFile);
 nullable!(CXIdxClientASTFile);
 nullable!(CXIdxClientContainer);

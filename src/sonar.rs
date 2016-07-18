@@ -14,12 +14,9 @@
 
 //! Finding C declarations.
 
-use std::mem;
 use std::vec;
 use std::collections::{HashSet};
 use std::str::{FromStr};
-
-use libc::{c_int};
 
 use super::{Entity, EntityKind, Type, TypeKind};
 
@@ -326,8 +323,7 @@ fn is_alias(type_: Type, name: &str) -> bool {
 }
 
 fn is_elaborated(type_: Type) -> bool {
-    let elaborated = unsafe { mem::transmute::<_, c_int>(type_.get_kind()) == 119 };
-    elaborated || type_.get_kind() == TypeKind::Unexposed
+    type_.is_elaborated().unwrap_or(type_.get_kind() == TypeKind::Unexposed)
 }
 
 fn next<'tu>(
