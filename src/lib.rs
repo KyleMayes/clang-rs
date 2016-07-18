@@ -20,6 +20,7 @@
 //! * 3.6 - [Documentation](https://kylemayes.github.io/clang-rs/3_6/clang)
 //! * 3.7 - [Documentation](https://kylemayes.github.io/clang-rs/3_7/clang)
 //! * 3.8 - [Documentation](https://kylemayes.github.io/clang-rs/3_8/clang)
+//! * 3.9 - [Documentation](https://kylemayes.github.io/clang-rs/3_9/clang)
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
