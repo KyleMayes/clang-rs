@@ -1,15 +1,17 @@
 environment:
   matrix:
+    - LLVM_VERSION: 3.6
+      CLANG_VERSION: clang_3_6
+    - LLVM_VERSION: 3.7
+      CLANG_VERSION: clang_3_7
     - LLVM_VERSION: 3.8
       CLANG_VERSION: clang_3_8
 
 install:
   - ps: .\ci\install.ps1
-  - rustc --version
-  - cargo --version
 
 build: false
 
 test_script:
   - SET RUST_BACKTRACE=1
-  - cargo test --verbose --features %CLANG_VERSION% -- --nocapture
+  - C:\Rust\bin\cargo.exe test --verbose --features %CLANG_VERSION% -- --nocapture
