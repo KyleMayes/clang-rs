@@ -2,6 +2,7 @@
 
 ### Added
 - Added support for `clang` 3.9.x
+- Added `Entity::get_child` method
 
 ### Changed
 - Bumped `clang-sys` version to `0.8.0`

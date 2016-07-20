@@ -1046,6 +1046,21 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_getCursorCompletionString(self.raw).map(CompletionString::from_raw) }
     }
 
+    /// Returns the child of this AST entity with the supplied index.
+    pub fn get_child(&self, mut index: usize) -> Option<Entity<'tu>> {
+        let mut child = None;
+        self.visit_children(|c, _| {
+            if index == 0 {
+                child = Some(c);
+                EntityVisitResult::Break
+            } else {
+                index -= 1;
+                EntityVisitResult::Continue
+            }
+        });
+        child
+    }
+
     /// Returns the children of this AST entity.
     pub fn get_children(&self) -> Vec<Entity<'tu>> {
         let mut children = vec![];
