@@ -8,10 +8,9 @@ environment:
       CLANG_VERSION: clang_3_8
 
 install:
-  - ps: .\ci\install.ps1
+  - .\ci\install.bat
 
 build: false
 
 test_script:
-  - SET RUST_BACKTRACE=1
-  - C:\Rust\bin\cargo.exe test --verbose --features %CLANG_VERSION% -- --nocapture
+  - .\ci\test_script.bat
