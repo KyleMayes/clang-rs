@@ -1,4 +1,4 @@
-## [0.10.0] - UNRELEASED
+## [0.10.0] - 2016-7-19
 
 ### Added
 - Added support for `clang` 3.9.x
