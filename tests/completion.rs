@@ -48,7 +48,11 @@ pub fn test(clang: &Clang) {
         assert!(!context.objc_selector_names);
 
         let mut results = results.get_results();
-        assert_eq!(results.len(), 6);
+        if cfg!(target_os="windows") && cfg!(feature="gte_clang_3_8") {
+            assert_eq!(results.len(), 7);
+        } else {
+            assert_eq!(results.len(), 6);
+        }
         results.sort();
 
         macro_rules! assert_result_eq {
@@ -73,7 +77,20 @@ pub fn test(clang: &Clang) {
             CompletionChunk::RightParenthesis,
         ]);
 
-        assert_result_eq!(results[1], EntityKind::Destructor, 34, None, "A", "~A", &[
+        let offset = if cfg!(target_os="windows") && cfg!(feature="gte_clang_3_8") {
+            assert_result_eq!(results[1], EntityKind::Method, 34, None, "A", "operator=", &[
+                CompletionChunk::ResultType("A &".into()),
+                CompletionChunk::TypedText("operator=".into()),
+                CompletionChunk::LeftParenthesis,
+                CompletionChunk::Placeholder("A &&".into()),
+                CompletionChunk::RightParenthesis,
+            ]);
+            1
+        } else {
+            0
+        };
+
+        assert_result_eq!(results[1 + offset], EntityKind::Destructor, 34, None, "A", "~A", &[
             CompletionChunk::ResultType("void".into()),
             CompletionChunk::TypedText("~A".into()),
             CompletionChunk::LeftParenthesis,
@@ -81,22 +98,22 @@ pub fn test(clang: &Clang) {
         ]);
 
         let brief = Some("An integer field.".into());
-        assert_result_eq!(results[2], EntityKind::FieldDecl, 35, brief, "A", "a", &[
+        assert_result_eq!(results[2 + offset], EntityKind::FieldDecl, 35, brief, "A", "a", &[
             CompletionChunk::ResultType("int".into()),
             CompletionChunk::TypedText("a".into()),
         ]);
 
-        assert_result_eq!(results[3], EntityKind::FieldDecl, 35, None, "A", "b", &[
+        assert_result_eq!(results[3 + offset], EntityKind::FieldDecl, 35, None, "A", "b", &[
             CompletionChunk::ResultType("int".into()),
             CompletionChunk::TypedText("b".into()),
         ]);
 
-        assert_result_eq!(results[4], EntityKind::FieldDecl, 35, None, "A", "c", &[
+        assert_result_eq!(results[4 + offset], EntityKind::FieldDecl, 35, None, "A", "c", &[
             CompletionChunk::ResultType("int".into()),
             CompletionChunk::TypedText("c".into()),
         ]);
 
-        assert_result_eq!(results[5], EntityKind::StructDecl, 75, None, "A", "A", &[
+        assert_result_eq!(results[5 + offset], EntityKind::StructDecl, 75, None, "A", "A", &[
             CompletionChunk::TypedText("A".into()),
             CompletionChunk::Text("::".into()),
         ]);

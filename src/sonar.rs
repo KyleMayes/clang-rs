@@ -337,7 +337,7 @@ fn next<'tu>(
             if let Some(name) = entity.get_name() {
                 if !seen.contains(&name) {
                     seen.insert(name);
-                    if entity.get_type().map_or(false, |t| t.get_sizeof().is_ok()) {
+                    if !entity.get_children().is_empty() {
                         return Some(Declaration::new(entity.get_name().unwrap(), entity, None));
                     }
                 }
