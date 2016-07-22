@@ -1,3 +1,11 @@
+## [0.11.0] - UNRELEASED
+
+### Added
+- Added `documentation` module
+
+### Changed
+- Bumped `clang-sys` version to `0.9.0`
+
 ## [0.10.0] - 2016-7-19
 
 ### Added

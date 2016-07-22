@@ -192,6 +192,16 @@ nullable!(CXModule);
 nullable!(CXRemapping);
 nullable!(CXTranslationUnit);
 
+impl Nullable for CXComment {
+    fn map<U, F: FnOnce(CXComment) -> U>(self, f: F) -> Option<U> {
+        if !self.ASTNode.is_null() {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
+}
+
 impl Nullable for CXCursor {
     fn map<U, F: FnOnce(CXCursor) -> U>(self, f: F) -> Option<U> {
         unsafe {

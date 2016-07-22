@@ -108,6 +108,8 @@ fn with_types<'c, F: FnOnce(Vec<Type>)>(clang: &'c Clang, contents: &str, f: F) 
 mod completion_test;
 #[path="diagnostic.rs"]
 mod diagnostic_test;
+#[path="documentation.rs"]
+mod documentation_test;
 #[path="source.rs"]
 mod source_test;
 #[path="token.rs"]
@@ -124,6 +126,7 @@ fn test() {
 
     completion_test::test(&clang);
     diagnostic_test::test(&clang);
+    documentation_test::test(&clang);
     source_test::test(&clang);
     token_test::test(&clang);
 

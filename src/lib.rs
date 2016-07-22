@@ -39,6 +39,7 @@ mod utility;
 
 pub mod completion;
 pub mod diagnostic;
+pub mod documentation;
 pub mod source;
 pub mod token;
 
@@ -62,6 +63,7 @@ use libc::{c_int, c_uint, c_ulong};
 
 use completion::{Completer, CompletionString};
 use diagnostic::{Diagnostic};
+use documentation::{Comment};
 use source::{File, Module, SourceLocation, SourceRange};
 use token::{Token};
 use utility::{FromError, Nullable};
@@ -1029,6 +1031,11 @@ impl<'tu> Entity<'tu> {
     /// Returns the comment associated with this AST entity, if any.
     pub fn get_comment(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_Cursor_getRawCommentText(self.raw)) }
+    }
+
+    ///  Returns the parsed comment associated with this declaration, if application.
+    pub fn get_parsed_comment(&self) -> Option<Comment<'tu>> {
+        unsafe { clang_Cursor_getParsedComment(self.raw).map(Comment::from_raw) }
     }
 
     /// Returns the brief of the comment associated with this AST entity, if any.
