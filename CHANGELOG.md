@@ -1,4 +1,4 @@
-## [0.11.0] - UNRELEASED
+## [0.11.0] - 2016-7-22
 
 ### Added
 - Added `documentation` module
