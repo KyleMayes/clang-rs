@@ -901,18 +901,46 @@ impl Clang {
     /// # Failures
     ///
     /// * an instance of `Clang` already exists
-    pub fn new() -> Result<Clang, ()> {
-        if AVAILABLE.swap(false, atomic::Ordering::Relaxed) {
+    /// * a `libclang` shared library could not be found
+    /// * a `libclang` shared library symbol could not be loaded
+    #[cfg(feature="runtime")]
+    pub fn new() -> Result<Clang, String> {
+        if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
+            load().map(|_| Clang)
+        } else {
+            Err("an instance of `Clang` already exists".into())
+        }
+    }
+
+    /// Constructs a new `Clang`.
+    ///
+    /// Only one instance of `Clang` is allowed at a time.
+    ///
+    /// # Failures
+    ///
+    /// * an instance of `Clang` already exists
+    #[cfg(not(feature="runtime"))]
+    pub fn new() -> Result<Clang, String> {
+        if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
             Ok(Clang)
         } else {
-            Err(())
+            Err("an instance of `Clang` already exists".into())
         }
     }
 }
 
+#[cfg(feature="runtime")]
 impl Drop for Clang {
     fn drop(&mut self) {
-        AVAILABLE.store(true, atomic::Ordering::Relaxed);
+        unload().unwrap();
+        AVAILABLE.store(true, atomic::Ordering::SeqCst);
+    }
+}
+
+#[cfg(not(feature="runtime"))]
+impl Drop for Clang {
+    fn drop(&mut self) {
+        AVAILABLE.store(true, atomic::Ordering::SeqCst);
     }
 }
 

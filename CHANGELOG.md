@@ -1,3 +1,8 @@
+## [0.12.0] - UNRELEASED
+
+### Changed
+- Added `runtime` Cargo feature that links to `libclang` shared library at runtime
+
 ## [0.11.0] - 2016-7-22
 
 ### Added

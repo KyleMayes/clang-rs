@@ -120,9 +120,9 @@ mod sonar_test;
 
 #[test]
 fn test() {
-    println!("libclang: {}", get_version());
-
     let clang = Clang::new().unwrap();
+
+    println!("libclang: {}", get_version());
 
     completion_test::test(&clang);
     diagnostic_test::test(&clang);

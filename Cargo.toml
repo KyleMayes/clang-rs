@@ -15,6 +15,7 @@ repository = "https://github.com/KyleMayes/clang-rs"
 
 [features]
 
+runtime = ["clang-sys/runtime"]
 static = ["clang-sys/static"]
 
 clang_3_5 = ["clang-sys/clang_3_5"]
@@ -30,7 +31,7 @@ gte_clang_3_9 = []
 
 [dependencies]
 
-clang-sys = "0.9.0"
+clang-sys = "0.10.0"
 lazy_static = "0.2.1"
 libc = "0.2.14"
 
