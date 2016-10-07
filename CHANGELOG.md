@@ -1,4 +1,4 @@
-## [0.13.0] - UNRELEASED
+## [0.13.0] - 2016-10-07
 
 ### Changed
 - Removed feature gates for `CallingConvention`, `EntityKind`, and `TypeKind` variants
