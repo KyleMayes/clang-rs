@@ -1,3 +1,7 @@
+if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
+    rvm get head || true
+fi
+
 set -e
 
 RUST_BACKTRACE=1 cargo test --verbose --features $CLANG_VERSION -- --nocapture
