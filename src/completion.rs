@@ -315,7 +315,7 @@ impl CompletionResults {
         unsafe {
             let mut incomplete = mem::uninitialized();
             match clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
-                CXCursorKind::InvalidCode => None,
+                CXCursor_InvalidCode => None,
                 other => Some((mem::transmute(other), incomplete != 0)),
             }
         }
@@ -430,31 +430,32 @@ impl<'r> CompletionString<'r> {
             }
 
             match k {
-                CXCompletionChunkKind::Colon => CompletionChunk::Colon,
-                CXCompletionChunkKind::Comma => CompletionChunk::Comma,
-                CXCompletionChunkKind::Equal => CompletionChunk::Equals,
-                CXCompletionChunkKind::SemiColon => CompletionChunk::Semicolon,
-                CXCompletionChunkKind::LeftAngle => CompletionChunk::LeftAngleBracket,
-                CXCompletionChunkKind::RightAngle => CompletionChunk::RightAngleBracket,
-                CXCompletionChunkKind::LeftBrace => CompletionChunk::LeftBrace,
-                CXCompletionChunkKind::RightBrace => CompletionChunk::RightBrace,
-                CXCompletionChunkKind::LeftParen => CompletionChunk::LeftParenthesis,
-                CXCompletionChunkKind::RightParen => CompletionChunk::RightParenthesis,
-                CXCompletionChunkKind::LeftBracket => CompletionChunk::LeftSquareBracket,
-                CXCompletionChunkKind::RightBracket => CompletionChunk::RightSquareBracket,
-                CXCompletionChunkKind::HorizontalSpace => text!(HorizontalSpace),
-                CXCompletionChunkKind::VerticalSpace => text!(VerticalSpace),
-                CXCompletionChunkKind::CurrentParameter => text!(CurrentParameter),
-                CXCompletionChunkKind::TypedText => text!(TypedText),
-                CXCompletionChunkKind::Text => text!(Text),
-                CXCompletionChunkKind::Placeholder => text!(Placeholder),
-                CXCompletionChunkKind::Informative => text!(Informative),
-                CXCompletionChunkKind::ResultType => text!(ResultType),
-                CXCompletionChunkKind::Optional => {
+                CXCompletionChunk_Colon => CompletionChunk::Colon,
+                CXCompletionChunk_Comma => CompletionChunk::Comma,
+                CXCompletionChunk_Equal => CompletionChunk::Equals,
+                CXCompletionChunk_SemiColon => CompletionChunk::Semicolon,
+                CXCompletionChunk_LeftAngle => CompletionChunk::LeftAngleBracket,
+                CXCompletionChunk_RightAngle => CompletionChunk::RightAngleBracket,
+                CXCompletionChunk_LeftBrace => CompletionChunk::LeftBrace,
+                CXCompletionChunk_RightBrace => CompletionChunk::RightBrace,
+                CXCompletionChunk_LeftParen => CompletionChunk::LeftParenthesis,
+                CXCompletionChunk_RightParen => CompletionChunk::RightParenthesis,
+                CXCompletionChunk_LeftBracket => CompletionChunk::LeftSquareBracket,
+                CXCompletionChunk_RightBracket => CompletionChunk::RightSquareBracket,
+                CXCompletionChunk_HorizontalSpace => text!(HorizontalSpace),
+                CXCompletionChunk_VerticalSpace => text!(VerticalSpace),
+                CXCompletionChunk_CurrentParameter => text!(CurrentParameter),
+                CXCompletionChunk_TypedText => text!(TypedText),
+                CXCompletionChunk_Text => text!(Text),
+                CXCompletionChunk_Placeholder => text!(Placeholder),
+                CXCompletionChunk_Informative => text!(Informative),
+                CXCompletionChunk_ResultType => text!(ResultType),
+                CXCompletionChunk_Optional => {
                     let i = i as c_uint;
                     let raw = unsafe { clang_getCompletionChunkCompletionString(self.raw, i) };
                     CompletionChunk::Optional(CompletionString::from_raw(raw))
                 },
+                _ => panic!("unexpected completion chunk kind: {:?}", k),
             }
         }).collect()
     }

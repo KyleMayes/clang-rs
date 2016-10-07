@@ -466,14 +466,14 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
                     &mut *(data as *mut (&TranslationUnit, Box<Callback>));
 
             if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
-                CXVisitorResult::Continue
+                CXVisit_Continue
             } else {
-                CXVisitorResult::Break
+                CXVisit_Break
             }
         }
     }
 
     let mut data = (tu, Box::new(f) as Box<Callback>);
     let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit: visit };
-    g(visitor) == CXResult::VisitBreak
+    g(visitor) == CXResult_VisitBreak
 }

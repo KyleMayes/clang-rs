@@ -1,3 +1,10 @@
+## [0.13.0] - UNRELEASED
+
+### Changed
+- Removed feature gates for `CallingConvention`, `EntityKind`, and `TypeKind` variants
+- Bumped `clang-sys` version to `0.11.0`
+- Bumped `libc` version to `0.2.16`
+
 ## [0.12.0] - 2016-8-1
 
 ### Changed

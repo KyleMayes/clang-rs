@@ -24,6 +24,8 @@
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
+#![allow(non_upper_case_globals)]
+
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", warn(clippy))]
@@ -124,16 +126,20 @@ pub enum CallingConvention {
     /// The function type uses the x86 `thiscall` calling convention.
     Thiscall = 4,
     /// The function type uses the x86 `vectorcall` calling convention.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     Vectorcall = 12,
     /// The function type uses the calling convention for the Swift programming language.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     Swift = 13,
     /// The function type uses a calling convention that perserves most registers.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     PreserveMost = 14,
     /// The function type uses a calling convention that preverses nearly all registers.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     PreserveAll = 15,
     /// The function type uses the ARM AACPS calling convention.
     Aapcs = 6,
@@ -351,10 +357,12 @@ pub enum EntityKind {
     /// An Objective-C `self` expression.
     ObjCSelfExpr = 146,
     /// An OpenMP array section expression.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     OmpArraySectionExpr = 147,
     /// An Objective-C availability check expression (e.g., `@available(macos 10.10, *)`).
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     ObjCAvailabilityCheckExpr = 148,
     /// A statement whose specific kind is not exposed via this interface.
     UnexposedStmt = 200,
@@ -453,70 +461,92 @@ pub enum EntityKind {
     /// An OpenMP flush directive.
     OmpFlushDirective = 246,
     /// An OpenMP ordered directive.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     OmpOrderedDirective = 248,
     /// An OpenMP atomic directive.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     OmpAtomicDirective = 249,
     /// An OpenMP for SIMD directive.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     OmpForSimdDirective = 250,
     /// An OpenMP parallel for SIMD directive.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     OmpParallelForSimdDirective = 251,
     /// An OpenMP target directive.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     OmpTargetDirective = 252,
     /// An OpenMP teams directive.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     OmpTeamsDirective = 253,
     /// An OpenMP taskgroup directive.
-    #[cfg(feature="gte_clang_3_7")]
+    ///
+    /// Only produced by `libclang` 3.7 and later.
     OmpTaskgroupDirective = 254,
     /// An OpenMP cancellation point directive.
-    #[cfg(feature="gte_clang_3_7")]
+    ///
+    /// Only produced by `libclang` 3.7 and later.
     OmpCancellationPointDirective = 255,
     /// An OpenMP cancel directive.
-    #[cfg(feature="gte_clang_3_7")]
+    ///
+    /// Only produced by `libclang` 3.7 and later.
     OmpCancelDirective = 256,
     /// An OpenMP target data directive.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     OmpTargetDataDirective = 257,
     /// An OpenMP task loop directive.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     OmpTaskLoopDirective = 258,
     /// An OpenMP task loop SIMD directive.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     OmpTaskLoopSimdDirective = 259,
     /// An OpenMP distribute directive.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     OmpDistributeDirective = 260,
     /// An OpenMP target enter data directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpTargetEnterDataDirective = 261,
     /// An OpenMP target exit data directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpTargetExitDataDirective = 262,
     /// An OpenMP target parallel directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpTargetParallelDirective = 263,
     /// An OpenMP target parallel for directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpTargetParallelForDirective = 264,
     /// An OpenMP target update directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpTargetUpdateDirective = 265,
     /// An OpenMP distribute parallel for directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpDistributeParallelForDirective = 266,
     /// An OpenMP distribute parallel for SIMD directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpDistributeParallelForSimdDirective = 267,
     /// An OpenMP distribute SIMD directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpDistributeSimdDirective = 268,
     /// An OpenMP target parallel for SIMD directive.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     OmpTargetParallelForSimdDirective = 269,
     /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
@@ -554,16 +584,20 @@ pub enum EntityKind {
     /// A CUDA host attribute.
     CudaHostAttr = 415,
     /// A CUDA shared attribute.
-    #[cfg(feature="gte_clang_3_6")]
+    ///
+    /// Only produced by `libclang` 3.6 and later.
     CudaSharedAttr = 416,
     /// A linker visibility attribute.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     VisibilityAttr = 417,
     /// A MSVC DLL export attribute.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     DllExport = 418,
     /// A MSVC DLL import attribute.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     DllImport = 419,
     /// A preprocessing directive.
     PreprocessingDirective = 500,
@@ -576,13 +610,16 @@ pub enum EntityKind {
     /// A module import declaration.
     ModuleImportDecl = 600,
     /// A C++11 alias template declaration (e.g., `template <typename T> using M = std::map<T, T>`).
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     TypeAliasTemplateDecl = 601,
     /// A `static_assert` node.
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     StaticAssert = 602,
     /// A single overload in a set of overloads.
-    #[cfg(feature="gte_clang_3_7")]
+    ///
+    /// Only produced by `libclang` 3.7 and later.
     OverloadCandidate = 700,
 }
 
@@ -820,7 +857,8 @@ pub enum TypeKind {
     /// `SEL` (Objective-C)
     ObjCSel = 29,
     /// `__float128`
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     Float128 = 30,
     /// An Objective-C interface type.
     ObjCInterface = 108,
@@ -857,10 +895,12 @@ pub enum TypeKind {
     /// A GCC generic vector type.
     Vector = 113,
     /// A C++11 `decltype(auto)` type.
-    #[cfg(feature="gte_clang_3_8")]
+    ///
+    /// Only produced by `libclang` 3.8 and later.
     Auto = 118,
     /// A type that was referred to using an elaborated type keyword (e.g., `struct S`).
-    #[cfg(feature="gte_clang_3_9")]
+    ///
+    /// Only produced by `libclang` 3.9 and later.
     Elaborated = 119,
 }
 
@@ -974,15 +1014,14 @@ impl<'tu> Entity<'tu> {
         unsafe {
             clang_Cursor_Evaluate(self.raw).map(|e| {
                 let result = match clang_EvalResult_getKind(e) {
-                    CXEvalResultKind::UnExposed => EvaluationResult::Unexposed,
-                    CXEvalResultKind::Int =>
-                        EvaluationResult::Integer(clang_EvalResult_getAsInt(e) as i64),
-                    CXEvalResultKind::Float =>
-                        EvaluationResult::Float(clang_EvalResult_getAsDouble(e) as f64),
-                    CXEvalResultKind::ObjCStrLiteral => EvaluationResult::ObjCString(string!(e)),
-                    CXEvalResultKind::StrLiteral => EvaluationResult::String(string!(e)),
-                    CXEvalResultKind::CFStr => EvaluationResult::CFString(string!(e)),
-                    CXEvalResultKind::Other => EvaluationResult::Other(string!(e)),
+                    CXEval_UnExposed => EvaluationResult::Unexposed,
+                    CXEval_Int => EvaluationResult::Integer(clang_EvalResult_getAsInt(e) as i64),
+                    CXEval_Float => EvaluationResult::Float(clang_EvalResult_getAsDouble(e) as f64),
+                    CXEval_ObjCStrLiteral => EvaluationResult::ObjCString(string!(e)),
+                    CXEval_StrLiteral => EvaluationResult::String(string!(e)),
+                    CXEval_CFStr => EvaluationResult::CFString(string!(e)),
+                    CXEval_Other => EvaluationResult::Other(string!(e)),
+                    _ => panic!("unexpected eval result: {:?}", e),
                 };
                 clang_EvalResult_dispose(e);
                 result
@@ -1017,7 +1056,7 @@ impl<'tu> Entity<'tu> {
     pub fn get_accessibility(&self) -> Option<Accessibility> {
         unsafe {
             match clang_getCXXAccessSpecifier(self.raw) {
-                CX_CXXAccessSpecifier::CXXInvalidAccessSpecifier => None,
+                CX_CXXInvalidAccessSpecifier => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1138,7 +1177,7 @@ impl<'tu> Entity<'tu> {
     pub fn get_language(&self) -> Option<Language> {
         unsafe {
             match clang_getCursorLanguage(self.raw) {
-                CXLanguageKind::Invalid => None,
+                CXLanguage_Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1153,7 +1192,7 @@ impl<'tu> Entity<'tu> {
     pub fn get_linkage(&self) -> Option<Linkage> {
         unsafe {
             match clang_getCursorLinkage(self.raw) {
-                CXLinkageKind::Invalid => None,
+                CXLinkage_Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1312,7 +1351,7 @@ impl<'tu> Entity<'tu> {
     pub fn get_storage_class(&self) -> Option<StorageClass> {
         unsafe {
             match clang_Cursor_getStorageClass(self.raw) {
-                CX_StorageClass::Invalid => None,
+                CX_SC_Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1338,23 +1377,22 @@ impl<'tu> Entity<'tu> {
         ).map(|i| {
             i.enumerate().map(|(i, t)| {
                 match t {
-                    CXTemplateArgumentKind::Null => TemplateArgument::Null,
-                    CXTemplateArgumentKind::Type => {
+                    CXTemplateArgumentKind_Null => TemplateArgument::Null,
+                    CXTemplateArgumentKind_Type => {
                         let type_ = unsafe { get_type(self.raw, i as c_uint) };
                         TemplateArgument::Type(Type::from_raw(type_, self.tu))
                     },
-                    CXTemplateArgumentKind::Declaration => TemplateArgument::Declaration,
-                    CXTemplateArgumentKind::NullPtr => TemplateArgument::Nullptr,
-                    CXTemplateArgumentKind::Integral => {
+                    CXTemplateArgumentKind_Declaration => TemplateArgument::Declaration,
+                    CXTemplateArgumentKind_NullPtr => TemplateArgument::Nullptr,
+                    CXTemplateArgumentKind_Integral => {
                         let signed = unsafe { get_signed(self.raw, i as c_uint) };
                         let unsigned = unsafe { get_unsigned(self.raw, i as c_uint) };
                         TemplateArgument::Integral(signed as i64, unsigned as u64)
                     },
-                    CXTemplateArgumentKind::Template => TemplateArgument::Template,
-                    CXTemplateArgumentKind::TemplateExpansion =>
-                        TemplateArgument::TemplateExpansion,
-                    CXTemplateArgumentKind::Expression => TemplateArgument::Expression,
-                    CXTemplateArgumentKind::Pack => TemplateArgument::Pack,
+                    CXTemplateArgumentKind_Template => TemplateArgument::Template,
+                    CXTemplateArgumentKind_TemplateExpansion => TemplateArgument::TemplateExpansion,
+                    CXTemplateArgumentKind_Expression => TemplateArgument::Expression,
+                    CXTemplateArgumentKind_Pack => TemplateArgument::Pack,
                     _ => unreachable!(),
                 }
             }).collect()
@@ -1366,7 +1404,7 @@ impl<'tu> Entity<'tu> {
     pub fn get_template_kind(&self) -> Option<EntityKind> {
         unsafe {
             match clang_getTemplateCursorKind(self.raw) {
-                CXCursorKind::NoDeclFound => None,
+                CXCursor_NoDeclFound => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -1397,7 +1435,7 @@ impl<'tu> Entity<'tu> {
     pub fn get_visibility(&self) -> Option<Visibility> {
         unsafe {
             match clang_getCursorVisibility(self.raw) {
-                CXVisibilityKind::Invalid => None,
+                CXVisibility_Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -2096,7 +2134,7 @@ impl<'tu> Type<'tu> {
     pub fn get_calling_convention(&self) -> Option<CallingConvention> {
         unsafe {
             match clang_getFunctionTypeCallingConv(self.raw) {
-                CXCallingConv::Invalid => None,
+                CXCallingConv_Invalid => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -2160,7 +2198,7 @@ impl<'tu> Type<'tu> {
     pub fn get_ref_qualifier(&self) -> Option<RefQualifier> {
         unsafe {
             match clang_Type_getCXXRefQualifier(self.raw) {
-                CXRefQualifierKind::None => None,
+                CXRefQualifier_None => None,
                 other => Some(mem::transmute(other)),
             }
         }
@@ -2251,9 +2289,9 @@ impl<'tu> Type<'tu> {
                     &mut *(data as *mut (&TranslationUnit, Box<Callback>));
 
                 if callback.call(Entity::from_raw(cursor, tu)) {
-                    CXVisitorResult::Continue
+                    CXVisit_Continue
                 } else {
-                    CXVisitorResult::Break
+                    CXVisit_Break
                 }
             }
         }
@@ -2261,7 +2299,7 @@ impl<'tu> Type<'tu> {
         let mut data = (self.tu, Box::new(f) as Box<Callback>);
         unsafe {
             let data = utility::addressof(&mut data);
-            Some(clang_Type_visitFields(self.raw, visit, data) == CXVisitorResult::Break)
+            Some(clang_Type_visitFields(self.raw, visit, data) == CXVisit_Break)
         }
     }
 
@@ -2269,17 +2307,17 @@ impl<'tu> Type<'tu> {
 
     /// Returns whether this type is an integer type.
     pub fn is_integer(&self) -> bool {
-        self.raw.kind >= CXTypeKind::Bool && self.raw.kind <= CXTypeKind::Int128
+        self.raw.kind >= CXType_Bool && self.raw.kind <= CXType_Int128
     }
 
     /// Returns whether this type is a signed integer type.
     pub fn is_signed_integer(&self) -> bool {
-        self.raw.kind >= CXTypeKind::Char_S && self.raw.kind <= CXTypeKind::Int128
+        self.raw.kind >= CXType_Char_S && self.raw.kind <= CXType_Int128
     }
 
     /// Returns whether this type is an unsigned integer type.
     pub fn is_unsigned_integer(&self) -> bool {
-        self.raw.kind >= CXTypeKind::Bool && self.raw.kind <= CXTypeKind::UInt128
+        self.raw.kind >= CXType_Bool && self.raw.kind <= CXType_UInt128
     }
 }
 

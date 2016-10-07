@@ -251,7 +251,7 @@ impl Nullable for CXString {
 
 impl Nullable for CXType {
     fn map<U, F: FnOnce(CXType) -> U>(self, f: F) -> Option<U> {
-        if self.kind != CXTypeKind::Invalid {
+        if self.kind != CXType_Invalid {
             Some(f(self))
         } else {
             None

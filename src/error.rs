@@ -107,9 +107,9 @@ error! {
     /// Indicates the type of error that prevented the saving of a translation unit to an AST file.
     pub enum SaveError: CXSaveError {
         /// Errors in the translation unit prevented saving.
-        Errors = (CXSaveError::InvalidTU, "errors in the translation unit prevented saving"),
+        Errors = (CXSaveError_InvalidTU, "errors in the translation unit prevented saving"),
         /// An unknown error occurred.
-        Unknown = (CXSaveError::Unknown, "an unknown error occurred"),
+        Unknown = (CXSaveError_Unknown, "an unknown error occurred"),
     }
 }
 
@@ -134,10 +134,10 @@ error! {
     /// file.
     pub enum SourceError: CXErrorCode {
         /// An error occurred while deserializing an AST file.
-        AstDeserialization = (CXErrorCode::ASTReadError, "AST deserialization failed"),
+        AstDeserialization = (CXError_ASTReadError, "AST deserialization failed"),
         /// `libclang` crashed.
-        Crash = (CXErrorCode::Crashed, "`libclang` crashed"),
+        Crash = (CXError_Crashed, "`libclang` crashed"),
         /// An unknown error occurred.
-        Unknown = (CXErrorCode::Failure, "an unknown error occurred"),
+        Unknown = (CXError_Failure, "an unknown error occurred"),
     }
 }

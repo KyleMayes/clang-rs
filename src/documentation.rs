@@ -62,25 +62,22 @@ impl CommentChild {
     fn from_raw(raw: CXComment) -> CommentChild {
         unsafe {
             match clang_Comment_getKind(raw) {
-                CXCommentKind::Text =>
-                   	CommentChild::Text(utility::to_string(clang_TextComment_getText(raw))),
-                CXCommentKind::InlineCommand =>
+                CXComment_Text =>
+                    CommentChild::Text(utility::to_string(clang_TextComment_getText(raw))),
+                CXComment_InlineCommand =>
                     CommentChild::InlineCommand(InlineCommand::from_raw(raw)),
-                CXCommentKind::HTMLStartTag =>
-                    CommentChild::HtmlStartTag(HtmlStartTag::from_raw(raw)),
-                CXCommentKind::HTMLEndTag => {
+                CXComment_HTMLStartTag => CommentChild::HtmlStartTag(HtmlStartTag::from_raw(raw)),
+                CXComment_HTMLEndTag => {
                     let name = utility::to_string(clang_HTMLTagComment_getTagName(raw));
                     CommentChild::HtmlEndTag(name)
                 },
-                CXCommentKind::Paragraph =>
+                CXComment_Paragraph =>
                     CommentChild::Paragraph(Comment::from_raw(raw).get_children()),
-                CXCommentKind::BlockCommand =>
-                    CommentChild::BlockCommand(BlockCommand::from_raw(raw)),
-                CXCommentKind::ParamCommand =>
-                    CommentChild::ParamCommand(ParamCommand::from_raw(raw)),
-                CXCommentKind::TParamCommand =>
+                CXComment_BlockCommand => CommentChild::BlockCommand(BlockCommand::from_raw(raw)),
+                CXComment_ParamCommand => CommentChild::ParamCommand(ParamCommand::from_raw(raw)),
+                CXComment_TParamCommand =>
                     CommentChild::TParamCommand(TParamCommand::from_raw(raw)),
-                CXCommentKind::VerbatimBlockCommand => {
+                CXComment_VerbatimBlockCommand => {
                     let lines = iter!(
                         clang_Comment_getNumChildren(raw),
                         clang_Comment_getChild(raw),
@@ -89,7 +86,7 @@ impl CommentChild {
                     }).collect();
                     CommentChild::VerbatimCommand(lines)
                 },
-                CXCommentKind::VerbatimLine => {
+                CXComment_VerbatimLine => {
                     let line = utility::to_string(clang_VerbatimLineComment_getText(raw));
                     CommentChild::VerbatimLineCommand(line)
                 },
@@ -254,7 +251,7 @@ impl InlineCommand {
             clang_InlineCommandComment_getArgText(raw),
         ).map(utility::to_string).collect();
         let style = match clang_InlineCommandComment_getRenderKind(raw) {
-            CXCommentInlineCommandRenderKind::Normal => None,
+            CXCommentInlineCommandRenderKind_Normal => None,
             other => Some(mem::transmute(other)),
         };
         InlineCommand { command: command, arguments: arguments, style: style }
