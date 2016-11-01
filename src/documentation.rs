@@ -269,6 +269,8 @@ pub struct ParamCommand {
     pub parameter: String,
     /// The parameter direction, if specified.
     pub direction: Option<ParameterDirection>,
+    /// The children of this parameter command
+    pub children: Vec<CommentChild>
 }
 
 impl ParamCommand {
@@ -286,7 +288,9 @@ impl ParamCommand {
         } else {
             None
         };
-        ParamCommand { index: index, parameter: parameter, direction: direction }
+        let paragraph = clang_BlockCommandComment_getParagraph(raw);
+        let children = Comment::from_raw(paragraph).get_children();
+        ParamCommand { index: index, parameter: parameter, direction: direction, children: children }
     }
 }
 
@@ -300,6 +304,8 @@ pub struct TParamCommand {
     pub position: Option<(usize, usize)>,
     /// The template parameter.
     pub parameter: String,
+    /// The children of this type parameter command
+    pub children: Vec<CommentChild>
 }
 
 impl TParamCommand {
@@ -314,6 +320,8 @@ impl TParamCommand {
             None
         };
         let parameter = utility::to_string(clang_TParamCommandComment_getParamName(raw));
-        TParamCommand { position: position, parameter: parameter }
+        let paragraph = clang_BlockCommandComment_getParagraph(raw);
+        let children = Comment::from_raw(paragraph).get_children();
+        TParamCommand { position: position, parameter: parameter, children: children }
     }
 }
