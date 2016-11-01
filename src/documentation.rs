@@ -269,7 +269,7 @@ pub struct ParamCommand {
     pub parameter: String,
     /// The parameter direction, if specified.
     pub direction: Option<ParameterDirection>,
-    /// The children of this parameter command
+    /// The children of this parameter.
     pub children: Vec<CommentChild>
 }
 
@@ -304,7 +304,7 @@ pub struct TParamCommand {
     pub position: Option<(usize, usize)>,
     /// The template parameter.
     pub parameter: String,
-    /// The children of this type parameter command
+    /// The children of this type parameter.
     pub children: Vec<CommentChild>
 }
 
