@@ -67,10 +67,15 @@ pub fn test(clang: &Clang) {
             CommentChild::Text(" ".into()),
         ]));
         assert_eq!(children[5], CommentChild::TParamCommand(TParamCommand {
-            position: Some((1, 0)), parameter: "T".into(),
+            position: Some((1, 0)), parameter: "T".into(), children: vec![
+                CommentChild::Text(" This template parameter doesn't actually do anything.".into()),
+                CommentChild::Text(" ".into()),
+            ]
         }));
         assert_eq!(children[6], CommentChild::ParamCommand(ParamCommand {
-            index: Some(0), parameter: "i".into(), direction: Some(ParameterDirection::In),
+            index: Some(0), parameter: "i".into(), direction: Some(ParameterDirection::In), children: vec![
+                CommentChild::Text(" This parameter alters the behavior of the function in some way.".into()),
+            ]
         }));
         assert_eq!(children[7], CommentChild::Paragraph(vec![
             CommentChild::Text(" ".into()),
