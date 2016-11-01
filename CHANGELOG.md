@@ -1,4 +1,4 @@
-## [0.14.0] - UNRELEASED
+## [0.14.0] - 2016-11-01
 
 ### Added
 - Added children to comment parameters
