@@ -6,9 +6,11 @@ function llvm_version_triple() {
     elif [ "$1" == "3.6" ]; then
         echo "3.6.2"
     elif [ "$1" == "3.7" ]; then
-        echo "3.7.0"
+        echo "3.7.1"
     elif [ "$1" == "3.8" ]; then
-        echo "3.8.0"
+        echo "3.8.1"
+    elif [ "$1" == "3.9" ]; then
+        echo "3.9.0"
     fi
 }
 

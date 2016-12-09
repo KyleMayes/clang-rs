@@ -15,18 +15,7 @@ rust: stable
 
 env:
   - LLVM_VERSION=3.5 CLANG_VERSION=clang_3_5
-  - LLVM_VERSION=3.6 CLANG_VERSION=clang_3_6
-  - LLVM_VERSION=3.7 CLANG_VERSION=clang_3_7
-  - LLVM_VERSION=3.8 CLANG_VERSION=clang_3_8
-
-matrix:
-  include:
-    - os: linux
-      rust: beta
-      env: LLVM_VERSION=3.8 CLANG_VERSION=clang_3_8
-    - os: linux
-      rust: nightly
-      env: LLVM_VERSION=3.8 CLANG_VERSION=clang_3_8
+  - LLVM_VERSION=3.9 CLANG_VERSION=clang_3_9
 
 before_install: . ./ci/before_install.sh
 
