@@ -172,25 +172,15 @@ macro_rules! nullable {
     );
 }
 
-nullable!(CXCompilationDatabase);
-nullable!(CXCompileCommand);
-nullable!(CXCompileCommands);
-nullable!(CXCompletionString);
-nullable!(CXCursorSet);
-nullable!(CXDiagnostic);
-nullable!(CXDiagnosticSet);
-#[cfg(feature="clang_3_9")]
-nullable!(CXEvalResult);
-nullable!(CXFile);
-nullable!(CXIdxClientASTFile);
-nullable!(CXIdxClientContainer);
-nullable!(CXIdxClientEntity);
-nullable!(CXIdxClientFile);
-nullable!(CXIndex);
-nullable!(CXIndexAction);
-nullable!(CXModule);
-nullable!(CXRemapping);
-nullable!(CXTranslationUnit);
+impl Nullable for *mut c_void {
+    fn map<U, F: FnOnce(*mut c_void) -> U>(self, f: F) -> Option<U> {
+        if !self.is_null() {
+            Some(f(self))
+        } else {
+            None
+        }
+    }
+}
 
 impl Nullable for CXComment {
     fn map<U, F: FnOnce(CXComment) -> U>(self, f: F) -> Option<U> {

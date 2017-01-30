@@ -20,8 +20,6 @@ use std::str::{FromStr};
 
 use super::{Entity, EntityKind, Type, TypeKind};
 
-type Seen = HashSet<String>;
-
 //================================================
 // Enums
 //================================================

@@ -143,7 +143,7 @@ impl<'tu> Diagnostic<'tu> {
 #[doc(hidden)]
 impl<'tu> cmp::PartialEq for Diagnostic<'tu> {
     fn eq(&self, other: &Diagnostic<'tu>) -> bool {
-        self.ptr.0 == other.ptr.0
+        self.ptr == other.ptr
     }
 }
 

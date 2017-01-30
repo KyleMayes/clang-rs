@@ -1228,10 +1228,10 @@ impl<'tu> Entity<'tu> {
                     false
                 } else {
                     let range = clang_getRangeStart(*r);
-                    let mut file = CXFile::default();
+                    let mut file = ptr::null_mut();
                     let null = ptr::null_mut();
                     clang_getSpellingLocation(range, &mut file, null, null, null);
-                    !file.0.is_null()
+                    !file.is_null()
                 }
             }).map(|r| SourceRange::from_raw(r, self.tu)).collect()
         }
@@ -1867,7 +1867,7 @@ impl<'tu> Parser<'tu> {
         let arguments = self.arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
         let unsaved = self.unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
         unsafe {
-            let mut ptr = CXTranslationUnit::default();
+            let mut ptr = ptr::null_mut();
             let code = clang_parseTranslationUnit2(
                 self.index.ptr,
                 utility::from_path(&self.file).as_ptr(),
