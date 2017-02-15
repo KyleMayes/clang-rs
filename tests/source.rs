@@ -33,6 +33,26 @@ pub fn test(clang: &Clang) {
         assert!(f.is_include_guarded());
     });
 
+    let source = r#"
+        void f() {
+            int a = 2 + 2;
+            double b = 0.25 * 2.0;
+            const char* c = "Hello, world!";
+        }
+    "#;
+
+    super::with_temporary_file("test.cpp", source, |_, f| {
+        let index = Index::new(&clang, false, false);
+        let tu = index.parser(f).detailed_preprocessing_record(true).parse().unwrap();
+        let tukids = tu.get_entity().get_children();
+        let child = tukids.first().unwrap();
+
+        // This may fail, if clang internals DO have a source
+        let file = child.get_location().unwrap().get_file_location().file;
+        assert_eq!(file, None);
+    });
+
+
     // Module ____________________________________
 
     let files = &[
@@ -74,10 +94,10 @@ pub fn test(clang: &Clang) {
 
     super::with_file(&clang, source, |_, f| {
         let location = f.get_location(3, 51);
-        assert_location_eq!(location.get_expansion_location(), f, 3, 33, 81);
-        assert_location_eq!(location.get_file_location(), f, 3, 33, 81);
+        assert_location_eq!(location.get_expansion_location(), Some(f), 3, 33, 81);
+        assert_location_eq!(location.get_file_location(), Some(f), 3, 33, 81);
         assert_eq!(location.get_presumed_location(), ("presumed.hpp".into(), 321, 33));
-        assert_location_eq!(location.get_spelling_location(), f, 3, 33, 81);
+        assert_location_eq!(location.get_spelling_location(), Some(f), 3, 33, 81);
         assert!(location.is_in_main_file());
         assert!(!location.is_in_system_header());
     });
@@ -86,7 +106,8 @@ pub fn test(clang: &Clang) {
 
     super::with_file(&clang, "int a = 322;", |_, f| {
         let range = range!(f, 1, 5, 1, 6);
-        assert_location_eq!(range.get_start().get_spelling_location(), f, 1, 5, 4);
-        assert_location_eq!(range.get_end().get_spelling_location(), f, 1, 6, 5);
+        assert_location_eq!(range.get_start().get_spelling_location(), Some(f), 1, 5, 4);
+        assert_location_eq!(range.get_end().get_spelling_location(), Some(f), 1, 6, 5);
     });
+
 }

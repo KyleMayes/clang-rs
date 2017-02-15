@@ -178,8 +178,8 @@ impl<'tu> hash::Hash for File<'tu> {
 /// The file, line, column, and character offset of a source location.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Location<'tu> {
-    /// The file of the source location.
-    pub file: File<'tu>,
+    /// The file of the source location, if it has any.
+    pub file: Option<File<'tu>>,
     /// The line of the source location.
     pub line: u32,
     /// The column of the source location.
@@ -264,7 +264,7 @@ macro_rules! location {
     ($function:ident, $location:expr, $tu:expr) => ({
         let (mut file, mut line, mut column, mut offset) = mem::uninitialized();
         $function($location, &mut file, &mut line, &mut column, &mut offset);
-        let file = File::from_ptr(file, $tu);
+        let file = file.map(|f| File::from_ptr(f, $tu));
         Location { file: file, line: line as u32, column: column as u32, offset: offset as u32 }
     });
 }
