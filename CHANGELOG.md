@@ -1,4 +1,4 @@
-## [0.15.0] - UNRELEASED
+## [0.15.0] - 2017-02-16
 
 ### Added
 - Added assertions that pointers returned from `libclang` functions are non-null
