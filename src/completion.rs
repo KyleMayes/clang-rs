@@ -258,7 +258,7 @@ impl<'r> CompletionResult<'r> {
 
     fn from_raw(raw: CXCompletionResult) -> CompletionResult<'r> {
         let kind = unsafe { mem::transmute(raw.CursorKind) };
-        CompletionResult { kind: kind, string: CompletionString::from_raw(raw.CompletionString) }
+        CompletionResult { kind: kind, string: CompletionString::from_ptr(raw.CompletionString) }
     }
 }
 
@@ -285,6 +285,7 @@ impl CompletionResults {
     //- Constructors -----------------------------
 
     fn from_ptr(ptr: *mut CXCodeCompleteResults) -> CompletionResults {
+        assert!(!ptr.is_null());
         CompletionResults { ptr: ptr }
     }
 
@@ -361,7 +362,7 @@ impl fmt::Debug for CompletionResults {
 /// A semantic string that describes a code completion result.
 #[derive(Copy, Clone)]
 pub struct CompletionString<'r> {
-    raw: CXCompletionString,
+    ptr: CXCompletionString,
     _marker: PhantomData<&'r CompletionResults>
 }
 
@@ -369,8 +370,9 @@ impl<'r> CompletionString<'r> {
     //- Constructors -----------------------------
 
     #[doc(hidden)]
-    pub fn from_raw(raw: CXCompletionString) -> CompletionString<'r> {
-        CompletionString { raw: raw, _marker: PhantomData }
+    pub fn from_ptr(ptr: CXCompletionString) -> CompletionString<'r> {
+        assert!(!ptr.is_null());
+        CompletionString { ptr: ptr, _marker: PhantomData }
     }
 
     //- Accessors --------------------------------
@@ -378,32 +380,32 @@ impl<'r> CompletionString<'r> {
     /// Returns an integer that represents how likely a user is to select this completion string as
     /// determined by internal heuristics. Smaller values indicate higher priorities.
     pub fn get_priority(&self) -> usize {
-        unsafe { clang_getCompletionPriority(self.raw) as usize }
+        unsafe { clang_getCompletionPriority(self.ptr) as usize }
     }
 
     /// Returns the annotations associated with this completion string.
     pub fn get_annotations(&self) -> Vec<String> {
         iter!(
-            clang_getCompletionNumAnnotations(self.raw),
-            clang_getCompletionAnnotation(self.raw),
+            clang_getCompletionNumAnnotations(self.ptr),
+            clang_getCompletionAnnotation(self.ptr),
         ).map(utility::to_string).collect()
     }
 
     /// Returns the availability of this completion string.
     pub fn get_availability(&self) -> Availability {
-        unsafe { mem::transmute(clang_getCompletionAvailability(self.raw)) }
+        unsafe { mem::transmute(clang_getCompletionAvailability(self.ptr)) }
     }
 
     /// Returns the documentation comment brief associated with the declaration this completion
     /// string refers to, if applicable.
     pub fn get_comment_brief(&self) -> Option<String> {
-        unsafe { utility::to_string_option(clang_getCompletionBriefComment(self.raw)) }
+        unsafe { utility::to_string_option(clang_getCompletionBriefComment(self.ptr)) }
     }
 
     /// Returns the name of the semantic parent of the declaration this completion string refers to,
     /// if applicable.
     pub fn get_parent_name(&self) -> Option<String> {
-        unsafe { utility::to_string_option(clang_getCompletionParent(self.raw, ptr::null_mut())) }
+        unsafe { utility::to_string_option(clang_getCompletionParent(self.ptr, ptr::null_mut())) }
     }
 
     /// Returns the text of the typed text chunk for this completion string, if any.
@@ -419,12 +421,12 @@ impl<'r> CompletionString<'r> {
     /// Returns the chunks of this completion string.
     pub fn get_chunks(&self) -> Vec<CompletionChunk> {
         iter!(
-            clang_getNumCompletionChunks(self.raw),
-            clang_getCompletionChunkKind(self.raw),
+            clang_getNumCompletionChunks(self.ptr),
+            clang_getCompletionChunkKind(self.ptr),
         ).enumerate().map(|(i, k)| {
             macro_rules! text {
                 ($variant:ident) => ({
-                    let text = unsafe { clang_getCompletionChunkText(self.raw, i as c_uint) };
+                    let text = unsafe { clang_getCompletionChunkText(self.ptr, i as c_uint) };
                     CompletionChunk::$variant(utility::to_string(text))
                 });
             }
@@ -452,8 +454,8 @@ impl<'r> CompletionString<'r> {
                 CXCompletionChunk_ResultType => text!(ResultType),
                 CXCompletionChunk_Optional => {
                     let i = i as c_uint;
-                    let raw = unsafe { clang_getCompletionChunkCompletionString(self.raw, i) };
-                    CompletionChunk::Optional(CompletionString::from_raw(raw))
+                    let ptr = unsafe { clang_getCompletionChunkCompletionString(self.ptr, i) };
+                    CompletionChunk::Optional(CompletionString::from_ptr(ptr))
                 },
                 _ => panic!("unexpected completion chunk kind: {:?}", k),
             }

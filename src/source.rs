@@ -47,6 +47,7 @@ impl<'tu> File<'tu> {
 
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
+        assert!(!ptr.is_null());
         File { ptr: ptr, tu: tu }
     }
 
@@ -202,6 +203,7 @@ impl<'tu> Module<'tu> {
 
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
+        assert!(!ptr.is_null());
         Module { ptr: ptr, tu: tu }
     }
 

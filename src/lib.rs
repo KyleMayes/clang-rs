@@ -1117,7 +1117,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns a completion string for this declaration or macro definition, if applicable.
     pub fn get_completion_string(&self) -> Option<CompletionString> {
-        unsafe { clang_getCursorCompletionString(self.raw).map(CompletionString::from_raw) }
+        unsafe { clang_getCursorCompletionString(self.raw).map(CompletionString::from_ptr) }
     }
 
     /// Returns the child of this AST entity with the supplied index.
@@ -1690,6 +1690,7 @@ impl<'c> Index<'c> {
     //- Constructors -----------------------------
 
     fn from_ptr(ptr: CXIndex) -> Index<'c> {
+        assert!(!ptr.is_null());
         Index { ptr: ptr, _marker: PhantomData }
     }
 
@@ -1944,6 +1945,7 @@ impl<'i> TranslationUnit<'i> {
     //- Constructors -----------------------------
 
     fn from_ptr(ptr: CXTranslationUnit) -> TranslationUnit<'i> {
+        assert!(!ptr.is_null());
         TranslationUnit{ ptr: ptr, _marker: PhantomData }
     }
 

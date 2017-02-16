@@ -78,6 +78,7 @@ impl<'tu> Diagnostic<'tu> {
 
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXDiagnostic, tu: &'tu TranslationUnit<'tu>) -> Diagnostic<'tu> {
+        assert!(!ptr.is_null());
         Diagnostic { ptr: ptr, tu: tu }
     }
 

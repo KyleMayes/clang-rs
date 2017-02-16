@@ -1,5 +1,8 @@
 ## [0.15.0] - UNRELEASED
 
+### Added
+- Added assertions to constructors that pointers are non-null
+
 ### Changed
 - Changed the type of the `file` field in the `Location` struct from `File` to `Option<File>`
 
