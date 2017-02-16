@@ -2238,7 +2238,7 @@ impl<'tu> Type<'tu> {
 
     /// Returns whether this type is an elaborated type, if it can be determined for certain.
     pub fn is_elaborated(&self) -> Option<bool> {
-        if unsafe { mem::transmute::<_, c_int>(self.raw.kind) } == 119 {
+        if self.raw.kind == 119 {
             Some(true)
         } else if cfg!(feature="gte_clang_3_9") {
             Some(false)

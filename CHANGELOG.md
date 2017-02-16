@@ -4,6 +4,7 @@
 - Added assertions that pointers returned from `libclang` functions are non-null
 
 ### Changed
+- Bumped `clang-sys` version to `0.14.0`
 - Changed the type of the `file` field in the `Location` struct from `File` to `Option<File>`
 
 ## [0.14.1] - 2017-01-29
