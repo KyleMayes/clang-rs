@@ -1,3 +1,8 @@
+## [0.15.0] - UNRELEASED
+
+### Changed
+- Changed the type of the `file` field in the `Location` struct from `File` to `Option<File>`
+
 ## [0.14.1] - 2017-01-29
 
 ### Changed
