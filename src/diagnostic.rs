@@ -128,10 +128,10 @@ impl<'tu> Diagnostic<'tu> {
 
     /// Returns the child diagnostics of this diagnostic.
     pub fn get_children(&self) -> Vec<Diagnostic> {
-        let raw = unsafe { clang_getChildDiagnostics(self.ptr) };
+        let ptr = unsafe { clang_getChildDiagnostics(self.ptr) };
         iter!(
-            clang_getNumDiagnosticsInSet(raw),
-            clang_getDiagnosticInSet(raw),
+            clang_getNumDiagnosticsInSet(ptr),
+            clang_getDiagnosticInSet(ptr),
         ).map(|d| Diagnostic::from_ptr(d, self.tu)).collect()
     }
 
@@ -210,7 +210,6 @@ impl<'tu> DiagnosticFormatter<'tu> {
 
     /// Returns a formatted string.
     pub fn format(&self) -> String {
-        let ptr = self.diagnostic.ptr;
-        unsafe { utility::to_string(clang_formatDiagnostic(ptr, self.flags)) }
+        unsafe { utility::to_string(clang_formatDiagnostic(self.diagnostic.ptr, self.flags)) }
     }
 }

@@ -1013,6 +1013,7 @@ impl<'tu> Entity<'tu> {
 
         unsafe {
             clang_Cursor_Evaluate(self.raw).map(|e| {
+                assert!(!e.is_null());
                 let result = match clang_EvalResult_getKind(e) {
                     CXEval_UnExposed => EvaluationResult::Unexposed,
                     CXEval_Int => EvaluationResult::Integer(clang_EvalResult_getAsInt(e) as i64),
