@@ -1,6 +1,6 @@
 environment:
   matrix:
-    - LLVM_VERSION: 3.9
+    - LLVM_VERSION: 3.9.1
       CLANG_VERSION: clang_3_9
 
 install:

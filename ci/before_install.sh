@@ -20,7 +20,7 @@ function llvm_download() {
 
     wget http://llvm.org/releases/${LLVM_VERSION_TRIPLE}/${LLVM}.tar.xz
     mkdir llvm
-    tar -xf ${LLVM}.tar.xz -C llvm --strip-components=1
+    tar xf ${LLVM}.tar.xz -C llvm --strip-components=1
 
     export LLVM_CONFIG_PATH=`pwd`/llvm/bin/llvm-config
 }
