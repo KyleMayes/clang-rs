@@ -23,15 +23,17 @@ clang_3_6 = ["clang-sys/clang_3_6", "gte_clang_3_6"]
 clang_3_7 = ["clang-sys/clang_3_7", "gte_clang_3_6", "gte_clang_3_7"]
 clang_3_8 = ["clang-sys/clang_3_8", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8"]
 clang_3_9 = ["clang-sys/clang_3_9", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9"]
+clang_4_0 = ["clang-sys/clang_4_0", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9", "gte_clang_4_0"]
 
 gte_clang_3_6 = []
 gte_clang_3_7 = []
 gte_clang_3_8 = []
 gte_clang_3_9 = []
+gte_clang_4_0 = []
 
 [dependencies]
 
-clang-sys = "0.14.0"
+clang-sys = "0.15.0"
 lazy_static = "0.2.1"
 libc = "0.2.16"
 

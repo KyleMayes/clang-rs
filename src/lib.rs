@@ -21,6 +21,7 @@
 //! * 3.7 - [Documentation](https://kylemayes.github.io/clang-rs/3_7/clang)
 //! * 3.8 - [Documentation](https://kylemayes.github.io/clang-rs/3_8/clang)
 //! * 3.9 - [Documentation](https://kylemayes.github.io/clang-rs/3_9/clang)
+//! * 4.0 - [Documentation](https://kylemayes.github.io/clang-rs/4_0/clang)
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
@@ -147,6 +148,11 @@ pub enum CallingConvention {
     AapcsVfp = 7,
     /// The function type uses the calling convention for Intel OpenCL built-ins.
     IntelOcl = 9,
+    /// The function type uses a calling convention that passes as many values in registers as
+    /// possible.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    RegCall = 8,
     /// The function type uses the x64 C calling convention as specified in the System V ABI.
     SysV64 = 11,
     /// The function type uses the x64 C calling convention as implemented on Windows.
@@ -548,6 +554,46 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 3.9 and later.
     OmpTargetParallelForSimdDirective = 269,
+    /// An OpenMP target SIMD directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTargetSimdDirective = 270,
+    /// An OpenMP teams distribute directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTeamsDistributeDirective = 271,
+    /// An OpenMP teams distribute SIMD directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTeamsDistributeSimdDirective = 272,
+    /// An OpenMP teams distribute parallel for SIMD directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTeamsDistributeParallelForSimdDirective = 273,
+    /// An OpenMP teams distribute parallel for directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTeamsDistributeParallelForDirective = 274,
+    /// An OpenMP target teams directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTargetTeamsDirective = 275,
+    /// An OpenMP target teams distribute directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTargetTeamsDistributeDirective = 276,
+    /// An OpenMP target teams distribute parallel for directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTargetTeamsDistributeParallelForDirective = 277,
+    /// An OpenMP target teams distribute parallel for SIMD directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTargetTeamsDistributeParallelForSimdDirective = 278,
+    /// An OpenMP target teams distribute SIMD directive.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    OmpTargetTeamsDistributeSimdDirective = 279,
     /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
     /// An attribute whose specific kind is not exposed via this interface.
@@ -617,6 +663,10 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 3.9 and later.
     StaticAssert = 602,
+    /// A friend declaration.
+    ///
+    /// Only produced by `libclang` 4.0 and later.
+    FriendDecl = 603,
     /// A single overload in a set of overloads.
     ///
     /// Only produced by `libclang` 3.7 and later.
@@ -645,8 +695,13 @@ pub enum EntityVisitResult {
 pub enum EvaluationResult {
     /// An evaluation result whose specific type is not exposed via this interface.
     Unexposed,
-    /// An integer evaluation result.
-    Integer(i64),
+    /// A signed integer evaluation result.
+    SignedInteger(i64),
+    /// An unsigned integer evaluation result.
+    ///
+    /// Only produced by `libclang` 4.0 and later. Earlier versions will always return
+    /// `SignedInteger` for integers.
+    UnsignedInteger(u64),
     /// A floating point number evaluation result.
     Float(f64),
     /// A string literal evaluation result.
@@ -1011,12 +1066,26 @@ impl<'tu> Entity<'tu> {
             };
         }
 
+        #[cfg(feature="gte_clang_4_0")]
+        unsafe fn evaluate_integer(e: CXEvalResult) -> EvaluationResult {
+            if clang_EvalResult_isUnsignedInt(e) != 0 {
+                EvaluationResult::UnsignedInteger(clang_EvalResult_getAsUnsigned(e) as u64)
+            } else {
+                EvaluationResult::SignedInteger(clang_EvalResult_getAsLongLong(e) as i64)
+            }
+        }
+
+        #[cfg(not(feature="gte_clang_4_0"))]
+        unsafe fn evaluate_integer(e: CXEvalResult) -> EvaluationResult {
+            EvaluationResult::SignedInteger(clang_EvalResult_getAsInt(e) as i64)
+        }
+
         unsafe {
             clang_Cursor_Evaluate(self.raw).map(|e| {
                 assert!(!e.is_null());
                 let result = match clang_EvalResult_getKind(e) {
                     CXEval_UnExposed => EvaluationResult::Unexposed,
-                    CXEval_Int => EvaluationResult::Integer(clang_EvalResult_getAsInt(e) as i64),
+                    CXEval_Int => evaluate_integer(e),
                     CXEval_Float => EvaluationResult::Float(clang_EvalResult_getAsDouble(e) as f64),
                     CXEval_ObjCStrLiteral => EvaluationResult::ObjCString(string!(e)),
                     CXEval_StrLiteral => EvaluationResult::String(string!(e)),
@@ -1991,6 +2060,21 @@ impl<'i> TranslationUnit<'i> {
             let usage = raws.iter().map(|u| (mem::transmute(u.kind), u.amount as usize)).collect();
             clang_disposeCXTUResourceUsage(raw);
             usage
+        }
+    }
+
+    /// Returns the source ranges in this translation unit that were skipped by the preprocessor.
+    ///
+    /// This will always return an empty `Vec` if the translation unit was not constructed with a
+    /// detailed preprocessing record.
+    #[cfg(feature="gte_clang_4_0")]
+    pub fn get_skipped_ranges(&'i self) -> Vec<SourceRange<'i>> {
+        unsafe {
+            let raw = clang_getAllSkippedRanges(self.ptr);
+            let raws = slice::from_raw_parts((*raw).ranges, (*raw).count as usize);
+            let ranges = raws.iter().map(|r| SourceRange::from_raw(*r, self)).collect();
+            clang_disposeSourceRangeList(raw);
+            ranges
         }
     }
 

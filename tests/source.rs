@@ -1,4 +1,5 @@
 use std::ffi::{OsStr};
+use std::path::{Path};
 
 use clang::*;
 use clang::source::*;
@@ -25,8 +26,20 @@ pub fn test(clang: &Clang) {
         let index = Index::new(&clang, false, false);
         let tu = index.parser(f).detailed_preprocessing_record(true).parse().unwrap();
 
-        let file = tu.get_file(f).unwrap();
-        assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
+        #[cfg(feature="gte_clang_4_0")]
+        fn test_get_skipped_ranges<'tu>(tu: TranslationUnit<'tu>, f: &Path) {
+            let file = tu.get_file(f).unwrap();
+            assert_eq!(tu.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
+            assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
+        }
+
+        #[cfg(not(feature="gte_clang_4_0"))]
+        fn test_get_skipped_ranges<'tu>(tu: TranslationUnit<'tu>, f: &Path) {
+            let file = tu.get_file(f).unwrap();
+            assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
+        }
+
+        test_get_skipped_ranges(tu, f);
     });
 
     super::with_file(&clang, "#ifndef _TEST_H_\n#define _TEST_H_\nint a = 322;\n#endif", |_, f| {

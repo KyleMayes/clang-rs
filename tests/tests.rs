@@ -170,16 +170,28 @@ fn test() {
 
     let source = r#"
         void f() {
-            int a = 2 + 2;
+            unsigned int a = 2 + 2;
             double b = 0.25 * 2.0;
             const char* c = "Hello, world!";
         }
     "#;
 
     with_entity(&clang, source, |e| {
-        #[cfg(feature="gte_clang_3_9")]
+        #[cfg(feature="gte_clang_4_0")]
         fn test_evaluate<'tu>(expressions: &[Entity<'tu>]) {
-            assert_eq!(expressions[0].evaluate(), Some(EvaluationResult::Integer(4)));
+            assert_eq!(expressions[0].evaluate(), Some(EvaluationResult::UnsignedInteger(4)));
+            assert_eq!(expressions[1].evaluate(), Some(EvaluationResult::Float(0.5)));
+            match expressions[2].evaluate() {
+                Some(EvaluationResult::String(string)) => {
+                    assert_eq!(string.to_str(), Ok("Hello, world!"));
+                },
+                _ => unreachable!(),
+            }
+        }
+
+        #[cfg(feature="clang_3_9")]
+        fn test_evaluate<'tu>(expressions: &[Entity<'tu>]) {
+            assert_eq!(expressions[0].evaluate(), Some(EvaluationResult::SignedInteger(4)));
             assert_eq!(expressions[1].evaluate(), Some(EvaluationResult::Float(0.5)));
             match expressions[2].evaluate() {
                 Some(EvaluationResult::String(string)) => {
