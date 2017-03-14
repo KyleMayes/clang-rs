@@ -1,4 +1,4 @@
-## [0.16.0] - UNRELEASED
+## [0.16.0] - 2017-03-14
 
 ### Added
 - Added support for `clang` 4.0.x
