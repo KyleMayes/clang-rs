@@ -28,6 +28,8 @@ To target a version of `libclang`, enable one of the following Cargo features:
   ([Documentation](https://kylemayes.github.io/clang-rs/3_9/clang))
 * `clang_4_0` - requires `libclang` 4.0 or later
   ([Documentation](https://kylemayes.github.io/clang-rs/4_0/clang))
+* `clang_5_0` - requires `libclang` 5.0 or later
+  ([Documentation](https://kylemayes.github.io/clang-rs/5_0/clang))
 
 If you do not enable one of these features, the API provided by `libclang` 3.5 will be available by
 default.

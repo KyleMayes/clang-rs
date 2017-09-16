@@ -2,7 +2,6 @@
 extern crate lazy_static;
 
 extern crate clang;
-extern crate clang_sys;
 extern crate libc;
 
 use std::env;
@@ -135,6 +134,16 @@ fn test() {
     // Entity ____________________________________
 
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
+        #[cfg(feature="gte_clang_5_0")]
+        fn test_target(tu: &TranslationUnit) {
+            let target = tu.get_target();
+            assert!(!target.triple.is_empty());
+            assert_eq!(target.pointer_width, mem::size_of::<usize>() * 8);
+        }
+
+        #[cfg(not(feature="gte_clang_5_0"))]
+        fn test_target(_: &TranslationUnit) { }
+
         let file = tu.get_file(f).unwrap();
 
         let entity = tu.get_entity();
@@ -166,6 +175,8 @@ fn test() {
             CompletionChunk::ResultType("int".into()),
             CompletionChunk::TypedText("a".into()),
         ]);
+
+        test_target(&tu);
     });
 
     let source = r#"
@@ -350,6 +361,29 @@ fn test() {
 
         assert_eq!(children[0].get_enum_constant_value(), Some((322, 322)));
         assert_eq!(children[1].get_enum_constant_value(), Some((644, 644)));
+    });
+
+    let source = "
+        void a();
+        void b() throw();
+        void c() throw(int);
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="gte_clang_5_0")]
+        fn test_get_exception_specification(children: &[Entity]) {
+            assert_eq!(children[0].get_exception_specification(), None);
+            assert_eq!(children[1].get_exception_specification(), Some(ExceptionSpecification::DynamicNone));
+            assert_eq!(children[2].get_exception_specification(), Some(ExceptionSpecification::Dynamic));
+        }
+
+        #[cfg(not(feature="gte_clang_5_0"))]
+        fn test_get_exception_specification(_: &[Entity]) { }
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 3);
+
+        test_get_exception_specification(&children[..]);
     });
 
     let files = &[
@@ -593,6 +627,27 @@ fn test() {
     });
 
     let source = "
+        enum A { A_A, A_B, A_C };
+        enum class B { B_A, B_B, B_C };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="gte_clang_5_0")]
+        fn test_is_scoped(children: &[Entity]) {
+            assert!(!children[0].is_scoped());
+            assert!(children[1].is_scoped());
+        }
+
+        #[cfg(not(feature="gte_clang_5_0"))]
+        fn test_is_scoped(_: &[Entity]) { }
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        test_is_scoped(&children[..]);
+    });
+
+    let source = "
         class Class {
             Class(int) { }
             explicit Class(const Class&) = default;
@@ -648,6 +703,36 @@ fn test() {
 
         assert!(!children[1].is_dynamic_call());
         assert!(children[2].is_dynamic_call());
+    });
+
+    let source = r#"
+        void a();
+        void b()
+            __attribute__((external_source_symbol(
+                language="Swift",
+                defined_in="module",
+                generated_declaration)));
+    "#;
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="gte_clang_5_0")]
+        fn test_get_external_symbol(children: &[Entity]) {
+            assert_eq!(children[0].get_external_symbol(), None);
+            let symbol = children[1].get_external_symbol();
+            assert!(symbol.is_some());
+            let symbol = symbol.unwrap();
+            assert_eq!(symbol.language, "Swift");
+            assert_eq!(symbol.defined, "module");
+            assert!(symbol.generated);
+        }
+
+        #[cfg(not(feature="gte_clang_5_0"))]
+        fn test_get_external_symbol(_: &[Entity]) { }
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 2);
+
+        test_get_external_symbol(&children[..]);
     });
 
     let source = "
@@ -713,9 +798,6 @@ fn test() {
 
     // TranslationUnit ___________________________
 
-    //- from_ast ---------------------------------
-    //- save -------------------------------------
-
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |d, _, tu| {
         let file = d.join("test.cpp.gch");
         tu.save(&file).unwrap();
@@ -723,27 +805,19 @@ fn test() {
         let _ = TranslationUnit::from_ast(&index, &file).unwrap();
     });
 
-    //- from_source ------------------------------
-
     with_temporary_file("test.cpp", "int a = 322;", |_, f| {
         let index = Index::new(&clang, false, false);
         let _ = index.parser(f).unsaved(&[Unsaved::new(f, "int a = 644;")]).parse().unwrap();
     });
 
-    //- get_file ---------------------------------
-
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |d, _, tu| {
         assert_eq!(tu.get_file(d.join("test.c")), None);
     });
-
-    //- get_memory_usage -------------------------
 
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, _, tu| {
         let usage = tu.get_memory_usage();
         assert_eq!(usage.get(&MemoryUsage::Selectors), Some(&0));
     });
-
-    //- reparse ----------------------------------
 
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
         let _ = tu.reparse(&[Unsaved::new(f, "int a = 644;")]).unwrap();
@@ -862,6 +936,26 @@ fn test() {
     });
 
     let source = "
+        void a();
+        void b() throw();
+        void c() throw(int);
+    ";
+
+    with_types(&clang, source, |ts| {
+        #[cfg(feature="gte_clang_5_0")]
+        fn test_get_exception_specification(ts: &[Type]) {
+            assert_eq!(ts[0].get_exception_specification(), None);
+            assert_eq!(ts[1].get_exception_specification(), Some(ExceptionSpecification::DynamicNone));
+            assert_eq!(ts[2].get_exception_specification(), Some(ExceptionSpecification::Dynamic));
+        }
+
+        #[cfg(not(feature="gte_clang_5_0"))]
+        fn test_get_exception_specification(_: &[Type]) { }
+
+        test_get_exception_specification(&ts[..]);
+    });
+
+    let source = "
         struct A { int a, b, c; };
     ";
 
@@ -914,6 +1008,26 @@ fn test() {
     with_types(&clang, source, |ts| {
         assert_eq!(ts[0].get_template_argument_types(), None);
         assert_eq!(ts[1].get_template_argument_types(), Some(vec![Some(ts[0]), None]));
+    });
+
+    let source = "
+        int a;
+        typedef int Integer;
+        Integer b;
+    ";
+
+    with_types(&clang, source, |ts| {
+        #[cfg(feature="gte_clang_5_0")]
+        fn test_get_typedef_name(ts: &[Type]) {
+            assert_eq!(ts[0].get_typedef_name(), None);
+            assert_eq!(ts[1].get_typedef_name(), Some("Integer".into()));
+            assert_eq!(ts[2].get_typedef_name(), Some("Integer".into()));
+        }
+
+        #[cfg(not(feature="gte_clang_5_0"))]
+        fn test_get_typedef_name(_: &[Type]) { }
+
+        test_get_typedef_name(&ts[..]);
     });
 
     let source = "

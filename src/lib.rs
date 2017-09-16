@@ -22,6 +22,7 @@
 //! * 3.8 - [Documentation](https://kylemayes.github.io/clang-rs/3_8/clang)
 //! * 3.9 - [Documentation](https://kylemayes.github.io/clang-rs/3_9/clang)
 //! * 4.0 - [Documentation](https://kylemayes.github.io/clang-rs/4_0/clang)
+//! * 5.0 - [Documentation](https://kylemayes.github.io/clang-rs/5_0/clang)
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
@@ -714,6 +715,31 @@ pub enum EvaluationResult {
     Other(CString),
 }
 
+// ExceptionSpecification ________________________
+
+/// Indicates the exception specification of a function.
+#[cfg(feature="gte_clang_5_0")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum ExceptionSpecification {
+    /// The function has a basic `noexcept` specification.
+    BasicNoexcept = 4,
+    /// The function has a computed `noexcept` specification.
+    ComputedNoexcept = 5,
+    /// The function has a `throw(T1, T2)` specification.
+    Dynamic = 2,
+    /// The function has a `throw(...)` specification.
+    DynamicAny = 3,
+    /// The function has a `throw()` specification.
+    DynamicNone = 1,
+    /// The function has an exception specification that has not yet been evaluated.
+    Unevaluated = 6,
+    /// The function has an exception specification that has not yet been instantiated.
+    Uninstantiated = 7,
+    /// The function has an exception specification that has not yet been parsed.
+    Unparsed = 8,
+}
+
 // Language ______________________________________
 
 /// Indicates the language used by a declaration.
@@ -726,6 +752,10 @@ pub enum Language {
     Cpp = 3,
     /// The declaration uses the Objective-C programming language.
     ObjectiveC = 2,
+    /// The declaration uses the Swift programming language.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    Swift = 4,
 }
 
 // Linkage _______________________________________
@@ -891,6 +921,10 @@ pub enum TypeKind {
     Int128 = 20,
     /// `__uint128_t`
     UInt128 = 12,
+    /// A half-precision floating point type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    Half = 31,
     /// `float`
     Float = 21,
     /// `double`
@@ -957,6 +991,170 @@ pub enum TypeKind {
     ///
     /// Only produced by `libclang` 3.9 and later.
     Elaborated = 119,
+    /// An OpenCL pipe type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    Pipe = 120,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dRO = 121,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dArrayRO = 122,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dBufferRO = 123,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dRO = 124,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayRO = 125,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dDepthRO = 126,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayDepthRO = 127,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dMSAARO = 128,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayMSAARO = 129,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dMSAADepthRO = 130,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayMSAADepthRO = 131,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage3dRO = 132,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dWO = 133,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dArrayWO = 134,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dBufferWO = 135,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dWO = 136,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayWO = 137,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dDepthWO = 138,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayDepthWO = 139,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dMSAAWO = 140,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayMSAAWO = 141,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dMSAADepthWO = 142,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayMSAADepthWO = 143,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage3dWO = 144,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dRW = 145,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dArrayRW = 146,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage1dBufferRW = 147,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dRW = 148,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayRW = 149,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dDepthRW = 150,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayDepthRW = 151,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dMSAARW = 152,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayMSAARW = 153,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dMSAADepthRW = 154,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage2dArrayMSAADepthRW = 155,
+    /// An OpenCL image type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLImage3dRW = 156,
+    /// An OpenCL sampler type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLSampler = 157,
+    /// An OpenCL event type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLEvent = 158,
+    /// An OpenCL queue type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLQueue = 159,
+    /// An OpenCL reserve ID type.
+    ///
+    /// Only produced by `libclang` 5.0 and later.
+    OCLReserveID = 160,
 }
 
 // Visibility ____________________________________
@@ -1236,6 +1434,36 @@ impl<'tu> Entity<'tu> {
     /// Returns the underlying type of this enum declaration, if applicable.
     pub fn get_enum_underlying_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getEnumDeclIntegerType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the exception specification of this AST entity, if applicable.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn get_exception_specification(&self) -> Option<ExceptionSpecification> {
+        unsafe {
+            match clang_getCursorExceptionSpecificationType(self.raw) {
+                -1 | CXCursor_ExceptionSpecificationKind_None => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
+    /// Returns the `external_source_symbol` attribute attached to this AST entity, if any.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn get_external_symbol(&self) -> Option<ExternalSymbol> {
+        unsafe {
+            let mut language: CXString = mem::uninitialized();
+            let mut defined: CXString = mem::uninitialized();
+            let mut generated: c_uint = 0;
+            if clang_Cursor_isExternalSymbol(self.raw, &mut language, &mut defined, &mut generated) != 0 {
+                Some(ExternalSymbol {
+                    language: utility::to_string(language),
+                    defined: utility::to_string(defined),
+                    generated: generated != 0
+                })
+            } else {
+                None
+            }
+        }
     }
 
     /// Returns the file included by this inclusion directive, if applicable.
@@ -1612,6 +1840,12 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_CXXMethod_isPureVirtual(self.raw) != 0 }
     }
 
+    /// Returns whether this AST entity is a scoped enum.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn is_scoped(&self) -> bool {
+        unsafe { clang_EnumDecl_isScoped(self.raw) != 0 }
+    }
+
     /// Returns whether this AST entity is a static method.
     pub fn is_static_method(&self) -> bool {
         unsafe { clang_CXXMethod_isStatic(self.raw) != 0 }
@@ -1746,6 +1980,20 @@ impl<'tu> hash::Hash for Entity<'tu> {
             hasher.write(slice);
         }
     }
+}
+
+// ExternalSymbol ________________________________
+
+/// An `external_source_symbol` attribute.
+#[cfg(feature="gte_clang_5_0")]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ExternalSymbol {
+    /// The `language` string from this attribute.
+    pub language: String,
+    /// The `definedIn` string from this attribute.
+    pub defined: String,
+    /// Whether `generated_declaration` is set for this attribute.
+    pub generated: bool,
 }
 
 // Index _________________________________________
@@ -1892,6 +2140,9 @@ builder! {
         /// Sets whether processing will continue after a fatal error is encountered.
         #[cfg(feature="gte_clang_3_9")]
         pub keep_going: CXTranslationUnit_KeepGoing,
+        /// Sets whether incremental processing will be used.
+        #[cfg(feature="gte_clang_5_0")]
+        pub single_file_parse: CXTranslationUnit_SingleFileParse,
     }
 }
 
@@ -1990,6 +2241,34 @@ impl PlatformAvailability {
     }
 }
 
+// Target ________________________________________
+
+/// Information about the target for a translation unit.
+#[cfg(feature="gte_clang_5_0")]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Target {
+    /// The normalized target triple for the target.
+    pub triple: String,
+    /// The width of a pointer in the target in bits.
+    pub pointer_width: usize,
+}
+
+#[cfg(feature="gte_clang_5_0")]
+impl Target {
+    //- Constructors -----------------------------
+
+    fn from_raw(raw: CXTargetInfo) -> Target {
+        unsafe {
+            let target = Target {
+                triple: utility::to_string(clang_TargetInfo_getTriple(raw)),
+                pointer_width: clang_TargetInfo_getPointerWidth(raw) as usize,
+            };
+            clang_TargetInfo_dispose(raw);
+            target
+        }
+    }
+}
+
 // ThreadOptions _________________________________
 
 options! {
@@ -2076,6 +2355,12 @@ impl<'i> TranslationUnit<'i> {
             clang_disposeSourceRangeList(raw);
             ranges
         }
+    }
+
+    /// Returns information about the target for this translation unit.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn get_target(&self) -> Target {
+        unsafe { Target::from_raw(clang_getTranslationUnitTargetInfo(self.ptr)) }
     }
 
     /// Returns the AST entities which correspond to the supplied tokens, if any.
@@ -2209,6 +2494,12 @@ impl<'tu> Type<'tu> {
         SizeofError::from_error(sizeof_).map(|_| sizeof_ as usize)
     }
 
+    /// Returns the address space of this type.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn get_address_space(&self) -> usize {
+        unsafe { clang_getAddressSpace(self.raw) as usize }
+    }
+
     /// Returns the argument types for this function or method type, if applicable.
     pub fn get_argument_types(&self) -> Option<Vec<Type<'tu>>> {
         iter_option!(
@@ -2253,6 +2544,17 @@ impl<'tu> Type<'tu> {
     /// Returns the element type for this array, complex, or vector type, if applicable.
     pub fn get_element_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getElementType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the exception specification of this type, if applicable.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn get_exception_specification(&self) -> Option<ExceptionSpecification> {
+        unsafe {
+            match clang_getExceptionSpecificationType(self.raw) {
+                -1 | CXCursor_ExceptionSpecificationKind_None => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
     }
 
     /// Returns the fields in this record type, if applicable.
@@ -2315,6 +2617,12 @@ impl<'tu> Type<'tu> {
         ).map(|i| i.map(|t| t.map(|t| Type::from_raw(t, self.tu))).collect())
     }
 
+    /// Returns the typedef name of this type, if applicable.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn get_typedef_name(&self) -> Option<String> {
+        unsafe { utility::to_string_option(clang_getTypedefName(self.raw)) }
+    }
+
     /// Returns whether this type is qualified with const.
     pub fn is_const_qualified(&self) -> bool {
         unsafe { clang_isConstQualifiedType(self.raw) != 0 }
@@ -2339,6 +2647,12 @@ impl<'tu> Type<'tu> {
     /// Returns whether this type is qualified with restrict.
     pub fn is_restrict_qualified(&self) -> bool {
         unsafe { clang_isRestrictQualifiedType(self.raw) != 0 }
+    }
+
+    /// Returns whether this type is a transparent tag typedef.
+    #[cfg(feature="gte_clang_5_0")]
+    pub fn is_transparent_tag(&self) -> bool {
+        unsafe { clang_Type_isTransparentTagTypedef(self.raw) != 0 }
     }
 
     /// Returns whether this type is a variadic function type.

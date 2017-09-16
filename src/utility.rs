@@ -158,20 +158,6 @@ pub trait Nullable: Sized {
     fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U>;
 }
 
-macro_rules! nullable {
-    ($name:ident) => (
-        impl Nullable for $name {
-            fn map<U, F: FnOnce($name) -> U>(self, f: F) -> Option<U> {
-                if !self.0.is_null() {
-                    Some(f(self))
-                } else {
-                    None
-                }
-            }
-        }
-    );
-}
-
 impl Nullable for *mut c_void {
     fn map<U, F: FnOnce(*mut c_void) -> U>(self, f: F) -> Option<U> {
         if !self.is_null() {
