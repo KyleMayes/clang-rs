@@ -3,6 +3,9 @@
 ### Added
 - Added support for `clang` 5.0.x
 
+### Changed
+- Bumped `clang-sys` version to `0.20.1`
+
 ## [0.16.0] - 2017-03-14
 
 ### Added

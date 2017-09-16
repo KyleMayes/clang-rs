@@ -35,7 +35,7 @@ gte_clang_5_0 = []
 
 [dependencies]
 
-clang-sys = "0.20.0"
+clang-sys = "0.20.1"
 lazy_static = "0.2.1"
 libc = "0.2.16"
 
