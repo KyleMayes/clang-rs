@@ -1,4 +1,4 @@
-## [0.18.0] - UNRELEASED
+## [0.18.0] - 2018-02-17
 
 ### Added
 - Added `Entity::get_result_type` method
