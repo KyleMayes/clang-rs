@@ -1,5 +1,8 @@
 ## [0.18.0] - UNRELEASED
 
+### Added
+- Added `Entity::get_result_type` method
+
 ### Changed
 - Bumped `clang-sys` version to `0.21.1`
 

@@ -1739,6 +1739,11 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns the result type of this AST entity, if applicable.
+    pub fn get_result_type(&self) -> Option<Type<'tu>> {
+        unsafe { clang_getCursorResultType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
     /// Returns whether this AST entity has any attached attributes.
     #[cfg(feature="gte_clang_3_9")]
     pub fn has_attributes(&self) -> bool {
