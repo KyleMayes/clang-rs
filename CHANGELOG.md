@@ -1,3 +1,8 @@
+## [0.18.0] - UNRELEASED
+
+### Changed
+- Bumped `clang-sys` version to `0.21.1`
+
 ## [0.17.0] - 2017-09-16
 
 ### Added

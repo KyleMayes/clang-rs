@@ -302,9 +302,9 @@ impl CompletionResults {
 
     /// Returns the code completion context for this set of code completion results, if any.
     pub fn get_context(&self) -> Option<CompletionContext> {
-        let bits = unsafe { clang_codeCompleteGetContexts(self.ptr) as c_uint };
-        if bits != 0 && bits != CXCompletionContext_Unknown.bits() {
-            Some(CompletionContext::from(CXCompletionContext::from_bits_truncate(bits)))
+        let contexts = unsafe { clang_codeCompleteGetContexts(self.ptr) as CXCompletionContext };
+        if contexts != 0 && contexts != CXCompletionContext_Unknown {
+            Some(CompletionContext::from(contexts))
         } else {
             None
         }

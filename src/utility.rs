@@ -43,9 +43,9 @@ macro_rules! builder {
         impl<'tu> $name<'tu> {
             $($(#[$odoc])+ pub fn $option(&mut self, $option: bool) -> &mut $name<'tu> {
                 if $option {
-                    self.flags.insert(::clang_sys::$flag);
+                    self.flags |= ::clang_sys::$flag;
                 } else {
-                    self.flags.remove(::clang_sys::$flag);
+                    self.flags &= !::clang_sys::$flag;
                 }
                 self
             })+
@@ -97,14 +97,14 @@ macro_rules! options {
 
         impl From<::clang_sys::$underlying> for $name {
             fn from(flags: ::clang_sys::$underlying) -> $name {
-                $name { $($option: flags.contains(::clang_sys::$flag)), + }
+                $name { $($option: (flags & ::clang_sys::$flag) != 0), + }
             }
         }
 
         impl From<$name> for ::clang_sys::$underlying {
             fn from(options: $name) -> ::clang_sys::$underlying {
-                let mut flags = ::clang_sys::$underlying::empty();
-                $(if options.$option { flags.insert(::clang_sys::$flag); })+
+                let mut flags: ::clang_sys::$underlying = 0;
+                $(if options.$option { flags |= ::clang_sys::$flag; })+
                 flags
             }
         }
