@@ -1538,7 +1538,7 @@ impl<'tu> Entity<'tu> {
     /// Returns which attributes were applied to this Objective-C property, if applicable.
     pub fn get_objc_attributes(&self) -> Option<ObjCAttributes> {
         let attributes = unsafe { clang_Cursor_getObjCPropertyAttributes(self.raw, 0) };
-        if attributes.bits() != 0 {
+        if attributes != 0 {
             Some(ObjCAttributes::from(attributes))
         } else {
             None
@@ -1574,7 +1574,7 @@ impl<'tu> Entity<'tu> {
     /// if applicable.
     pub fn get_objc_qualifiers(&self) -> Option<ObjCQualifiers> {
         let qualifiers = unsafe { clang_Cursor_getObjCDeclQualifiers(self.raw) };
-        if qualifiers.bits() != 0 {
+        if qualifiers != 0 {
             Some(ObjCQualifiers::from(qualifiers))
         } else {
             None
@@ -2150,7 +2150,7 @@ impl<'tu> Parser<'tu> {
     //- Constructors -----------------------------
 
     fn new<F: Into<PathBuf>>(index: &'tu Index<'tu>, file: F) -> Parser<'tu> {
-        let flags = CXTranslationUnit_Flags::empty();
+        let flags: CXTranslationUnit_Flags = 0;
         Parser { index: index, file: file.into(), arguments: vec![], unsaved: vec![], flags: flags }
     }
 
