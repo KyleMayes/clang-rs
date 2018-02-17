@@ -785,6 +785,35 @@ fn test() {
         assert!(children[2].get_children()[0].is_virtual_base());
     });
 
+    let source = "
+        @interface A
+        - (int)foo;
+        @end
+    ";
+
+    with_translation_unit(&clang, "test.mm", source, &[], |_, _, tu| {
+        let entities = tu.get_entity().get_children();
+        assert_eq!(entities.len(), 2);
+        // The Protocol class reference is automatically added by clang at the start of any Objective-C file
+        assert_eq!(entities[0].get_kind(), EntityKind::ObjCClassRef);
+        assert_eq!(entities[0].get_name(), Some("Protocol".into()));
+        assert_eq!(entities[1].get_kind(), EntityKind::ObjCInterfaceDecl);
+        assert_eq!(entities[1].get_name(), Some("A".into()));
+
+        let children = entities[1].get_children();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].get_kind(), EntityKind::ObjCInstanceMethodDecl,);
+        assert_eq!(children[0].get_name(), Some("foo".into()));
+
+        match children[0].get_result_type() {
+            Some(result_type) => {
+                assert_eq!(result_type.get_kind(), TypeKind::Int);
+                assert_eq!(result_type.get_display_name(), "int");
+            }
+            _ => unreachable!(),
+        }
+    });
+
     // Index _____________________________________
 
     let mut index = Index::new(&clang, false, false);
