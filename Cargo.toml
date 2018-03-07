@@ -36,7 +36,7 @@ gte_clang_5_0 = []
 [dependencies]
 
 clang-sys = "0.21.1"
-lazy_static = "0.2.1"
+lazy_static = "1.0"
 libc = "0.2.16"
 
 clippy = { version = "0.0.*", optional = true }
