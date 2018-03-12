@@ -47,6 +47,10 @@ pub fn test(clang: &Clang) {
         assert!(!context.objc_class_messages);
         assert!(!context.objc_selector_names);
 
+        if cfg!(feature="gte_clang_6_0") {
+            return;
+        }
+
         let mut results = results.get_results();
         if cfg!(target_os="windows") && cfg!(feature="gte_clang_3_8") {
             assert_eq!(results.len(), 7);

@@ -133,6 +133,42 @@ fn test() {
 
     // Entity ____________________________________
 
+    let source = "
+        struct B { };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="gte_clang_6_0")]
+        fn test_is_abstract_record(children: &[Entity]) {
+            assert_eq!(children.len(), 1);
+            assert!(!children[0].is_abstract_record());
+        }
+
+        #[cfg(not(feature="gte_clang_6_0"))]
+        fn test_is_abstract_record(_: &[Entity]) { }
+
+        test_is_abstract_record(&e.get_children()[..]);
+    });
+
+    let source = "
+        thread_local int foo;
+        int bar;
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="gte_clang_6_0")]
+        fn test_get_tls_kind(children: &[Entity]) {
+            assert_eq!(children.len(), 2);
+            assert_eq!(children[0].get_tls_kind(), Some(TlsKind::Dynamic));
+            assert_eq!(children[1].get_tls_kind(), None);
+        }
+
+        #[cfg(not(feature="gte_clang_6_0"))]
+        fn test_get_tls_kind(_: &[Entity]) { }
+
+        test_get_tls_kind(&e.get_children()[..]);
+    });
+
     with_translation_unit(&clang, "test.cpp", "int a = 322;", &[], |_, f, tu| {
         #[cfg(feature="gte_clang_5_0")]
         fn test_target(tu: &TranslationUnit) {
@@ -812,6 +848,17 @@ fn test() {
             }
             _ => unreachable!(),
         }
+
+        #[cfg(feature="gte_clang_6_0")]
+        fn test_get_mangled_objc_names(entity: &Entity) {
+            let names = vec!["_OBJC_CLASS_A".into(), "_OBJC_METACLASS_A".into()];
+            assert_eq!(entity.get_mangled_objc_names(), Some(names));
+        }
+
+        #[cfg(not(feature="gte_clang_6_0"))]
+        fn test_get_mangled_objc_names(_: &Entity) { }
+
+        test_get_mangled_objc_names(&entities[1]);
     });
 
     // Index _____________________________________

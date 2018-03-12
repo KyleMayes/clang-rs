@@ -1,5 +1,8 @@
 ## [0.19.0] - UNRELEASED
 
+### Added
+- Added support for `clang` 6.0.x
+
 ### Changed
 - Bumped `lazy_static` version to `1.0.0`
 

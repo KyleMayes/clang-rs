@@ -7,6 +7,18 @@ use clang::source::*;
 pub fn test(clang: &Clang) {
     // File ______________________________________
 
+    super::with_file(&clang, "int a = 322;", |_, f| {
+        #[cfg(feature="gte_clang_6_0")]
+        fn test_get_contents(file: &File) {
+            assert_eq!(file.get_contents(), Some("int a = 322;".into()));
+        }
+
+        #[cfg(not(feature="gte_clang_6_0"))]
+        fn test_get_contents(_: &File) { }
+
+        test_get_contents(&f);
+    });
+
     super::with_file(&clang, "int a = 322;", |p, f| {
         assert_eq!(f.get_path(), p.to_path_buf());
         assert!(f.get_time() != 0);
@@ -29,8 +41,13 @@ pub fn test(clang: &Clang) {
         #[cfg(feature="gte_clang_4_0")]
         fn test_get_skipped_ranges<'tu>(tu: TranslationUnit<'tu>, f: &Path) {
             let file = tu.get_file(f).unwrap();
-            assert_eq!(tu.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
-            assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
+            if cfg!(feature="gte_clang_6_0") {
+                assert_eq!(tu.get_skipped_ranges(), &[range!(file, 2, 9, 4, 15)]);
+                assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 9, 4, 15)]);
+            } else {
+                assert_eq!(tu.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
+                assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
+            }
         }
 
         #[cfg(not(feature="gte_clang_4_0"))]

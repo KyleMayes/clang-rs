@@ -72,6 +72,22 @@ impl<'tu> File<'tu> {
         }
     }
 
+    /// Returns the contents of this file, if this file has been loaded.
+    #[cfg(feature="gte_clang_6_0")]
+    pub fn get_contents(&self) -> Option<String> {
+        use std::ptr;
+        use std::ffi::{CStr};
+
+        unsafe {
+            let c = clang_getFileContents(self.tu.ptr, self.ptr, ptr::null_mut());
+            if !c.is_null() {
+                Some(CStr::from_ptr(c).to_str().expect("invalid Rust string").into())
+            } else {
+                None
+            }
+        }
+    }
+
     /// Returns the module containing this file, if any.
     pub fn get_module(&self) -> Option<Module<'tu>> {
         let module = unsafe { clang_getModuleForFile(self.tu.ptr, self.ptr) };

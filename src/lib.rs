@@ -23,6 +23,7 @@
 //! * 3.9 - [Documentation](https://kylemayes.github.io/clang-rs/3_9/clang)
 //! * 4.0 - [Documentation](https://kylemayes.github.io/clang-rs/4_0/clang)
 //! * 5.0 - [Documentation](https://kylemayes.github.io/clang-rs/5_0/clang)
+//! * 6.0 - [Documentation](https://kylemayes.github.io/clang-rs/6_0/clang)
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
@@ -875,6 +876,19 @@ pub enum TemplateArgument<'tu> {
     Type(Type<'tu>),
 }
 
+// TlsKind _______________________________________
+
+/// Indicates the thread-local storage (TLS) kind of a declaration.
+#[cfg(feature="gte_clang_6_0")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum TlsKind {
+    /// The declaration uses dynamic TLS.
+    Dynamic = 1,
+    /// The declaration uses static TLS.
+    Static = 2,
+}
+
 // TypeKind ______________________________________
 
 /// Indicates the categorization of a type.
@@ -921,10 +935,14 @@ pub enum TypeKind {
     Int128 = 20,
     /// `__uint128_t`
     UInt128 = 12,
-    /// A half-precision floating point type.
+    /// A half-precision (16-bit) floating point type.
     ///
     /// Only produced by `libclang` 5.0 and later.
     Half = 31,
+    /// A half-precision (16-bit) floating point type.
+    ///
+    /// Only produced by `libclang` 6.0 and later.
+    Float16 = 32,
     /// `float`
     Float = 21,
     /// `double`
@@ -1508,6 +1526,12 @@ impl<'tu> Entity<'tu> {
         unsafe { utility::to_string_set_option(clang_Cursor_getCXXManglings(self.raw)) }
     }
 
+    /// Returns the mangled names of this Objective-C class interface or implementation, if applicable.
+    #[cfg(feature="gte_clang_6_0")]
+    pub fn get_mangled_objc_names(&self) -> Option<Vec<String>> {
+        unsafe { utility::to_string_set_option(clang_Cursor_getObjCManglings(self.raw)) }
+    }
+
     /// Returns the module imported by this module import declaration, if applicable.
     pub fn get_module(&self) -> Option<Module<'tu>> {
         unsafe { clang_Cursor_getModule(self.raw).map(|m| Module::from_ptr(m, self.tu)) }
@@ -1708,6 +1732,17 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns the thread-local storage (TLS) kind of this declaration, if applicable.
+    #[cfg(feature="gte_clang_6_0")]
+    pub fn get_tls_kind(&self) -> Option<TlsKind> {
+        unsafe {
+            match clang_getCursorTLSKind(self.raw) {
+                CXTLS_None => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
     /// Returns the translation unit which contains this AST entity.
     pub fn get_translation_unit(&self) -> &'tu TranslationUnit<'tu> {
         self.tu
@@ -1748,6 +1783,12 @@ impl<'tu> Entity<'tu> {
     #[cfg(feature="gte_clang_3_9")]
     pub fn has_attributes(&self) -> bool {
         unsafe { clang_Cursor_hasAttrs(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an abstract C++ record.
+    #[cfg(feature="gte_clang_6_0")]
+    pub fn is_abstract_record(&self) -> bool {
+        unsafe { clang_CXXRecord_isAbstract(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an anonymous record declaration.
@@ -2030,6 +2071,13 @@ impl<'c> Index<'c> {
     /// Returns a parser for the supplied file.
     pub fn parser<F: Into<PathBuf>>(&'c self, f: F) -> Parser<'c> {
         Parser::new(self, f)
+    }
+
+    /// Sets the invocation emission path for this index.
+    #[cfg(feature="gte_clang_6_0")]
+    pub fn set_invocation_emission_path<P: AsRef<Path>>(&'c self, path: P) {
+        let path = utility::from_path(path);
+        unsafe { clang_CXIndex_setInvocationEmissionPathOption(self.ptr, path.as_ptr()); }
     }
 
     /// Returns the thread options for this index.
