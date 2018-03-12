@@ -5,6 +5,7 @@
 
 ### Changed
 - Bumped `lazy_static` version to `1.0.0`
+- Bumped `libc` version to `0.2.39`
 
 ## [0.18.0] - 2018-02-17
 
