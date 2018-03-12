@@ -1,3 +1,8 @@
+## [0.19.0] - UNRELEASED
+
+### Changed
+- Bumped `lazy_static` version to `1.0.0`
+
 ## [0.18.0] - 2018-02-17
 
 ### Added
