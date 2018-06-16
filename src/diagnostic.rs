@@ -79,7 +79,7 @@ impl<'tu> Diagnostic<'tu> {
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXDiagnostic, tu: &'tu TranslationUnit<'tu>) -> Diagnostic<'tu> {
         assert!(!ptr.is_null());
-        Diagnostic { ptr: ptr, tu: tu }
+        Diagnostic { ptr, tu }
     }
 
     //- Accessors --------------------------------
@@ -203,7 +203,7 @@ impl<'tu> DiagnosticFormatter<'tu> {
 
     fn new(diagnostic: Diagnostic<'tu>) -> DiagnosticFormatter<'tu> {
         let flags = unsafe { clang_defaultDiagnosticDisplayOptions() };
-        DiagnosticFormatter { diagnostic: diagnostic, flags: flags }
+        DiagnosticFormatter { diagnostic, flags }
     }
 
     //- Accessors --------------------------------

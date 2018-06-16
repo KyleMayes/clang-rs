@@ -157,7 +157,7 @@ impl<'tu> Completer<'tu> {
     ) -> Completer<'tu> {
         let file = file.into();
         let flags = unsafe { clang_defaultCodeCompleteOptions() };
-        Completer {  tu: tu, file: file, line: line, column: column, unsaved: vec![], flags: flags }
+        Completer { tu, file, line, column, unsaved: vec![], flags }
     }
 
     //- Mutators ---------------------------------
@@ -178,7 +178,7 @@ impl<'tu> Completer<'tu> {
                 utility::from_path(&self.file).as_ptr(),
                 self.line as c_uint,
                 self.column as c_uint,
-                mem::transmute(self.unsaved.as_ptr()),
+                self.unsaved.as_ptr() as *mut CXUnsavedFile,
                 self.unsaved.len() as c_uint,
                 self.flags,
             );
@@ -258,7 +258,7 @@ impl<'r> CompletionResult<'r> {
 
     fn from_raw(raw: CXCompletionResult) -> CompletionResult<'r> {
         let kind = unsafe { mem::transmute(raw.CursorKind) };
-        CompletionResult { kind: kind, string: CompletionString::from_ptr(raw.CompletionString) }
+        CompletionResult { kind, string: CompletionString::from_ptr(raw.CompletionString) }
     }
 }
 
@@ -286,7 +286,7 @@ impl CompletionResults {
 
     fn from_ptr(ptr: *mut CXCodeCompleteResults) -> CompletionResults {
         assert!(!ptr.is_null());
-        CompletionResults { ptr: ptr }
+        CompletionResults { ptr }
     }
 
     //- Accessors --------------------------------
@@ -372,7 +372,7 @@ impl<'r> CompletionString<'r> {
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXCompletionString) -> CompletionString<'r> {
         assert!(!ptr.is_null());
-        CompletionString { ptr: ptr, _marker: PhantomData }
+        CompletionString { ptr, _marker: PhantomData }
     }
 
     //- Accessors --------------------------------

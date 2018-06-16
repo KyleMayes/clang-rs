@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::mem;
 use std::ffi::{CStr, CString};
 use std::path::{Path};
 
@@ -298,5 +297,5 @@ pub fn to_string_set_option(clang: *mut CXStringSet) -> Option<Vec<String>> {
 
 pub fn with_string<S: AsRef<str>, T, F: FnOnce(CXString) -> T>(string: S, f: F) -> T {
     let string = from_string(string);
-    unsafe { f(CXString { data: mem::transmute(string.as_ptr()), private_flags: 0 }) }
+    f(CXString { data: string.as_ptr() as *const c_void, private_flags: 0 })
 }

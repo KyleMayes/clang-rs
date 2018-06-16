@@ -87,7 +87,7 @@ impl<'tu> Declaration<'tu> {
     //- Constructors -----------------------------
 
     fn new(name: String, entity: Entity<'tu>, source: Option<Entity<'tu>>) -> Declaration<'tu> {
-        Declaration { name: name, entity: entity, source: source }
+        Declaration { name, entity, source }
     }
 }
 
@@ -108,7 +108,7 @@ impl<'tu> Definition<'tu> {
     //- Constructors -----------------------------
 
     fn new(name: String, value: DefinitionValue, entity: Entity<'tu>) -> Definition<'tu> {
-        Definition { name: name, value: value, entity: entity }
+        Definition { name, value, entity }
     }
 }
 
@@ -125,7 +125,7 @@ impl<'tu> Definitions<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Definitions<'tu> {
-        Definitions { entities: entities, seen: HashSet::new() }
+        Definitions { entities, seen: HashSet::new() }
     }
 }
 
@@ -161,7 +161,7 @@ impl<'tu> Enums<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Enums<'tu> {
-        Enums { entities: entities, seen: HashSet::new() }
+        Enums { entities, seen: HashSet::new() }
     }
 }
 
@@ -186,7 +186,7 @@ impl<'tu> Functions<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Functions<'tu> {
-        Functions { entities: entities, seen: HashSet::new() }
+        Functions { entities, seen: HashSet::new() }
     }
 }
 
@@ -220,7 +220,7 @@ impl<'tu> Structs<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Structs<'tu> {
-        Structs { entities: entities, seen: HashSet::new() }
+        Structs { entities, seen: HashSet::new() }
     }
 }
 
@@ -245,7 +245,7 @@ impl<'tu> Typedefs<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Typedefs<'tu> {
-        Typedefs { entities: entities, seen: HashSet::new() }
+        Typedefs { entities, seen: HashSet::new() }
     }
 }
 
@@ -288,7 +288,7 @@ impl<'tu> Unions<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Unions<'tu> {
-        Unions { entities: entities, seen: HashSet::new() }
+        Unions { entities, seen: HashSet::new() }
     }
 }
 

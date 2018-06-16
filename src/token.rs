@@ -63,7 +63,7 @@ impl<'tu> Token<'tu> {
 
     #[doc(hidden)]
     pub fn from_raw(raw: CXToken, tu: &'tu TranslationUnit<'tu>) -> Token<'tu> {
-        Token{ raw: raw, tu: tu }
+        Token{ raw, tu }
     }
 
     //- Accessors --------------------------------

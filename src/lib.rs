@@ -1264,7 +1264,7 @@ impl<'tu> Entity<'tu> {
     //- Constructors -----------------------------
 
     fn from_raw(raw: CXCursor, tu: &'tu TranslationUnit<'tu>) -> Entity<'tu> {
-        Entity { raw: raw, tu: tu }
+        Entity { raw, tu }
     }
 
     //- Accessors --------------------------------
@@ -2051,7 +2051,7 @@ impl<'c> Index<'c> {
 
     fn from_ptr(ptr: CXIndex) -> Index<'c> {
         assert!(!ptr.is_null());
-        Index { ptr: ptr, _marker: PhantomData }
+        Index { ptr, _marker: PhantomData }
     }
 
     /// Constructs a new `Index`.
@@ -2200,7 +2200,7 @@ impl<'tu> Parser<'tu> {
 
     fn new<F: Into<PathBuf>>(index: &'tu Index<'tu>, file: F) -> Parser<'tu> {
         let flags: CXTranslationUnit_Flags = 0;
-        Parser { index: index, file: file.into(), arguments: vec![], unsaved: vec![], flags: flags }
+        Parser { index, file: file.into(), arguments: vec![], unsaved: vec![], flags }
     }
 
     //- Mutators ---------------------------------
@@ -2244,7 +2244,7 @@ impl<'tu> Parser<'tu> {
                 utility::from_path(&self.file).as_ptr(),
                 arguments.as_ptr(),
                 arguments.len() as c_int,
-                mem::transmute(unsaved.as_ptr()),
+                unsaved.as_ptr() as *mut CXUnsavedFile,
                 unsaved.len() as c_uint,
                 self.flags,
                 &mut ptr,
@@ -2344,7 +2344,7 @@ impl<'i> TranslationUnit<'i> {
 
     fn from_ptr(ptr: CXTranslationUnit) -> TranslationUnit<'i> {
         assert!(!ptr.is_null());
-        TranslationUnit{ ptr: ptr, _marker: PhantomData }
+        TranslationUnit { ptr, _marker: PhantomData }
     }
 
     /// Constructs a new `TranslationUnit` from an AST file.
@@ -2416,7 +2416,7 @@ impl<'i> TranslationUnit<'i> {
     pub fn annotate(&'i self, tokens: &[Token<'i>]) -> Vec<Option<Entity<'i>>> {
         unsafe {
             let mut raws = vec![CXCursor::default(); tokens.len()];
-            let ptr = mem::transmute(tokens.as_ptr());
+            let ptr = tokens.as_ptr() as *mut CXToken;
             clang_annotateTokens(self.ptr, ptr, tokens.len() as c_uint, raws.as_mut_ptr());
             raws.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
         }
@@ -2456,7 +2456,7 @@ impl<'i> TranslationUnit<'i> {
             let code = clang_reparseTranslationUnit(
                 self.ptr,
                 unsaved.len() as c_uint,
-                mem::transmute(unsaved.as_ptr()),
+                unsaved.as_ptr() as *mut CXUnsavedFile,
                 CXReparse_None,
             );
             SourceError::from_error(code).map(|_| self)
@@ -2492,7 +2492,7 @@ impl<'tu> Type<'tu> {
     //- Constructors -----------------------------
 
     fn from_raw(raw: CXType, tu: &'tu TranslationUnit<'tu>) -> Type<'tu> {
-        Type { raw: raw, tu: tu }
+        Type { raw, tu }
     }
 
     //- Accessors --------------------------------

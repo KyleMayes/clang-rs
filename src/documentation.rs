@@ -152,7 +152,7 @@ impl BlockCommand {
         ).map(utility::to_string).collect();
         let paragraph = clang_BlockCommandComment_getParagraph(raw);
         let children = Comment::from_raw(paragraph).get_children();
-        BlockCommand { command: command, arguments: arguments, children: children }
+        BlockCommand { command, arguments, children }
     }
 }
 
@@ -170,7 +170,7 @@ impl<'tu> Comment<'tu> {
 
     #[doc(hidden)]
     pub fn from_raw(raw: CXComment) -> Comment<'tu> {
-        Comment { raw: raw, _marker: PhantomData }
+        Comment { raw, _marker: PhantomData }
     }
 
     //- Accessors --------------------------------
@@ -224,7 +224,7 @@ impl HtmlStartTag {
             clang_HTMLStartTag_getAttrValue(raw),
         ).map(|(n, v)| (utility::to_string(n), utility::to_string(v))).collect();
         let closing = clang_HTMLStartTagComment_isSelfClosing(raw) != 0;
-        HtmlStartTag { name: name, attributes: attributes, closing: closing }
+        HtmlStartTag { name, attributes, closing }
     }
 }
 
@@ -254,7 +254,7 @@ impl InlineCommand {
             CXCommentInlineCommandRenderKind_Normal => None,
             other => Some(mem::transmute(other)),
         };
-        InlineCommand { command: command, arguments: arguments, style: style }
+        InlineCommand { command, arguments, style }
     }
 }
 
@@ -290,7 +290,7 @@ impl ParamCommand {
         };
         let paragraph = clang_BlockCommandComment_getParagraph(raw);
         let children = Comment::from_raw(paragraph).get_children();
-        ParamCommand { index: index, parameter: parameter, direction: direction, children: children }
+        ParamCommand { index, parameter, direction, children }
     }
 }
 
@@ -322,6 +322,6 @@ impl TParamCommand {
         let parameter = utility::to_string(clang_TParamCommandComment_getParamName(raw));
         let paragraph = clang_BlockCommandComment_getParagraph(raw);
         let children = Comment::from_raw(paragraph).get_children();
-        TParamCommand { position: position, parameter: parameter, children: children }
+        TParamCommand { position, parameter, children }
     }
 }

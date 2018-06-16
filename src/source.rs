@@ -48,7 +48,7 @@ impl<'tu> File<'tu> {
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXFile, tu: &'tu TranslationUnit<'tu>) -> File<'tu> {
         assert!(!ptr.is_null());
-        File { ptr: ptr, tu: tu }
+        File { ptr, tu }
     }
 
     //- Accessors --------------------------------
@@ -220,7 +220,7 @@ impl<'tu> Module<'tu> {
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXModule, tu: &'tu TranslationUnit<'tu>) -> Module<'tu> {
         assert!(!ptr.is_null());
-        Module { ptr: ptr, tu: tu }
+        Module { ptr, tu }
     }
 
     //- Accessors --------------------------------
@@ -299,7 +299,7 @@ impl<'tu> SourceLocation<'tu> {
 
     #[doc(hidden)]
     pub fn from_raw(raw: CXSourceLocation, tu: &'tu TranslationUnit<'tu>) -> SourceLocation<'tu> {
-        SourceLocation { raw: raw, tu: tu }
+        SourceLocation { raw, tu }
     }
 
     //- Accessors --------------------------------
@@ -392,7 +392,7 @@ impl<'tu> SourceRange<'tu> {
 
     #[doc(hidden)]
     pub fn from_raw(raw: CXSourceRange, tu: &'tu TranslationUnit<'tu>) -> SourceRange<'tu> {
-        SourceRange { raw: raw, tu: tu }
+        SourceRange { raw, tu }
     }
 
     /// Constructs a new `SourceRange` that spans [`start`, `end`).
@@ -492,6 +492,6 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     }
 
     let mut data = (tu, Box::new(f) as Box<Callback>);
-    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit: visit };
+    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit };
     g(visitor) == CXResult_VisitBreak
 }
