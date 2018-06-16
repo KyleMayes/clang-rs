@@ -43,8 +43,6 @@ clang-sys = "0.22.0"
 lazy_static = "1.0"
 libc = "0.2.39"
 
-clippy = { version = "0.0.*", optional = true }
-
 [[test]]
 
 name = "tests"

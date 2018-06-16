@@ -29,10 +29,6 @@
 
 #![allow(non_upper_case_globals)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", warn(clippy))]
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -814,7 +810,7 @@ pub enum MemoryUsage {
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
-#[cfg_attr(feature="clippy", allow(enum_variant_names))]
+#[cfg_attr(feature="cargo-clippy", allow(enum_variant_names))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum RefQualifier {
