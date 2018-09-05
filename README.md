@@ -10,8 +10,6 @@ Supported on the stable, beta, and nightly Rust channels.
 
 Released under the Apache License 2.0.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this repository.
-
 ## Supported Versions
 
 To target a version of `libclang`, enable one of the following Cargo features:
