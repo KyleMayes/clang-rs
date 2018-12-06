@@ -29,9 +29,6 @@
 
 #![allow(non_upper_case_globals)]
 
-#[macro_use]
-extern crate lazy_static;
-
 extern crate clang_sys;
 extern crate libc;
 
@@ -1192,7 +1189,7 @@ pub enum Visibility {
 
 // Clang _________________________________________
 
-lazy_static! { static ref AVAILABLE: AtomicBool = AtomicBool::new(true); }
+static AVAILABLE: AtomicBool = AtomicBool::new(true);
 
 /// An empty type which prevents the use of this library from multiple threads simultaneously.
 #[derive(Debug)]

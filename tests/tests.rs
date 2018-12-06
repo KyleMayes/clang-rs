@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate lazy_static;
-
 extern crate clang;
 extern crate libc;
 
@@ -49,7 +46,7 @@ fn with_file<'c, F: FnOnce(&Path, File)>(clang: &'c Clang, contents: &str, f: F)
     });
 }
 
-lazy_static! { static ref COUNTER: AtomicUsize = AtomicUsize::new(0); }
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn with_temporary_directory<F: FnOnce(&Path)>(f: F) {
     let exe = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().into_owned();
