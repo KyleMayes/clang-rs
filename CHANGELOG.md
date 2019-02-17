@@ -1,4 +1,4 @@
-## [0.21.0] - UNRELEASED
+## [0.21.0] - 2019-02-17
 
 ### Changed
 - Bumped `clang-sys` version to `0.26.4`
