@@ -39,7 +39,7 @@ gte_clang_6_0 = []
 
 [dependencies]
 
-clang-sys = "0.23.0"
+clang-sys = "0.26.4"
 libc = "0.2.39"
 
 [[test]]
