@@ -52,6 +52,33 @@ macro_rules! builder {
     );
 }
 
+#[cfg(feature="gte_clang_7_0")]
+macro_rules! extern_properties {
+    (
+        with {
+            $get_fn:ident,
+            $set_fn:ident,
+        }
+
+        $(pub $flag:ident: bool {
+            $(#[$get_doc:meta])+
+            $get_name:ident,
+            $(#[$set_doc:meta])+
+            $set_name:ident,
+        })+
+    ) => ($(
+        $(#[$get_doc])+
+        pub fn $get_name(&self) -> bool {
+            unsafe { $get_fn(self.ptr) != 0 }
+        }
+
+        $(#[$set_doc])+
+        pub fn $set_name(&self, value: bool) {
+            unsafe { $set_fn(self.ptr, if value { 1 } else { 0 }) }
+        }
+    )+);
+}
+
 // iter! _________________________________________
 
 /// Returns an iterator over the values returned by `get_argument`.
