@@ -2941,6 +2941,24 @@ impl<'tu> Type<'tu> {
         unsafe { clang_Type_getObjCObjectBaseType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
+    /// Returns the declarations for all protocal references for this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_protocal_declarations(&self) -> Option<Vec<Entity<'tu>>> {
+        iter_option!(
+            clang_Type_getNumObjCProtocolRefs(self.raw),
+            clang_Type_getObjCProtocolDecl(self.raw)
+        ).map(|i| i.map(|c| Entity::from_raw(c, self.tu)).collect())
+    }
+
+    /// Returns the type arguments for this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_type_arguments(&self) -> Option<Vec<Type<'tu>>> {
+        iter_option!(
+            clang_Type_getNumObjCTypeArgs(self.raw),
+            clang_Type_getObjCTypeArg(self.raw)
+        ).map(|i| i.map(|t| Type::from_raw(t, self.tu)).collect())
+    }
+
     /// Return the type that was modified by this attributed type.
     #[cfg(feature="gte_clang_8_0")]
     pub fn get_modified_type(&self) -> Option<Type<'tu>> {
