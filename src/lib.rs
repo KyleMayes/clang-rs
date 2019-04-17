@@ -1336,6 +1336,7 @@ impl<'tu> Entity<'tu> {
         unsafe { utility::to_string_option(clang_getCursorDisplayName(self.raw)) }
     }
 
+    #[cfg(feature="gte_clang_7_0")]
     /// Returns the pretty printer for this declaration.
     pub fn get_pretty_printer(&self) -> PrettyPrinter {
         unsafe { PrettyPrinter::from_raw(clang_getCursorPrintingPolicy(self.raw), self) }
