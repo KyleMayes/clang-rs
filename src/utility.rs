@@ -52,6 +52,9 @@ macro_rules! builder {
     );
 }
 
+// extern_properties! ____________________________
+
+/// Defines accessors for properties accessed through functions with an enum selector.
 #[cfg(feature="gte_clang_7_0")]
 macro_rules! extern_properties {
     (
@@ -69,12 +72,13 @@ macro_rules! extern_properties {
     ) => ($(
         $(#[$get_doc])+
         pub fn $get_name(&self) -> bool {
-            unsafe { $get_fn(self.ptr) != 0 }
+            unsafe { $get_fn(self.ptr, ::clang_sys::$flag) != 0 }
         }
 
         $(#[$set_doc])+
-        pub fn $set_name(&self, value: bool) {
-            unsafe { $set_fn(self.ptr, if value { 1 } else { 0 }) }
+        pub fn $set_name(&self, value: bool) -> &Self {
+            unsafe { $set_fn(self.ptr, ::clang_sys::$flag, if value { 1 } else { 0 }); }
+            self
         }
     )+);
 }

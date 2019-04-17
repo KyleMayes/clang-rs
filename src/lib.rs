@@ -1336,6 +1336,11 @@ impl<'tu> Entity<'tu> {
         unsafe { utility::to_string_option(clang_getCursorDisplayName(self.raw)) }
     }
 
+    /// Returns the pretty printer for this declaration.
+    pub fn get_pretty_printer(&self) -> PrettyPrinter {
+        unsafe { PrettyPrinter::from_raw(clang_getCursorPrintingPolicy(self.raw), self) }
+    }
+
     /// Returns the source location of this AST entity, if any.
     pub fn get_location(&self) -> Option<SourceLocation<'tu>> {
         unsafe { clang_getCursorLocation(self.raw).map(|l| SourceLocation::from_raw(l, self.tu)) }
@@ -2342,6 +2347,7 @@ impl PlatformAvailability {
 
 /// Pretty prints declarations.
 #[cfg(feature="gte_clang_7_0")]
+#[derive(Debug)]
 pub struct PrettyPrinter<'e> {
     ptr: CXPrintingPolicy,
     entity: &'e Entity<'e>,
@@ -2359,7 +2365,7 @@ impl<'e> PrettyPrinter<'e> {
 
     /// Pretty print the declaration.
     pub fn print(&self) -> String {
-        unsafe { utility::to_string(clang_getCursorPrettyPrinted(self.entity, self.ptr)) }
+        unsafe { utility::to_string(clang_getCursorPrettyPrinted(self.entity.raw, self.ptr)) }
     }
 
     //- Properties -------------------------------
@@ -2370,43 +2376,44 @@ impl<'e> PrettyPrinter<'e> {
     }
 
     /// Sets the number of spaces used to indent each line.
-    pub fn get_indentation_amount(&self, value: u8) {
+    pub fn set_indentation_amount(&self, value: u8) -> &Self {
         unsafe {
-            clang_PrintingPolicy_setProperty(self.ptr, CXPrintingPolicy_Indentation, value.into())
+            clang_PrintingPolicy_setProperty(self.ptr, CXPrintingPolicy_Indentation, value.into());
         }
+        self
     }
 
     extern_properties!{
         with {
             clang_PrintingPolicy_getProperty,
-            clang_PrintingPolicy_setProperty
+            clang_PrintingPolicy_setProperty,
         }
 
-        CXPrintingPolicy_SuppressSpecifiers: bool {
+        pub CXPrintingPolicy_SuppressSpecifiers: bool {
             /// Gets whether to suppress printing specifiers for a given type or declaration.
             get_suppress_specifiers,
             /// Sets whether to suppress printing specifiers for a given type or declaration.
             set_suppress_specifiers,
         }
-        CXPrintingPolicy_SuppressTagKeyword: bool {
+        pub CXPrintingPolicy_SuppressTagKeyword: bool {
             /// Gets whether to suppress printing the tag keyword.
             get_suppress_tag_keyword,
             /// Sets whether to suppress printing the tag keyword.
             set_suppress_tag_keyword,
         }
-        CXPrintingPolicy_IncludeTagDefinition: bool {
+        pub CXPrintingPolicy_IncludeTagDefinition: bool {
             /// Gets whether to include the body of a tag definition.
             get_include_tag_definition,
             /// Gets whether to include the body of a tag definition.
             set_include_tag_definition,
         }
-        CXPrintingPolicy_SuppressScope: bool {
+        pub CXPrintingPolicy_SuppressScope: bool {
             /// Gets whether to suppress printing of scope speifiers.
             get_suppress_scope,
             /// Sets whether to suppress printing of scope speifiers.
             set_suppress_scope,
         }
-        CXPrintingPolicy_SuppressUnwrittenScope: bool {
+        pub CXPrintingPolicy_SuppressUnwrittenScope: bool {
             /// Gets whether to suppress printing the parts of scope specifiers that don't need to
             /// be written.
             get_suppress_unwritten_scope,
@@ -2414,67 +2421,67 @@ impl<'e> PrettyPrinter<'e> {
             /// be written.
             set_suppress_unwritten_scope,
         }
-        CXPrintingPolicy_SuppressInitializers: bool {
+        pub CXPrintingPolicy_SuppressInitializers: bool {
             /// Gets whether to suppress printing of variable initializers.
             get_suppress_initializers,
             /// Sets whether to suppress printing of variable initializers.
             set_suppress_initializers,
         }
-        CXPrintingPolicy_ConstantArraySizeAsWritten: bool {
+        pub CXPrintingPolicy_ConstantArraySizeAsWritten: bool {
             /// Gets whether to print the size of constant array expressions as written.
             get_print_constant_array_size_as_written,
             /// Sets whether to print the size of constant array expressions as written.
             set_print_constant_array_size_as_written,
         }
-        CXPrintingPolicy_AnonymousTagLocations: bool {
+        pub CXPrintingPolicy_AnonymousTagLocations: bool {
             /// Gets whether to print the location of anonymous tags.
             get_print_anonymous_tag_locations,
             /// Sets whether to print the location of anonymous tags.
             set_print_anonymous_tag_locations,
         }
-        CXPrintingPolicy_SuppressStrongLifetime: bool {
+        pub CXPrintingPolicy_SuppressStrongLifetime: bool {
             /// Gets whether to suppress printing the __strong lifetime qualifier in ARC.
             get_suppress_strong_lifetime,
             /// Sets whether to suppress printing the __strong lifetime qualifier in ARC.
             set_suppress_strong_lifetime,
         }
-        CXPrintingPolicy_SuppressLifetimeQualifiers: bool {
+        pub CXPrintingPolicy_SuppressLifetimeQualifiers: bool {
             /// Gets whether to suppress printing lifetime qualifiers in ARC.
             get_suppress_lifetime_qualifiers,
             /// Sets whether to suppress printing lifetime qualifiers in ARC.
             set_suppress_lifetime_qualifiers,
         }
-        CXPrintingPolicy_SuppressTemplateArgsInCXXConstructors: bool {
+        pub CXPrintingPolicy_SuppressTemplateArgsInCXXConstructors: bool {
             /// Gets whether to suppress printing template arguments in names of C++ constructors.
             get_suppress_template_args_in_cxx_constructors,
             /// Sets whether to suppress printing template arguments in names of C++ constructors.
             set_suppress_template_args_in_cxx_constructors,
         }
-        CXPrintingPolicy_Bool: bool {
+        pub CXPrintingPolicy_Bool: bool {
             /// Gets whether to print 'bool' rather than '_Bool'.
             get_use_bool,
             /// Sets whether to print 'bool' rather than '_Bool'.
             set_use_bool,
         }
-        CXPrintingPolicy_: bool {
+        pub CXPrintingPolicy_Restrict: bool {
             /// Gets whether to print 'restrict' rather than '__restrict'
             get_use_restrict,
             /// Sets whether to print 'restrict' rather than '__restrict'
             set_use_restrict,
         }
-        CXPrintingPolicy_: bool {
+        pub CXPrintingPolicy_Alignof: bool {
             /// Gets whether to print 'alignof' rather than '__alignof'
             get_use_alignof,
             /// Sets whether to print 'alignof' rather than '__alignof'
             set_use_alignof,
         }
-        CXPrintingPolicy_UnderscoreAlignof: bool {
+        pub CXPrintingPolicy_UnderscoreAlignof: bool {
             /// Gets whether to print '_Alignof' rather than '__alignof'
             get_use_underscore_alignof,
             /// Sets whether to print '_Alignof' rather than '__alignof'
             set_use_underscore_alignof,
         }
-        CXPrintingPolicy_UseVoidForZeroParams: bool {
+        pub CXPrintingPolicy_UseVoidForZeroParams: bool {
             /// Gets whether to print '(void)' rather then '()' for a function prototype with zero
             /// parameters.
             get_use_void_for_zero_params,
@@ -2482,13 +2489,13 @@ impl<'e> PrettyPrinter<'e> {
             /// parameters.
             set_use_void_for_zero_params,
         }
-        CXPrintingPolicy_TerseOutput: bool {
+        pub CXPrintingPolicy_TerseOutput: bool {
             /// Gets whether to print terse output.
             get_use_terse_output,
             /// Sets whether to print terse output.
             set_use_terse_output,
         }
-        CXPrintingPolicy_PolishForDeclaration: bool {
+        pub CXPrintingPolicy_PolishForDeclaration: bool {
             /// Gets whether to do certain refinements needed for producing a proper declaration
             /// tag.
             get_polish_for_declaration,
@@ -2496,43 +2503,43 @@ impl<'e> PrettyPrinter<'e> {
             /// tag.
             set_polish_for_declaration,
         }
-        CXPrintingPolicy_Half: bool {
+        pub CXPrintingPolicy_Half: bool {
             /// Gets whether to print 'half' rather than '__fp16'
             get_use_half,
             /// Sets whether to print 'half' rather than '__fp16'
             set_use_half,
         }
-        CXPrintingPolicy_MSWChar: bool {
+        pub CXPrintingPolicy_MSWChar: bool {
             /// Gets whether to print the built-in wchar_t type as '__wchar_t'
             get_use_ms_wchar,
             /// Sets whether to print the built-in wchar_t type as '__wchar_t'
             set_use_ms_wchar,
         }
-        CXPrintingPolicy_IncludeNewlines: bool {
+        pub CXPrintingPolicy_IncludeNewlines: bool {
             /// Gets whether to include newlines after statements.
             get_include_newlines,
             /// Sets whether to include newlines after statements.
             set_include_newlines,
         }
-        CXPrintingPolicy_MSVCFormatting: bool {
+        pub CXPrintingPolicy_MSVCFormatting: bool {
             /// Gets whether to use whitespace and punctuation like MSVC does.
             get_msvc_formatting,
             /// Sets whether to use whitespace and punctuation like MSVC does.
             set_msvc_formatting,
         }
-        CXPrintingPolicy_ConstantsAsWritten: bool {
+        pub CXPrintingPolicy_ConstantsAsWritten: bool {
             /// Gets whether to print constant expressions as written.
             get_print_constants_as_written,
             /// Sets whether to print constant expressions as written.
             set_print_constants_as_written,
         }
-        CXPrintingPolicy_SuppressImplicitBase: bool {
+        pub CXPrintingPolicy_SuppressImplicitBase: bool {
             /// Gets whether to suppress printing the implicit 'self' or 'this' expressions.
             get_suppress_implicit_base,
             /// Sets whether to suppress printing the implicit 'self' or 'this' expressions.
             set_suppress_implicit_base,
         }
-        CXPrintingPolicy_FullyQualifiedName: bool {
+        pub CXPrintingPolicy_FullyQualifiedName: bool {
             /// Gets whether to print the fully qualified name of function declarations.
             get_print_fully_qualified_name,
             /// Sets whether to print the fully qualified name of function declarations.
@@ -2937,26 +2944,26 @@ impl<'tu> Type<'tu> {
 
     /// Returns the base type of this Objective-C type, if applicable.
     #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_object_base_type(&self) -> Option<String> {
+    pub fn get_objc_object_base_type(&self) -> Option<Type> {
         unsafe { clang_Type_getObjCObjectBaseType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the declarations for all protocal references for this Objective-C type, if applicable.
     #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_protocal_declarations(&self) -> Option<Vec<Entity<'tu>>> {
-        iter_option!(
+    pub fn get_objc_protocal_declarations(&self) -> Vec<Entity<'tu>> {
+        iter!(
             clang_Type_getNumObjCProtocolRefs(self.raw),
-            clang_Type_getObjCProtocolDecl(self.raw)
-        ).map(|i| i.map(|c| Entity::from_raw(c, self.tu)).collect())
+            clang_Type_getObjCProtocolDecl(self.raw),
+        ).map(|c| Entity::from_raw(c, self.tu)).collect()
     }
 
     /// Returns the type arguments for this Objective-C type, if applicable.
     #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_type_arguments(&self) -> Option<Vec<Type<'tu>>> {
-        iter_option!(
+    pub fn get_objc_type_arguments(&self) -> Vec<Type<'tu>> {
+        iter!(
             clang_Type_getNumObjCTypeArgs(self.raw),
-            clang_Type_getObjCTypeArg(self.raw)
-        ).map(|i| i.map(|t| Type::from_raw(t, self.tu)).collect())
+            clang_Type_getObjCTypeArg(self.raw),
+        ).map(|t| Type::from_raw(t, self.tu)).collect()
     }
 
     /// Return the type that was modified by this attributed type.
