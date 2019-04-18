@@ -2358,7 +2358,7 @@ impl<'e> PrettyPrinter<'e> {
     //- Constructors -----------------------------
 
     fn from_raw(ptr: CXPrintingPolicy, entity: &'e Entity<'e>) -> Self {
-        assert!(ptr.is_null());
+        assert!(!ptr.is_null());
         PrettyPrinter { ptr, entity }
     }
 
@@ -2949,9 +2949,9 @@ impl<'tu> Type<'tu> {
         unsafe { clang_Type_getObjCObjectBaseType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
-    /// Returns the declarations for all protocal references for this Objective-C type, if applicable.
+    /// Returns the declarations for all protocol references for this Objective-C type, if applicable.
     #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_protocal_declarations(&self) -> Vec<Entity<'tu>> {
+    pub fn get_objc_protocol_declarations(&self) -> Vec<Entity<'tu>> {
         iter!(
             clang_Type_getNumObjCProtocolRefs(self.raw),
             clang_Type_getObjCProtocolDecl(self.raw),
