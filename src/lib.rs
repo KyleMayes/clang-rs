@@ -804,6 +804,21 @@ pub enum MemoryUsage {
     SourceManagerMMap = 8,
 }
 
+// Nullability ___________________________________
+
+/// Indicates the nullability of a pointer type.
+#[cfg(feature="gte_clang_8_0")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum Nullability {
+    /// Values of this type can never be null.
+    NonNull = 0,
+    /// Values of this type can be null.
+    Nullable = 1,
+    /// Whether values of this type can be null is (explicitly) unspecified.
+    Unspecified = 2,
+}
+
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
@@ -1181,21 +1196,6 @@ pub enum Visibility {
     Hidden = 1,
     /// The AST element can be seen by the linker but resolves to a symbol inside this object.
     Protected = 2,
-}
-
-// Nullability ___________________________________
-
-/// Indicates the nullability of a pointer type.
-#[cfg(feature="gte_clang_8_0")]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[repr(C)]
-pub enum Nullability {
-    /// Values of this type can never be null.
-    NonNull = 0,
-    /// Values of this type can be null.
-    Nullable = 1,
-    /// Whether values of this type can be null is (explicitly) unspecified.
-    Unspecified = 2,
 }
 
 //================================================
@@ -1589,12 +1589,6 @@ impl<'tu> Entity<'tu> {
         utility::to_string_option(unsafe { clang_Cursor_getObjCPropertyGetterName(self.raw) })
     }
 
-    /// Returns the name of the method implementing the setter for this Objective-C property, if applicable
-    #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_setter_name(&self) -> Option<String> {
-        utility::to_string_option(unsafe { clang_Cursor_getObjCPropertySetterName(self.raw) })
-    }
-
     /// Returns the element type for this Objective-C `iboutletcollection` attribute, if applicable.
     pub fn get_objc_ib_outlet_collection_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getIBOutletCollectionType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
@@ -1615,6 +1609,12 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns the name of the method implementing the setter for this Objective-C property, if applicable
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_setter_name(&self) -> Option<String> {
+        utility::to_string_option(unsafe { clang_Cursor_getObjCPropertySetterName(self.raw) })
+    }
+
     /// Returns the type encoding for this Objective-C declaration, if applicable.
     pub fn get_objc_type_encoding(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_getDeclObjCTypeEncoding(self.raw)) }
@@ -1629,6 +1629,13 @@ impl<'tu> Entity<'tu> {
         } else {
             None
         }
+    }
+
+    /// Returns the the offset of this field, if applicable.
+    #[cfg(feature="gte_clang_3_7")]
+    pub fn get_offset_of_field<F: AsRef<str>>(&self) -> Result<usize, OffsetofError> {
+        let offsetof_ = unsafe { clang_Cursor_getOffsetOfField(self.raw) };
+        OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
     }
 
     /// Returns the overloaded declarations referenced by this overloaded declaration reference, if
@@ -1805,13 +1812,6 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_getCursorResultType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
-    /// Returns the the offset of this field, if applicable.
-    #[cfg(feature="gte_clang_3_7")]
-    pub fn get_offset_of_field<F: AsRef<str>>(&self) -> Result<usize, OffsetofError> {
-        let offsetof_ = unsafe { clang_Cursor_getOffsetOfField(self.raw) };
-        OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
-    }
-
     /// Returns whether this AST entity has any attached attributes.
     #[cfg(feature="gte_clang_3_9")]
     pub fn has_attributes(&self) -> bool {
@@ -1896,6 +1896,12 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_Cursor_isFunctionInlined(self.raw) != 0 }
     }
 
+    /// Returns whether this AST entity is an invalid declaration.
+    #[cfg(feature="gte_clang_7_0")]
+    pub fn is_invalid_declaration(&self) -> bool {
+        unsafe { clang_isInvalidDeclaration(self.raw) != 0 }
+    }
+
     /// Returns whether this AST entity is a C++ default constructor.
     #[cfg(feature="gte_clang_3_9")]
     pub fn is_move_constructor(&self) -> bool {
@@ -1943,12 +1949,6 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is a virtual method.
     pub fn is_virtual_method(&self) -> bool {
         unsafe { clang_CXXMethod_isVirtual(self.raw) != 0 }
-    }
-
-    /// Returns whether this AST entity is an invalid declaration.
-    #[cfg(feature="gte_clang_7_0")]
-    pub fn is_invalid_declaration(&self) -> bool {
-        unsafe { clang_isInvalidDeclaration(self.raw) != 0 }
     }
 
     /// Visits the children of this AST entity recursively and returns whether visitation was ended
@@ -2833,17 +2833,6 @@ impl<'tu> Type<'tu> {
         }
     }
 
-    /// Returns the nullability of this pointer type, if applicable.
-    #[cfg(feature="gte_clang_8_0")]
-    pub fn get_nullability(&self) -> Option<Nullability> {
-        unsafe {
-            match clang_Type_getNullability(self.raw) {
-                CXTypeNullability_Invalid => None,
-                other => Some(mem::transmute(other)),
-            }
-        }
-    }
-
     /// Returns the canonical type for this type.
     ///
     /// The canonical type is the underlying type with all "sugar" removed (e.g., typedefs).
@@ -2898,10 +2887,51 @@ impl<'tu> Type<'tu> {
         }
     }
 
+    /// Return the type that was modified by this attributed type.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_modified_type(&self) -> Option<Type<'tu>> {
+        unsafe { clang_Type_getModifiedType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the nullability of this pointer type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_nullability(&self) -> Option<Nullability> {
+        unsafe {
+            match clang_Type_getNullability(self.raw) {
+                CXTypeNullability_Invalid => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
     /// Returns the encoding of this Objective-C type, if applicable.
     #[cfg(feature="gte_clang_3_9")]
     pub fn get_objc_encoding(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_Type_getObjCEncoding(self.raw)) }
+    }
+
+    /// Returns the base type of this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_object_base_type(&self) -> Option<Type> {
+        unsafe { clang_Type_getObjCObjectBaseType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the declarations for all protocol references for this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_protocol_declarations(&self) -> Vec<Entity<'tu>> {
+        iter!(
+            clang_Type_getNumObjCProtocolRefs(self.raw),
+            clang_Type_getObjCProtocolDecl(self.raw),
+        ).map(|c| Entity::from_raw(c, self.tu)).collect()
+    }
+
+    /// Returns the type arguments for this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_type_arguments(&self) -> Vec<Type<'tu>> {
+        iter!(
+            clang_Type_getNumObjCTypeArgs(self.raw),
+            clang_Type_getObjCTypeArg(self.raw),
+        ).map(|t| Type::from_raw(t, self.tu)).collect()
     }
 
     /// Returns the pointee type for this pointer type, if applicable.
@@ -2941,36 +2971,6 @@ impl<'tu> Type<'tu> {
             clang_Type_getNumTemplateArguments(self.raw),
             clang_Type_getTemplateArgumentAsType(self.raw),
         ).map(|i| i.map(|t| t.map(|t| Type::from_raw(t, self.tu))).collect())
-    }
-
-    /// Returns the base type of this Objective-C type, if applicable.
-    #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_object_base_type(&self) -> Option<Type> {
-        unsafe { clang_Type_getObjCObjectBaseType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
-    }
-
-    /// Returns the declarations for all protocol references for this Objective-C type, if applicable.
-    #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_protocol_declarations(&self) -> Vec<Entity<'tu>> {
-        iter!(
-            clang_Type_getNumObjCProtocolRefs(self.raw),
-            clang_Type_getObjCProtocolDecl(self.raw),
-        ).map(|c| Entity::from_raw(c, self.tu)).collect()
-    }
-
-    /// Returns the type arguments for this Objective-C type, if applicable.
-    #[cfg(feature="gte_clang_8_0")]
-    pub fn get_objc_type_arguments(&self) -> Vec<Type<'tu>> {
-        iter!(
-            clang_Type_getNumObjCTypeArgs(self.raw),
-            clang_Type_getObjCTypeArg(self.raw),
-        ).map(|t| Type::from_raw(t, self.tu)).collect()
-    }
-
-    /// Return the type that was modified by this attributed type.
-    #[cfg(feature="gte_clang_8_0")]
-    pub fn get_modified_type(&self) -> Option<Type<'tu>> {
-        unsafe { clang_Type_getModifiedType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the typedef name of this type, if applicable.
