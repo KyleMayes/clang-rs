@@ -365,6 +365,10 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 3.9 and later.
     ObjCAvailabilityCheckExpr = 148,
+    /// A fixed-point literal.
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    FixedPointLiteral = 149,
     /// A statement whose specific kind is not exposed via this interface.
     UnexposedStmt = 200,
     /// A labelled statement in a function.
@@ -640,6 +644,78 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 3.8 and later.
     DllImport = 419,
+    /// `__attribute__((ns_returns_retained))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSReturnsRetained = 420,
+    /// `__attribute__((ns_returns_not_retained))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSReturnsNotRetained = 421,
+    /// `__attribute__((ns_returns_autoreleased))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSReturnsAutoreleased = 422,
+    /// `__attribute__((ns_consumes_self))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSConsumesSelf = 423,
+    /// `__attribute__((ns_consumed))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSConsumed = 424,
+    /// `__attribute__((objc_exception))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCException = 425,
+    /// `__attribute__((NSObject))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCNSObject = 426,
+    /// `__attribute__((objc_independent_class))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCIndependentClass = 427,
+    /// `__attribute__((objc_precise_lifetime))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCPreciseLifetime = 428,
+    /// `__attribute__((objc_returns_inner_pointer))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCReturnsInnerPointer = 429,
+    /// `__attribute__((objc_requires_super))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCRequiresSuper = 430,
+    /// `__attribute__((objc_root_class))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCRootClass = 431,
+    /// `__attribute__((objc_subclassing_restricted))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCSubclassingRestricted = 432,
+    /// `__attribute__((objc_protocol_requires_explicit_implementation))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCExplicitProtocolImpl = 433,
+    /// `__attribute__((objc_designated_initializer))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCDesignatedInitializer = 434,
+    /// `__attribute__((objc_runtime_visible))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCRuntimeVisible = 435,
+    /// `__attribute__((objc_boxable))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCBoxable = 436,
+    /// `__attribute__((flag_enum))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    FlagEnum = 437,
     /// A preprocessing directive.
     PreprocessingDirective = 500,
     /// A macro definition.
@@ -951,6 +1027,30 @@ pub enum TypeKind {
     ///
     /// Only produced by `libclang` 6.0 and later.
     Float16 = 32,
+    /// `short _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    ShortAccum = 33,
+    /// `_Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    Accum = 34,
+    /// `long _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    LongAccum = 35,
+    /// `unsigned short _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    UShortAccum = 36,
+    /// `unsigned _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    UAccum = 37,
+    /// `unsigned long _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    ULongAccum = 38,
     /// `float`
     Float = 21,
     /// `double`
@@ -1181,6 +1281,66 @@ pub enum TypeKind {
     ///
     /// Only produced by `libclang` 5.0 and later.
     OCLReserveID = 160,
+    /// An Objective-C object type.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCObject = 161,
+    /// An Objective-C type param.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCTypeParam = 162,
+    /// An attributed type.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    Attributed = 163,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCMcePayload = 164,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImePayload = 165,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCRefPayload = 166,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCSicPayload = 167,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCMceResult = 168,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeResult = 169,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCRefResult = 170,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCSicResult = 171,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeResultSingleRefStreamout = 172,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeResultDualRefStreamout = 173,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeSingleRefStreamin = 174,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeDualRefStreamin = 175,
 }
 
 // Visibility ____________________________________
