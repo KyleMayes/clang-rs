@@ -365,6 +365,10 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 3.9 and later.
     ObjCAvailabilityCheckExpr = 148,
+    /// A fixed-point literal.
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    FixedPointLiteral = 149,
     /// A statement whose specific kind is not exposed via this interface.
     UnexposedStmt = 200,
     /// A labelled statement in a function.
@@ -640,6 +644,78 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 3.8 and later.
     DllImport = 419,
+    /// `__attribute__((ns_returns_retained))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSReturnsRetained = 420,
+    /// `__attribute__((ns_returns_not_retained))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSReturnsNotRetained = 421,
+    /// `__attribute__((ns_returns_autoreleased))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSReturnsAutoreleased = 422,
+    /// `__attribute__((ns_consumes_self))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSConsumesSelf = 423,
+    /// `__attribute__((ns_consumed))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    NSConsumed = 424,
+    /// `__attribute__((objc_exception))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCException = 425,
+    /// `__attribute__((NSObject))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCNSObject = 426,
+    /// `__attribute__((objc_independent_class))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCIndependentClass = 427,
+    /// `__attribute__((objc_precise_lifetime))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCPreciseLifetime = 428,
+    /// `__attribute__((objc_returns_inner_pointer))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCReturnsInnerPointer = 429,
+    /// `__attribute__((objc_requires_super))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCRequiresSuper = 430,
+    /// `__attribute__((objc_root_class))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCRootClass = 431,
+    /// `__attribute__((objc_subclassing_restricted))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCSubclassingRestricted = 432,
+    /// `__attribute__((objc_protocol_requires_explicit_implementation))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCExplicitProtocolImpl = 433,
+    /// `__attribute__((objc_designated_initializer))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCDesignatedInitializer = 434,
+    /// `__attribute__((objc_runtime_visible))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCRuntimeVisible = 435,
+    /// `__attribute__((objc_boxable))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCBoxable = 436,
+    /// `__attribute__((flag_enum))`
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    FlagEnum = 437,
     /// A preprocessing directive.
     PreprocessingDirective = 500,
     /// A macro definition.
@@ -804,6 +880,80 @@ pub enum MemoryUsage {
     SourceManagerMMap = 8,
 }
 
+// Nullability ___________________________________
+
+/// Indicates the nullability of a pointer type.
+#[cfg(feature="gte_clang_8_0")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum Nullability {
+    /// Values of this type can never be null.
+    NonNull = 0,
+    /// Values of this type can be null.
+    Nullable = 1,
+    /// Whether values of this type can be null is (explicitly) unspecified.
+    Unspecified = 2,
+}
+
+// PrintingPolicyFlag ____________________________
+
+/// Flags for the printing policy.
+#[cfg(feature="gte_clang_7_0")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum PrintingPolicyFlag {
+    /// Whether to suppress printing specifiers for a given type or declaration.
+    SuppressSpecifiers = 1,
+    /// Whether to suppress printing the tag keyword.
+    SuppressTagKeyword = 2,
+    /// Whether to include the body of a tag definition.
+    IncludeTagDefinition = 3,
+    /// Whether to suppress printing of scope specifiers.
+    SuppressScope = 4,
+    /// Whether to suppress printing the parts of scope specifiers that don't need to be written.
+    SuppressUnwrittenScope = 5,
+    /// Whether to suppress printing of variable initializers.
+    SuppressInitializers = 6,
+    /// Whether to print the size of constant array expressions as written.
+    PrintConstantArraySizeAsWritten = 7,
+    /// Whether to print the location of anonymous tags.
+    PrintAnonymousTagLocations = 8,
+    /// Whether to suppress printing the __strong lifetime qualifier in ARC.
+    SuppressStrongLifetime = 9,
+    /// Whether to suppress printing lifetime qualifiers in ARC.
+    SuppressLifetimeQualifiers = 10,
+    /// Whether to suppress printing template arguments in names of C++ constructors.
+    SuppressTemplateArgsInCXXConstructors = 11,
+    /// Whether to print 'bool' rather than '_Bool'.
+    UseBool = 12,
+    /// Whether to print 'restrict' rather than '__restrict'
+    UseRestrict = 13,
+    /// Whether to print 'alignof' rather than '__alignof'
+    UseAlignof = 14,
+    /// Whether to print '_Alignof' rather than '__alignof'
+    UseUnderscoreAlignof = 15,
+    /// Whether to print '(void)' rather then '()' for a function prototype with zero parameters.
+    UseVoidForZeroParams = 16,
+    /// Whether to print terse output.
+    UseTerseOutput = 17,
+    /// Whether to do certain refinements needed for producing a proper declaration tag.
+    PolishForDeclaration = 18,
+    /// Whether to print 'half' rather than '__fp16'
+    UseHalf = 19,
+    /// Whether to print the built-in wchar_t type as '__wchar_t'
+    UseMsWchar = 20,
+    /// Whether to include newlines after statements.
+    IncludeNewlines = 21,
+    /// Whether to use whitespace and punctuation like MSVC does.
+    UseMsvcFormatting = 22,
+    /// Whether to print constant expressions as written.
+    PrintConstantsAsWritten = 23,
+    /// Whether to suppress printing the implicit 'self' or 'this' expressions.
+    SuppressImplicitBase = 24,
+    /// Whether to print the fully qualified name of function declarations.
+    PrintFullyQualifiedName = 25,
+}
+
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
@@ -936,6 +1086,30 @@ pub enum TypeKind {
     ///
     /// Only produced by `libclang` 6.0 and later.
     Float16 = 32,
+    /// `short _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    ShortAccum = 33,
+    /// `_Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    Accum = 34,
+    /// `long _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    LongAccum = 35,
+    /// `unsigned short _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    UShortAccum = 36,
+    /// `unsigned _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    UAccum = 37,
+    /// `unsigned long _Accum`
+    ///
+    /// Only produced by `libclang` 7.0 and later.
+    ULongAccum = 38,
     /// `float`
     Float = 21,
     /// `double`
@@ -1166,6 +1340,66 @@ pub enum TypeKind {
     ///
     /// Only produced by `libclang` 5.0 and later.
     OCLReserveID = 160,
+    /// An Objective-C object type.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCObject = 161,
+    /// An Objective-C type param.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    ObjCTypeParam = 162,
+    /// An attributed type.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    Attributed = 163,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCMcePayload = 164,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImePayload = 165,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCRefPayload = 166,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCSicPayload = 167,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCMceResult = 168,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeResult = 169,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCRefResult = 170,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCSicResult = 171,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeResultSingleRefStreamout = 172,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeResultDualRefStreamout = 173,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeSingleRefStreamin = 174,
+    /// An Intel OpenCL extension type for the AVC VME media sampler in Intel graphics processors.
+    ///
+    /// Only produced by `libclang` 8.0 and later.
+    OCLIntelSubgroupAVCImeDualRefStreamin = 175,
 }
 
 // Visibility ____________________________________
@@ -1319,6 +1553,12 @@ impl<'tu> Entity<'tu> {
     /// entity.
     pub fn get_display_name(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_getCursorDisplayName(self.raw)) }
+    }
+
+    #[cfg(feature="gte_clang_7_0")]
+    /// Returns the pretty printer for this declaration.
+    pub fn get_pretty_printer(&self) -> PrettyPrinter {
+        unsafe { PrettyPrinter::from_raw(clang_getCursorPrintingPolicy(self.raw), self) }
     }
 
     /// Returns the source location of this AST entity, if any.
@@ -1562,6 +1802,12 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns the name of the method implementing the getter for this Objective-C property, if applicable
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_getter_name(&self) -> Option<String> {
+        utility::to_string_option(unsafe { clang_Cursor_getObjCPropertyGetterName(self.raw) })
+    }
+
     /// Returns the element type for this Objective-C `iboutletcollection` attribute, if applicable.
     pub fn get_objc_ib_outlet_collection_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getIBOutletCollectionType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
@@ -1582,6 +1828,12 @@ impl<'tu> Entity<'tu> {
         }
     }
 
+    /// Returns the name of the method implementing the setter for this Objective-C property, if applicable
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_setter_name(&self) -> Option<String> {
+        utility::to_string_option(unsafe { clang_Cursor_getObjCPropertySetterName(self.raw) })
+    }
+
     /// Returns the type encoding for this Objective-C declaration, if applicable.
     pub fn get_objc_type_encoding(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_getDeclObjCTypeEncoding(self.raw)) }
@@ -1596,6 +1848,13 @@ impl<'tu> Entity<'tu> {
         } else {
             None
         }
+    }
+
+    /// Returns the the offset of this field, if applicable.
+    #[cfg(feature="gte_clang_3_7")]
+    pub fn get_offset_of_field(&self) -> Result<usize, OffsetofError> {
+        let offsetof_ = unsafe { clang_Cursor_getOffsetOfField(self.raw) };
+        OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
     }
 
     /// Returns the overloaded declarations referenced by this overloaded declaration reference, if
@@ -1854,6 +2113,12 @@ impl<'tu> Entity<'tu> {
     #[cfg(feature="gte_clang_3_9")]
     pub fn is_inline_function(&self) -> bool {
         unsafe { clang_Cursor_isFunctionInlined(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an invalid declaration.
+    #[cfg(feature="gte_clang_7_0")]
+    pub fn is_invalid_declaration(&self) -> bool {
+        unsafe { clang_isInvalidDeclaration(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a C++ default constructor.
@@ -2189,6 +2454,17 @@ builder! {
         /// Sets whether incremental processing will be used.
         #[cfg(feature="gte_clang_5_0")]
         pub single_file_parse: CXTranslationUnit_SingleFileParse,
+        /// Sets whether function bodies will only be skipped in the preamble.
+        ///
+        /// Used in conjunction with `skip_function_bodies`.
+        #[cfg(feature="gte_clang_7_0")]
+        pub limit_skip_function_bodies_to_preamble: CXTranslationUnit_LimitSkipFunctionBodiesToPreamble,
+        /// Sets whether attributed types should be included.
+        #[cfg(feature="gte_clang_8_0")]
+        pub include_attributed_types: CXTranslationUnit_IncludeAttributedTypes,
+        /// Sets whether implicit attributes should be visited.
+        #[cfg(feature="gte_clang_8_0")]
+        pub visit_implicit_attributes: CXTranslationUnit_VisitImplicitAttributes,
     }
 }
 
@@ -2284,6 +2560,64 @@ impl PlatformAvailability {
         };
         unsafe { clang_disposeCXPlatformAvailability(&mut raw); }
         availability
+    }
+}
+
+// PrettyPrinter _________________________________
+
+/// Pretty prints declarations.
+#[cfg(feature="gte_clang_7_0")]
+#[derive(Debug)]
+pub struct PrettyPrinter<'e> {
+    ptr: CXPrintingPolicy,
+    entity: &'e Entity<'e>,
+}
+#[cfg(feature="gte_clang_7_0")]
+impl<'e> PrettyPrinter<'e> {
+    //- Constructors -----------------------------
+
+    fn from_raw(ptr: CXPrintingPolicy, entity: &'e Entity<'e>) -> Self {
+        assert!(!ptr.is_null());
+        PrettyPrinter { ptr, entity }
+    }
+
+    //- Accessors --------------------------------
+
+    /// Gets the specified flag value.
+    pub fn get_flag(&self, flag: PrintingPolicyFlag) -> bool {
+        unsafe { clang_PrintingPolicy_getProperty(self.ptr, mem::transmute(flag)) != 0 }
+    }
+
+    /// Sets the specified flag value.
+    pub fn set_flag(&self, flag: PrintingPolicyFlag, value: bool) -> &Self {
+        let value = if value { 1 } else { 0 };
+        unsafe { clang_PrintingPolicy_setProperty(self.ptr, mem::transmute(flag), value); }
+        self
+    }
+
+    /// Gets the number of spaces used to indent each line.
+    pub fn get_indentation_amount(&self) -> u8 {
+        unsafe { clang_PrintingPolicy_getProperty(self.ptr, CXPrintingPolicy_Indentation) as u8 }
+    }
+
+    /// Sets the number of spaces used to indent each line.
+    pub fn set_indentation_amount(&self, value: u8) -> &Self {
+        unsafe {
+            clang_PrintingPolicy_setProperty(self.ptr, CXPrintingPolicy_Indentation, value.into());
+        }
+        self
+    }
+
+    /// Pretty print the declaration.
+    pub fn print(&self) -> String {
+        unsafe { utility::to_string(clang_getCursorPrettyPrinted(self.entity.raw, self.ptr)) }
+    }
+}
+
+#[cfg(feature="gte_clang_7_0")]
+impl<'e> Drop for PrettyPrinter<'e> {
+    fn drop(&mut self) {
+        unsafe { clang_PrintingPolicy_dispose(self.ptr) }
     }
 }
 
@@ -2618,10 +2952,51 @@ impl<'tu> Type<'tu> {
         }
     }
 
+    /// Return the type that was modified by this attributed type.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_modified_type(&self) -> Option<Type<'tu>> {
+        unsafe { clang_Type_getModifiedType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the nullability of this pointer type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_nullability(&self) -> Option<Nullability> {
+        unsafe {
+            match clang_Type_getNullability(self.raw) {
+                CXTypeNullability_Invalid => None,
+                other => Some(mem::transmute(other)),
+            }
+        }
+    }
+
     /// Returns the encoding of this Objective-C type, if applicable.
     #[cfg(feature="gte_clang_3_9")]
     pub fn get_objc_encoding(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_Type_getObjCEncoding(self.raw)) }
+    }
+
+    /// Returns the base type of this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_object_base_type(&self) -> Option<Type> {
+        unsafe { clang_Type_getObjCObjectBaseType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the declarations for all protocol references for this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_protocol_declarations(&self) -> Vec<Entity<'tu>> {
+        iter!(
+            clang_Type_getNumObjCProtocolRefs(self.raw),
+            clang_Type_getObjCProtocolDecl(self.raw),
+        ).map(|c| Entity::from_raw(c, self.tu)).collect()
+    }
+
+    /// Returns the type arguments for this Objective-C type, if applicable.
+    #[cfg(feature="gte_clang_8_0")]
+    pub fn get_objc_type_arguments(&self) -> Vec<Type<'tu>> {
+        iter!(
+            clang_Type_getNumObjCTypeArgs(self.raw),
+            clang_Type_getObjCTypeArg(self.raw),
+        ).map(|t| Type::from_raw(t, self.tu)).collect()
     }
 
     /// Returns the pointee type for this pointer type, if applicable.

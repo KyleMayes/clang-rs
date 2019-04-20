@@ -858,6 +858,115 @@ fn test() {
         test_get_mangled_objc_names(&entities[1]);
     });
 
+    let source = "
+        struct x {
+            char y;
+            char z;
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+
+        #[cfg(feature="gte_clang_3_7")]
+        fn test_get_offset_of_field(fields: &[Entity]) {
+            assert_eq!(fields[0].get_offset_of_field(), Ok(0));
+            assert_eq!(fields[1].get_offset_of_field(), Ok(8));
+        }
+
+        #[cfg(not(feature="gte_clang_3_7"))]
+        fn test_get_offset_of_field(_: &[Entity]) {}
+
+        test_get_offset_of_field(&children[0].get_children());
+    });
+
+    let source = "
+        const int x = 0;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+
+        #[cfg(feature="gte_clang_7_0")]
+        fn test_is_invalid_declaration(entity: Entity) {
+            assert_eq!(entity.is_invalid_declaration(), false);
+        }
+
+        #[cfg(not(feature="gte_clang_7_0"))]
+        fn test_is_invalid_declaration(_: Entity) {}
+
+        test_is_invalid_declaration(children[0]);
+    });
+
+    let source = "
+        int main() {
+            return 0;
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+
+        #[cfg(feature="gte_clang_7_0")]
+        fn test_pretty_printer(entity: Entity) {
+            let s = entity.get_pretty_printer()
+                .set_indentation_amount(1)
+                .set_flag(PrintingPolicyFlag::IncludeNewlines, true)
+                .set_flag(PrintingPolicyFlag::IncludeTagDefinition, true)
+                .set_flag(PrintingPolicyFlag::PolishForDeclaration, false)
+                .set_flag(PrintingPolicyFlag::PrintAnonymousTagLocations, false)
+                .set_flag(PrintingPolicyFlag::PrintConstantArraySizeAsWritten, true)
+                .set_flag(PrintingPolicyFlag::PrintConstantsAsWritten, true)
+                .set_flag(PrintingPolicyFlag::PrintFullyQualifiedName, true)
+                .set_flag(PrintingPolicyFlag::SuppressImplicitBase, true)
+                .set_flag(PrintingPolicyFlag::SuppressInitializers, false)
+                .set_flag(PrintingPolicyFlag::SuppressLifetimeQualifiers, false)
+                .set_flag(PrintingPolicyFlag::SuppressScope, false)
+                .set_flag(PrintingPolicyFlag::SuppressSpecifiers, false)
+                .set_flag(PrintingPolicyFlag::SuppressStrongLifetime, false)
+                .set_flag(PrintingPolicyFlag::SuppressTagKeyword, true)
+                .set_flag(PrintingPolicyFlag::SuppressTemplateArgsInCXXConstructors, false)
+                .set_flag(PrintingPolicyFlag::SuppressUnwrittenScope, false)
+                .set_flag(PrintingPolicyFlag::UseAlignof, true)
+                .set_flag(PrintingPolicyFlag::UseBool, true)
+                .set_flag(PrintingPolicyFlag::UseHalf, false)
+                .set_flag(PrintingPolicyFlag::UseMsWchar, false)
+                .set_flag(PrintingPolicyFlag::UseMsvcFormatting, false)
+                .set_flag(PrintingPolicyFlag::UseRestrict, true)
+                .set_flag(PrintingPolicyFlag::UseTerseOutput, false)
+                .set_flag(PrintingPolicyFlag::UseUnderscoreAlignof, false)
+                .set_flag(PrintingPolicyFlag::UseVoidForZeroParams, true)
+                .print();
+            assert_eq!(s, "int main() {\n  return 0;\n}\n");
+        }
+
+        #[cfg(not(feature="gte_clang_7_0"))]
+        fn test_pretty_printer(_: Entity) {}
+
+        test_pretty_printer(children[0]);
+    });
+
+    let source = "
+        @interface Foo
+        - @property NSString *x;
+        @end
+    ";
+
+    with_translation_unit(&clang, "test.mm", source, &[], |_, _, tu| {
+        let children = tu.get_entity().get_children();
+
+        #[cfg(feature="gte_clang_8_0")]
+        fn test_get_objc_getter_setter_name(properties: &[Entity]) {
+            assert_eq!(properties[0].get_objc_getter_name().as_ref().map(|s| s.as_ref()), Some("x"));
+            assert_eq!(properties[0].get_objc_setter_name().as_ref().map(|s| s.as_ref()), Some("setX:"));
+        }
+
+        #[cfg(not(feature="gte_clang_8_0"))]
+        fn test_get_objc_getter_setter_name(_: &[Entity]) {}
+
+        test_get_objc_getter_setter_name(&children[1].get_children());
+    });
+
     // Index _____________________________________
 
     let mut index = Index::new(&clang, false, false);
@@ -1143,6 +1252,52 @@ fn test() {
     with_types(&clang, source, |ts| {
         assert!(!ts[0].is_variadic());
         assert!(ts[1].is_variadic());
+    });
+
+    let source = "
+        void f(int * _Nullable x, int * _Nonnull y);
+    ";
+
+    with_types(&clang, source, |ts| {
+        #[cfg(feature="gte_clang_8_0")]
+        fn test_get_nullability(ts: &[Type]) {
+            assert_eq!(ts[0].get_nullability(), Some(Nullability::Nullable));
+            assert_eq!(ts[1].get_nullability(), Some(Nullability::NonNull));
+        }
+
+        #[cfg(not(feature="gte_clang_8_0"))]
+        fn test_get_nullability(_: &[Type]) {}
+
+        test_get_nullability(&ts[0].get_argument_types().unwrap());
+    });
+
+    let source = "
+        @class C<T>;
+        @protocol P
+        @end
+        C<C*><P> *x;
+        C* y;
+    ";
+
+    with_translation_unit(&clang, "test.mm", source, &[], |_, _, tu| {
+        let children = tu.get_entity().get_children();
+
+        #[cfg(feature="gte_clang_8_0")]
+        fn test_objc_object_type(e: &[Entity]) {
+            let ty = e[3].get_type().unwrap().get_pointee_type().unwrap();
+            assert_eq!(ty.get_objc_object_base_type(), Some(e[1].get_type().unwrap()));
+            let protocols = ty.get_objc_protocol_declarations();
+            assert_eq!(protocols.len(), 1);
+            assert_eq!(protocols[0], e[2]);
+            let args = ty.get_objc_type_arguments();
+            assert_eq!(args.len(), 1);
+            assert_eq!(args[0], e[4].get_type().unwrap());
+        }
+
+        #[cfg(not(feature="gte_clang_8_0"))]
+        fn test_objc_object_type(_: &[Entity]) {}
+
+        test_objc_object_type(&children);
     });
 
     // Usr _______________________________________
