@@ -1793,7 +1793,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the the offset of this field, if applicable.
     #[cfg(feature="gte_clang_3_7")]
-    pub fn get_offset_of_field<F: AsRef<str>>(&self) -> Result<usize, OffsetofError> {
+    pub fn get_offset_of_field(&self) -> Result<usize, OffsetofError> {
         let offsetof_ = unsafe { clang_Cursor_getOffsetOfField(self.raw) };
         OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
     }
