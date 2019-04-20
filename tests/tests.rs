@@ -86,7 +86,10 @@ fn with_translation_unit<'c, F>(
 ) where F: FnOnce(&Path, &Path, TranslationUnit) {
     with_temporary_file(name, contents, |d, file| {
         let index = Index::new(clang, false, false);
-        f(d, &file, index.parser(file).arguments(arguments).parse().unwrap());
+        #[cfg(feature="gte_clang_8_0")]
+        f(d, &file, index.parser(file).include_attributed_types(true).arguments(arguments).parse().unwrap());
+        // #[cfg(not(feature="gte_clang_8_0"))]
+        // f(d, &file, index.parser(file).arguments(arguments).parse().unwrap());
     });
 }
 
@@ -896,6 +899,54 @@ fn test() {
         fn test_is_invalid_declaration(_: Entity) {}
 
         test_is_invalid_declaration(children[0]);
+    });
+
+    let source = "
+        int main() {
+            return 0;
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+
+        #[cfg(feature="gte_clang_7_0")]
+        fn test_pretty_printer(entity: Entity) {
+            let s = entity.get_pretty_printer()
+                .set_indentation_amount(1)
+                .set_flag(PrintingPolicyFlag::IncludeNewlines, true)
+                .set_flag(PrintingPolicyFlag::IncludeTagDefinition, true)
+                .set_flag(PrintingPolicyFlag::PolishForDeclaration, false)
+                .set_flag(PrintingPolicyFlag::PrintAnonymousTagLocations, false)
+                .set_flag(PrintingPolicyFlag::PrintConstantArraySizeAsWritten, true)
+                .set_flag(PrintingPolicyFlag::PrintConstantsAsWritten, true)
+                .set_flag(PrintingPolicyFlag::PrintFullyQualifiedName, true)
+                .set_flag(PrintingPolicyFlag::SuppressImplicitBase, true)
+                .set_flag(PrintingPolicyFlag::SuppressInitializers, false)
+                .set_flag(PrintingPolicyFlag::SuppressLifetimeQualifiers, false)
+                .set_flag(PrintingPolicyFlag::SuppressScope, false)
+                .set_flag(PrintingPolicyFlag::SuppressSpecifiers, false)
+                .set_flag(PrintingPolicyFlag::SuppressStrongLifetime, false)
+                .set_flag(PrintingPolicyFlag::SuppressTagKeyword, true)
+                .set_flag(PrintingPolicyFlag::SuppressTemplateArgsInCXXConstructors, false)
+                .set_flag(PrintingPolicyFlag::SuppressUnwrittenScope, false)
+                .set_flag(PrintingPolicyFlag::UseAlignof, true)
+                .set_flag(PrintingPolicyFlag::UseBool, true)
+                .set_flag(PrintingPolicyFlag::UseHalf, false)
+                .set_flag(PrintingPolicyFlag::UseMsWchar, false)
+                .set_flag(PrintingPolicyFlag::UseMsvcFormatting, false)
+                .set_flag(PrintingPolicyFlag::UseRestrict, true)
+                .set_flag(PrintingPolicyFlag::UseTerseOutput, false)
+                .set_flag(PrintingPolicyFlag::UseUnderscoreAlignof, false)
+                .set_flag(PrintingPolicyFlag::UseVoidForZeroParams, true)
+                .print();
+            assert_eq!(s, "int main() {\n  return 0;\n}\n");
+        }
+
+        #[cfg(not(feature="gte_clang_7_0"))]
+        fn test_pretty_printer(_: Entity) {}
+
+        test_pretty_printer(children[0]);
     });
 
     let source = "
