@@ -86,10 +86,7 @@ fn with_translation_unit<'c, F>(
 ) where F: FnOnce(&Path, &Path, TranslationUnit) {
     with_temporary_file(name, contents, |d, file| {
         let index = Index::new(clang, false, false);
-        #[cfg(feature="gte_clang_8_0")]
-        f(d, &file, index.parser(file).include_attributed_types(true).arguments(arguments).parse().unwrap());
-        // #[cfg(not(feature="gte_clang_8_0"))]
-        // f(d, &file, index.parser(file).arguments(arguments).parse().unwrap());
+        f(d, &file, index.parser(file).arguments(arguments).parse().unwrap());
     });
 }
 
