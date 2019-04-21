@@ -1,4 +1,4 @@
-## [0.22.0] - UNRELEASED
+## [0.22.0] - 2019-04-20
 
 ### Added
 - Added partial support for `clang` 7.0.x / 8.0.x
