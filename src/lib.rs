@@ -24,6 +24,8 @@
 //! * 4.0 - [Documentation](https://kylemayes.github.io/clang-rs/4_0/clang)
 //! * 5.0 - [Documentation](https://kylemayes.github.io/clang-rs/5_0/clang)
 //! * 6.0 - [Documentation](https://kylemayes.github.io/clang-rs/6_0/clang)
+//! * 7.0 - [Documentation](https://kylemayes.github.io/clang-rs/7_0/clang)
+//! * 8.0 - [Documentation](https://kylemayes.github.io/clang-rs/8_0/clang)
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
