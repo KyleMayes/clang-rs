@@ -1,3 +1,11 @@
+## [0.22.0] - UNRELEASED
+
+### Added
+- Added partial support for `clang` 7.0.x / 8.0.x
+
+### Changed
+- Bumped `clang-sys` version to `0.28.0`
+
 ## [0.21.0] - 2019-02-17
 
 ### Changed
