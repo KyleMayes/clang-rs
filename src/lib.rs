@@ -2490,7 +2490,9 @@ impl<'tu> Parser<'tu> {
     /// * `-fsyntax-only`
     /// * `-o` and the following `<output>`
     pub fn arguments<S: AsRef<str>>(&mut self, arguments: &[S]) -> &mut Parser<'tu> {
-        self.arguments = arguments.iter().map(utility::from_string).collect();
+        self.arguments = arguments.iter().map(|s| String::from(s.as_ref()))
+            .flat_map(|s| s.split(" ").map(str::to_owned).collect::<Vec<String>>() )
+            .map(utility::from_string).collect();
         self
     }
 
