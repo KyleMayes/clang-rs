@@ -2108,7 +2108,7 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is a function-like macro.
     #[cfg(feature="gte_clang_3_9")]
     pub fn is_function_like_macro(&self) -> bool {
-        unsafe { clang_Cursor_isFunctionInlined(self.raw) != 0 }
+        unsafe { clang_Cursor_isMacroFunctionLike(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an inline function.
