@@ -1,4 +1,4 @@
-## [0.22.1] - UNRELEASED
+## [0.22.1] - 2019-07-15
 
 ### Fixed
 - Fixed `Entity::is_function_like_macro` calling the wrong `libclang` function
