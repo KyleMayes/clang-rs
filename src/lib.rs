@@ -2197,7 +2197,7 @@ impl<'tu> Entity<'tu> {
         ) -> CXChildVisitResult {
             unsafe {
                 let &mut (tu, ref mut callback) =
-                    &mut *(data as *mut (&TranslationUnit, Box<EntityCallback>));
+                    &mut *(data as *mut (&TranslationUnit, Box<dyn EntityCallback>));
 
                 let entity = Entity::from_raw(cursor, tu);
                 let parent = Entity::from_raw(parent, tu);
@@ -2205,7 +2205,7 @@ impl<'tu> Entity<'tu> {
             }
         }
 
-        let mut data = (self.tu, Box::new(f) as Box<EntityCallback>);
+        let mut data = (self.tu, Box::new(f) as Box<dyn EntityCallback>);
         unsafe { clang_visitChildren(self.raw, visit, utility::addressof(&mut data)) != 0 }
     }
 
@@ -3110,7 +3110,7 @@ impl<'tu> Type<'tu> {
         extern fn visit(cursor: CXCursor, data: CXClientData) -> CXVisitorResult {
             unsafe {
                 let &mut (tu, ref mut callback) =
-                    &mut *(data as *mut (&TranslationUnit, Box<Callback>));
+                    &mut *(data as *mut (&TranslationUnit, Box<dyn Callback>));
 
                 if callback.call(Entity::from_raw(cursor, tu)) {
                     CXVisit_Continue
@@ -3120,7 +3120,7 @@ impl<'tu> Type<'tu> {
             }
         }
 
-        let mut data = (self.tu, Box::new(f) as Box<Callback>);
+        let mut data = (self.tu, Box::new(f) as Box<dyn Callback>);
         unsafe {
             let data = utility::addressof(&mut data);
             Some(clang_Type_visitFields(self.raw, visit, data) == CXVisit_Break)

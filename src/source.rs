@@ -480,8 +480,8 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     extern fn visit(data: CXClientData, cursor: CXCursor, range: CXSourceRange) -> CXVisitorResult {
         unsafe {
             let &mut (tu, ref mut callback):
-                &mut (&TranslationUnit, Box<Callback>) =
-                    &mut *(data as *mut (&TranslationUnit, Box<Callback>));
+                &mut (&TranslationUnit, Box<dyn Callback>) =
+                    &mut *(data as *mut (&TranslationUnit, Box<dyn Callback>));
 
             if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
                 CXVisit_Continue
@@ -491,7 +491,7 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
         }
     }
 
-    let mut data = (tu, Box::new(f) as Box<Callback>);
+    let mut data = (tu, Box::new(f) as Box<dyn Callback>);
     let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit };
     g(visitor) == CXResult_VisitBreak
 }
