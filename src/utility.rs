@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::ffi::{CStr, CString};
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 
 use clang_sys::*;
 
@@ -254,6 +254,11 @@ pub fn addressof<T>(value: &mut T) -> *mut c_void {
 
 pub fn from_path<P: AsRef<Path>>(path: P) -> CString {
     from_string(path.as_ref().as_os_str().to_str().expect("invalid C string"))
+}
+
+pub fn to_path(clang: CXString) -> PathBuf {
+    let rust_string = to_string(clang);
+    PathBuf::from(rust_string)
 }
 
 pub fn from_string<S: AsRef<str>>(string: S) -> CString {

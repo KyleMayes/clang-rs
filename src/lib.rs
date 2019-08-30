@@ -1484,6 +1484,125 @@ impl Drop for Clang {
     }
 }
 
+// CompilationDatabase ________________________________________
+
+/// A compilation database of all information used to compile files in a project.
+#[derive(Debug)]
+pub struct CompilationDatabase {
+    ptr: CXCompilationDatabase,
+}
+
+impl CompilationDatabase {
+    /// Creates a compilation database from the database found in the given directory.
+    pub fn from_directory<P: AsRef<Path>>(path: P) -> Result<CompilationDatabase, ()> {
+        let path = utility::from_path(path);
+        unsafe {
+            let mut error: CXCompilationDatabase_Error = mem::uninitialized();
+            let ptr = clang_CompilationDatabase_fromDirectory(path.as_ptr(), &mut error);
+            match error {
+                CXCompilationDatabase_NoError => Ok(CompilationDatabase { ptr }),
+                CXCompilationDatabase_CanNotLoadDatabase => Err(()),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    /// Get all the compile commands from the database.
+    pub fn get_all_compile_commands(&self) -> CompileCommands {
+        unsafe {
+            CompileCommands::from_ptr(clang_CompilationDatabase_getAllCompileCommands(self.ptr))
+        }
+    }
+
+    /// Find the compile commands for the given file.
+    pub fn get_compile_commands<P: AsRef<Path>>(&self, path: P) -> Result<CompileCommands, ()> {
+        // Presumably this returns null if we can't find the given path?
+        // The Clang docs don't specify.
+        let path = utility::from_path(path);
+        let ptr = unsafe { clang_CompilationDatabase_getCompileCommands(self.ptr, path.as_ptr()) };
+        ptr.map(CompileCommands::from_ptr).ok_or(())
+    }
+}
+
+impl Drop for CompilationDatabase {
+    fn drop(&mut self) {
+        unsafe {
+            clang_CompilationDatabase_dispose(self.ptr);
+        }
+    }
+}
+
+/// The result of a search in a CompilationDatabase
+#[derive(Debug)]
+pub struct CompileCommands {
+    ptr: CXCompileCommands,
+}
+
+impl CompileCommands {
+    fn from_ptr(ptr: CXCompileCommands) -> CompileCommands {
+        assert!(!ptr.is_null());
+        CompileCommands { ptr }
+    }
+
+    /// Returns all commands for this search
+    pub fn get_commands(&self) -> Vec<CompileCommand> {
+        iter!(
+            clang_CompileCommands_getSize(self.ptr),
+            clang_CompileCommands_getCommand(self.ptr),
+        )
+        .map(|p| CompileCommand::from_ptr(self, p))
+        .collect()
+    }
+}
+
+impl Drop for CompileCommands {
+    fn drop(&mut self) {
+        unsafe {
+            clang_CompileCommands_dispose(self.ptr);
+        }
+    }
+}
+
+/// A compile comand from CompilationDatabase
+#[derive(Debug, Copy, Clone)]
+pub struct CompileCommand<'cmds> {
+    ptr: CXCompileCommand,
+    _marker: PhantomData<&'cmds CompileCommands>,
+}
+
+impl<'cmds> CompileCommand<'cmds> {
+    fn from_ptr(_: &'cmds CompileCommands, ptr: CXCompileCommand) -> CompileCommand<'cmds> {
+        assert!(!ptr.is_null());
+        CompileCommand {
+            ptr,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Get the working directory where the command was executed.
+    pub fn get_directory(&self) -> PathBuf {
+        utility::to_path(unsafe { clang_CompileCommand_getDirectory(self.ptr) })
+    }
+
+    /// Get the filename associated with the command.
+    #[cfg(feature="gte_clang_3_8")]
+    pub fn get_filename(&self) -> PathBuf {
+        utility::to_path(unsafe { clang_CompileCommand_getFilename(self.ptr) })
+    }
+
+    /// Get all arguments passed to the command.
+    pub fn get_arguments(&self) -> Vec<String> {
+        iter!(
+            clang_CompileCommand_getNumArgs(self.ptr),
+            clang_CompileCommand_getArg(self.ptr),
+        )
+        .map(utility::to_string)
+        .collect()
+    }
+
+    // TODO: Args, mapped source path, mapped sourth context.
+}
+
 // Entity ________________________________________
 
 /// An AST entity.
