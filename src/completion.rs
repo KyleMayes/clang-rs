@@ -313,11 +313,11 @@ impl CompletionResults {
     /// Returns the categorization of the entity that contains the code completion context for this
     /// set of code completion results and whether that entity is incomplete, if applicable.
     pub fn get_container_kind(&self) -> Option<(EntityKind, bool)> {
+        let mut incomplete = mem::MaybeUninit::uninit();
         unsafe {
-            let mut incomplete = mem::uninitialized();
-            match clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
+            match clang_codeCompleteGetContainerKind(self.ptr, incomplete.as_mut_ptr()) {
                 CXCursor_InvalidCode => None,
-                other => Some((mem::transmute(other), incomplete != 0)),
+                other => Some((mem::transmute(other), incomplete.assume_init() != 0)),
             }
         }
     }

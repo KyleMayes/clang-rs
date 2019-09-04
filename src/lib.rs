@@ -1496,10 +1496,10 @@ impl CompilationDatabase {
     /// Creates a compilation database from the database found in the given directory.
     pub fn from_directory<P: AsRef<Path>>(path: P) -> Result<CompilationDatabase, ()> {
         let path = utility::from_path(path);
+        let mut error = mem::MaybeUninit::uninit();
         unsafe {
-            let mut error: CXCompilationDatabase_Error = mem::uninitialized();
-            let ptr = clang_CompilationDatabase_fromDirectory(path.as_ptr(), &mut error);
-            match error {
+            let ptr = clang_CompilationDatabase_fromDirectory(path.as_ptr(), error.as_mut_ptr());
+            match error.assume_init() {
                 CXCompilationDatabase_NoError => Ok(CompilationDatabase { ptr }),
                 CXCompilationDatabase_CanNotLoadDatabase => Err(()),
                 _ => unreachable!(),
@@ -1822,11 +1822,11 @@ impl<'tu> Entity<'tu> {
     /// Returns the `external_source_symbol` attribute attached to this AST entity, if any.
     #[cfg(feature="gte_clang_5_0")]
     pub fn get_external_symbol(&self) -> Option<ExternalSymbol> {
+        let mut language: MaybeUninit::uninit();
+        let mut defined: MaybeUninit::uninit();
         unsafe {
-            let mut language: CXString = mem::uninitialized();
-            let mut defined: CXString = mem::uninitialized();
             let mut generated: c_uint = 0;
-            if clang_Cursor_isExternalSymbol(self.raw, &mut language, &mut defined, &mut generated) != 0 {
+            if clang_Cursor_isExternalSymbol(self.raw, language.as_mut_ptr(), defined.as_mut_ptr(), &mut generated) != 0 {
                 Some(ExternalSymbol {
                     language: utility::to_string(language),
                     defined: utility::to_string(defined),
