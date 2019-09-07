@@ -1,4 +1,4 @@
-## [0.23.0] - UNRELEASED
+## [0.23.0] - 2019-09-07
 
 ### Fixed
 - Fixed warnings on recent versions of the Rust compiler
