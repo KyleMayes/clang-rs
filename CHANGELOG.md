@@ -1,3 +1,11 @@
+## [0.23.0] - UNRELEASED
+
+### Fixed
+- Fixed warnings on recent versions of the Rust compiler
+
+### Added
+- Added support for compilation databases
+
 ## [0.22.1] - 2019-07-15
 
 ### Fixed
