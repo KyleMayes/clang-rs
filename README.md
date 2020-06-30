@@ -6,7 +6,8 @@
 
 A somewhat idiomatic Rust wrapper for `libclang`.
 
-Supported on the stable, beta, and nightly Rust channels.
+Supported on the stable, beta, and nightly Rust channels.<br/>
+Minimum supported Rust version: **1.36.0**
 
 Released under the Apache License 2.0.
 
