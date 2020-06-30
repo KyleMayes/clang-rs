@@ -89,6 +89,15 @@ pub enum Accessibility {
     Public = 1,
 }
 
+impl Accessibility {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=3 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+}
+
 // Availability __________________________________
 
 /// Indicates the availability of an AST entity.
@@ -103,6 +112,15 @@ pub enum Availability {
     Inaccessible = 3,
     /// The entity is not available and any usage of it will be an error.
     Unavailable = 2,
+}
+
+impl Availability {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            0..=3 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
 }
 
 // CallingConvention _____________________________
@@ -156,12 +174,22 @@ pub enum CallingConvention {
     Win64 = 10,
 }
 
+impl CallingConvention {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=15 | 200 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+}
+
 // EntityKind ____________________________________
 
 /// Indicates the categorization of an AST entity.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum EntityKind {
+    // IMPORTANT: If you add variants, update the from_raw() code below.
     /// A declaration whose specific type is not exposed via this interface.
     UnexposedDecl = 1,
     /// A C or C++ struct.
@@ -746,6 +774,23 @@ pub enum EntityKind {
     OverloadCandidate = 700,
 }
 
+impl EntityKind {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=50 | 100..=149 | 200..=279 | 300 | 400..=437 | 500..=503 | 600..=603 | 700 => {
+                Some(unsafe { mem::transmute(raw) })
+            }
+            _ => None,
+        }
+    }
+
+    fn from_raw_infallible(raw: c_int) -> Self {
+        // What to return if the variant isn't recognized and we can't signal this to the caller?
+        // There's no perfect answer, but one of the Unexposed variants is certainly reasonable.
+        Self::from_raw(raw).unwrap_or(EntityKind::UnexposedDecl)
+    }
+}
+
 // EntityVisitResult _____________________________
 
 /// Indicates how a entity visitation should proceed.
@@ -812,6 +857,16 @@ pub enum ExceptionSpecification {
     Unparsed = 8,
 }
 
+#[cfg(feature="gte_clang_5_0")]
+impl ExceptionSpecification {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=8 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+}
+
 // Language ______________________________________
 
 /// Indicates the language used by a declaration.
@@ -830,6 +885,15 @@ pub enum Language {
     Swift = 4,
 }
 
+impl Language {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=4 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+}
+
 // Linkage _______________________________________
 
 /// Indicates the linkage of an AST entity.
@@ -844,6 +908,15 @@ pub enum Linkage {
     External = 4,
     /// The AST entity has external linkage and lives in a C++ anonymous namespace.
     UniqueExternal = 3,
+}
+
+impl Linkage {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=4 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
 }
 
 // MemoryUsage ___________________________________
@@ -882,6 +955,15 @@ pub enum MemoryUsage {
     SourceManagerMMap = 8,
 }
 
+impl MemoryUsage {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=14 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+}
+
 // Nullability ___________________________________
 
 /// Indicates the nullability of a pointer type.
@@ -895,6 +977,16 @@ pub enum Nullability {
     Nullable = 1,
     /// Whether values of this type can be null is (explicitly) unspecified.
     Unspecified = 2,
+}
+
+#[cfg(feature="gte_clang_8_0")]
+impl Nullability {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            0..=2 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
 }
 
 // PrintingPolicyFlag ____________________________
@@ -956,6 +1048,16 @@ pub enum PrintingPolicyFlag {
     PrintFullyQualifiedName = 25,
 }
 
+#[cfg(feature="gte_clang_7_0")]
+impl PrintingPolicyFlag {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=25 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+}
+
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
@@ -967,6 +1069,15 @@ pub enum RefQualifier {
     LValue = 1,
     /// The function or method has an r-value ref qualifier (`&&`).
     RValue = 2,
+}
+
+impl RefQualifier {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=2 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
 }
 
 // StorageClass __________________________________
@@ -993,6 +1104,16 @@ pub enum StorageClass {
     PrivateExtern = 4,
     /// The declaration specifies a storage duration related to an OpenCL work group.
     OpenClWorkGroupLocal = 5,
+}
+
+#[cfg(feature="gte_clang_3_6")]
+impl StorageClass {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=7 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
 }
 
 // TemplateArgument ______________________________
@@ -1032,6 +1153,16 @@ pub enum TlsKind {
     Dynamic = 1,
     /// The declaration uses static TLS.
     Static = 2,
+}
+
+#[cfg(feature="gte_clang_6_0")]
+impl TlsKind {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=2 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
 }
 
 // TypeKind ______________________________________
@@ -1404,6 +1535,19 @@ pub enum TypeKind {
     OCLIntelSubgroupAVCImeDualRefStreamin = 175,
 }
 
+impl TypeKind {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=38 | 101..=175 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+
+    fn from_raw_infallible(raw: c_int) -> Self {
+        Self::from_raw(raw).unwrap_or(TypeKind::Unexposed)
+    }
+}
+
 // Visibility ____________________________________
 
 /// Indicates the linker visibility of an AST element.
@@ -1417,6 +1561,16 @@ pub enum Visibility {
     Hidden = 1,
     /// The AST element can be seen by the linker but resolves to a symbol inside this object.
     Protected = 2,
+}
+
+#[cfg(feature="gte_clang_3_8")]
+impl Visibility {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=3 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
 }
 
 //================================================
@@ -1665,7 +1819,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the categorization of this AST entity.
     pub fn get_kind(&self) -> EntityKind {
-        unsafe { mem::transmute(clang_getCursorKind(self.raw)) }
+        EntityKind::from_raw_infallible(unsafe { clang_getCursorKind(self.raw) })
     }
 
     /// Returns the display name of this AST entity, if any.
@@ -1697,7 +1851,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_getCXXAccessSpecifier(self.raw) {
                 CX_CXXInvalidAccessSpecifier => None,
-                other => Some(mem::transmute(other)),
+                other => Accessibility::from_raw(other),
             }
         }
     }
@@ -1712,7 +1866,7 @@ impl<'tu> Entity<'tu> {
 
     /// Returns the availability of this AST entity.
     pub fn get_availability(&self) -> Availability {
-        unsafe { mem::transmute(clang_getCursorAvailability(self.raw)) }
+        Availability::from_raw(unsafe {clang_getCursorAvailability(self.raw) }).unwrap()
     }
 
     /// Returns the width of this bit field, if applicable.
@@ -1814,7 +1968,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_getCursorExceptionSpecificationType(self.raw) {
                 -1 | CXCursor_ExceptionSpecificationKind_None => None,
-                other => Some(mem::transmute(other)),
+                other => ExceptionSpecification::from_raw(other),
             }
         }
     }
@@ -1848,7 +2002,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_getCursorLanguage(self.raw) {
                 CXLanguage_Invalid => None,
-                other => Some(mem::transmute(other)),
+                other => Language::from_raw(other),
             }
         }
     }
@@ -1863,7 +2017,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_getCursorLinkage(self.raw) {
                 CXLinkage_Invalid => None,
-                other => Some(mem::transmute(other)),
+                other => Linkage::from_raw(other),
             }
         }
     }
@@ -2047,7 +2201,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_Cursor_getStorageClass(self.raw) {
                 CX_SC_Invalid => None,
-                other => Some(mem::transmute(other)),
+                other => StorageClass::from_raw(other),
             }
         }
     }
@@ -2100,7 +2254,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_getTemplateCursorKind(self.raw) {
                 CXCursor_NoDeclFound => None,
-                other => Some(mem::transmute(other)),
+                other => EntityKind::from_raw(other),
             }
         }
     }
@@ -2111,7 +2265,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_getCursorTLSKind(self.raw) {
                 CXTLS_None => None,
-                other => Some(mem::transmute(other)),
+                other => TlsKind::from_raw(other),
             }
         }
     }
@@ -2142,7 +2296,7 @@ impl<'tu> Entity<'tu> {
         unsafe {
             match clang_getCursorVisibility(self.raw) {
                 CXVisibility_Invalid => None,
-                other => Some(mem::transmute(other)),
+                other => Visibility::from_raw(other),
             }
         }
     }
@@ -2320,7 +2474,7 @@ impl<'tu> Entity<'tu> {
 
                 let entity = Entity::from_raw(cursor, tu);
                 let parent = Entity::from_raw(parent, tu);
-                mem::transmute(callback.call(entity, parent))
+                callback.call(entity, parent) as c_int
             }
         }
 
@@ -2706,13 +2860,13 @@ impl<'e> PrettyPrinter<'e> {
 
     /// Gets the specified flag value.
     pub fn get_flag(&self, flag: PrintingPolicyFlag) -> bool {
-        unsafe { clang_PrintingPolicy_getProperty(self.ptr, mem::transmute(flag)) != 0 }
+        unsafe { clang_PrintingPolicy_getProperty(self.ptr, flag as c_int) != 0 }
     }
 
     /// Sets the specified flag value.
     pub fn set_flag(&self, flag: PrintingPolicyFlag, value: bool) -> &Self {
         let value = if value { 1 } else { 0 };
-        unsafe { clang_PrintingPolicy_setProperty(self.ptr, mem::transmute(flag), value); }
+        unsafe { clang_PrintingPolicy_setProperty(self.ptr, flag as c_int, value); }
         self
     }
 
@@ -2837,7 +2991,10 @@ impl<'i> TranslationUnit<'i> {
         unsafe {
             let raw = clang_getCXTUResourceUsage(self.ptr);
             let raws = slice::from_raw_parts(raw.entries, raw.numEntries as usize);
-            let usage = raws.iter().map(|u| (mem::transmute(u.kind), u.amount as usize)).collect();
+            let usage = raws
+                .iter()
+                .flat_map(|u| MemoryUsage::from_raw(u.kind).map(|kind| (kind, u.amount as usize)))
+                .collect();
             clang_disposeCXTUResourceUsage(raw);
             usage
         }
@@ -2951,7 +3108,7 @@ impl<'tu> Type<'tu> {
 
     /// Returns the kind of this type.
     pub fn get_kind(&self) -> TypeKind {
-        unsafe { mem::transmute(self.raw.kind) }
+        TypeKind::from_raw_infallible(self.raw.kind)
     }
 
     /// Returns the display name of this type.
@@ -3014,7 +3171,7 @@ impl<'tu> Type<'tu> {
         unsafe {
             match clang_getFunctionTypeCallingConv(self.raw) {
                 CXCallingConv_Invalid => None,
-                other => Some(mem::transmute(other)),
+                other => CallingConvention::from_raw(other),
             }
         }
     }
@@ -3053,7 +3210,7 @@ impl<'tu> Type<'tu> {
         unsafe {
             match clang_getExceptionSpecificationType(self.raw) {
                 -1 | CXCursor_ExceptionSpecificationKind_None => None,
-                other => Some(mem::transmute(other)),
+                other => ExceptionSpecification::from_raw(other),
             }
         }
     }
@@ -3085,7 +3242,7 @@ impl<'tu> Type<'tu> {
         unsafe {
             match clang_Type_getNullability(self.raw) {
                 CXTypeNullability_Invalid => None,
-                other => Some(mem::transmute(other)),
+                other => Nullability::from_raw(other),
             }
         }
     }
@@ -3130,7 +3287,7 @@ impl<'tu> Type<'tu> {
         unsafe {
             match clang_Type_getCXXRefQualifier(self.raw) {
                 CXRefQualifier_None => None,
-                other => Some(mem::transmute(other)),
+                other => RefQualifier::from_raw(other),
             }
         }
     }
