@@ -1,3 +1,5 @@
+@echo on
+
 curl -sSf https://static.rust-lang.org/dist/rust-1.37.0-i686-pc-windows-msvc.exe -o rust.exe
 rust.exe /VERYSILENT /NORESTART /DIR="C:\Rust"
 set PATH=%PATH%;C:\Rust\bin
