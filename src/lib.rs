@@ -1651,9 +1651,9 @@ impl CompilationDatabase {
     pub fn from_directory<P: AsRef<Path>>(path: P) -> Result<CompilationDatabase, ()> {
         let path = utility::from_path(path);
         unsafe {
-            let mut error: CXCompilationDatabase_Error = mem::uninitialized();
-            let ptr = clang_CompilationDatabase_fromDirectory(path.as_ptr(), &mut error);
-            match error {
+            let mut error = mem::MaybeUninit::uninit();
+            let ptr = clang_CompilationDatabase_fromDirectory(path.as_ptr(), error.as_mut_ptr());
+            match error.assume_init() {
                 CXCompilationDatabase_NoError => Ok(CompilationDatabase { ptr }),
                 CXCompilationDatabase_CanNotLoadDatabase => Err(()),
                 _ => unreachable!(),

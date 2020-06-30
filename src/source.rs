@@ -66,8 +66,9 @@ impl<'tu> File<'tu> {
     /// Returns a unique identifier for this file.
     pub fn get_id(&self) -> (u64, u64, u64) {
         unsafe {
-            let mut id = mem::uninitialized();
-            clang_getFileUniqueID(self.ptr, &mut id);
+            let mut id = mem::MaybeUninit::uninit();
+            clang_getFileUniqueID(self.ptr, id.as_mut_ptr());
+            let id = id.assume_init();
             (id.data[0] as u64, id.data[1] as u64, id.data[2] as u64)
         }
     }
@@ -76,7 +77,7 @@ impl<'tu> File<'tu> {
     #[cfg(feature="gte_clang_6_0")]
     pub fn get_contents(&self) -> Option<String> {
         use std::ptr;
-        use std::ffi::{CStr};
+        use std::ffi::CStr;
 
         unsafe {
             let c = clang_getFileContents(self.tu.ptr, self.ptr, ptr::null_mut());
@@ -280,10 +281,21 @@ impl<'tu> cmp::Eq for Module<'tu> { }
 
 macro_rules! location {
     ($function:ident, $location:expr, $tu:expr) => ({
-        let (mut file, mut line, mut column, mut offset) = mem::uninitialized();
-        $function($location, &mut file, &mut line, &mut column, &mut offset);
-        let file = file.map(|f| File::from_ptr(f, $tu));
-        Location { file: file, line: line as u32, column: column as u32, offset: offset as u32 }
+        fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() };
+        let (mut file, mut line, mut column, mut offset) = (uninit(), uninit(), uninit(), uninit());
+        $function(
+            $location,
+            file.as_mut_ptr(),
+            line.as_mut_ptr(),
+            column.as_mut_ptr(),
+            offset.as_mut_ptr(),
+        );
+        Location {
+            file: file.assume_init().map(|f| File::from_ptr(f, $tu)),
+            line: line.assume_init() as u32,
+            column: column.assume_init() as u32,
+            offset: offset.assume_init() as u32,
+        }
     });
 }
 
@@ -325,9 +337,15 @@ impl<'tu> SourceLocation<'tu> {
     /// account.
     pub fn get_presumed_location(&self) -> (String, u32, u32) {
         unsafe {
-            let (mut file, mut line, mut column) = mem::uninitialized();
-            clang_getPresumedLocation(self.raw, &mut file, &mut line, &mut column);
-            (utility::to_string(file), line as u32, column as u32)
+            fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() };
+            let (mut file, mut line, mut column) = (uninit(), uninit(), uninit());
+            clang_getPresumedLocation(
+                self.raw, file.as_mut_ptr(), line.as_mut_ptr(), column.as_mut_ptr());
+            (
+                utility::to_string(file.assume_init()),
+                line.assume_init() as u32,
+                column.assume_init() as u32
+            )
         }
     }
 
@@ -425,8 +443,9 @@ impl<'tu> SourceRange<'tu> {
     /// Tokenizes the source code covered by this source range and returns the resulting tokens.
     pub fn tokenize(&self) -> Vec<Token<'tu>> {
         unsafe {
-            let (mut raw, mut count) = mem::uninitialized();
-            clang_tokenize(self.tu.ptr, self.raw, &mut raw, &mut count);
+            let (mut raw, mut count) = (mem::MaybeUninit::uninit(), mem::MaybeUninit::uninit());
+            clang_tokenize(self.tu.ptr, self.raw, raw.as_mut_ptr(), count.as_mut_ptr());
+            let (raw, count) = (raw.assume_init(), count.assume_init());
             let raws = slice::from_raw_parts(raw, count as usize);
             let tokens = raws.iter().map(|t| Token::from_raw(*t, self.tu)).collect();
             clang_disposeTokens(self.tu.ptr, raw, count);

@@ -111,10 +111,10 @@ impl<'tu> Diagnostic<'tu> {
     pub fn get_fix_its(&self) -> Vec<FixIt<'tu>> {
         unsafe {
             (0..clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
-                let mut range = mem::uninitialized();
-                let fixit = clang_getDiagnosticFixIt(self.ptr, i, &mut range);
+                let mut range = mem::MaybeUninit::uninit();
+                let fixit = clang_getDiagnosticFixIt(self.ptr, i, range.as_mut_ptr());
                 let string = utility::to_string(fixit);
-                let range = SourceRange::from_raw(range, self.tu);
+                let range = SourceRange::from_raw(range.assume_init(), self.tu);
                 if string.is_empty() {
                     FixIt::Deletion(range)
                 } else if range.get_start() == range.get_end() {

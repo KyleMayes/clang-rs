@@ -48,7 +48,7 @@ macro_rules! error {
 
         impl From<$name> for String {
             fn from(error: $name) -> String {
-                error.description().into()
+                error.to_string()
             }
         }
 
@@ -63,7 +63,7 @@ macro_rules! error {
 
         impl fmt::Display for $name {
             fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "{}", self.description())
+                write!(formatter, "{}", self)
             }
         }
     };

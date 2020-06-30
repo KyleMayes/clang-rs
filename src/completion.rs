@@ -314,10 +314,10 @@ impl CompletionResults {
     /// set of code completion results and whether that entity is incomplete, if applicable.
     pub fn get_container_kind(&self) -> Option<(EntityKind, bool)> {
         unsafe {
-            let mut incomplete = mem::uninitialized();
-            match clang_codeCompleteGetContainerKind(self.ptr, &mut incomplete) {
+            let mut incomplete = mem::MaybeUninit::uninit();
+            match clang_codeCompleteGetContainerKind(self.ptr, incomplete.as_mut_ptr()) {
                 CXCursor_InvalidCode => None,
-                other => Some((mem::transmute(other), incomplete != 0)),
+                other => Some((mem::transmute(other), incomplete.assume_init() != 0)),
             }
         }
     }
