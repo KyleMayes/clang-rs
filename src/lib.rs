@@ -631,6 +631,10 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 4.0 and later.
     OmpTargetTeamsDistributeSimdDirective = 279,
+    /// C++2a std::bit_cast expression.
+    ///
+    /// Only produced by 'libclang' 9.0 and later.
+    BitCastExpr = 280,
     /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
     /// An attribute whose specific kind is not exposed via this interface.
@@ -754,6 +758,18 @@ pub enum EntityKind {
     ///
     /// Only produced by `libclang` 8.0 and later.
     FlagEnum = 437,
+    /// `__attribute__((clang::convergent))`
+    ///
+    /// Only produced by `libclang` 9.0 and later.
+    ConvergentAttr  = 438,
+    /// Only produced by `libclang` 9.0 and later.
+    WarnUnusedAttr = 439,
+    /// `__attribute__((nodiscard))`
+    ///
+    /// Only produced by `libclang` 9.0 and later.
+    WarnUnusedResultAttr = 440,
+    /// Only produced by `libclang` 9.0 and later.
+    AlignedAttr = 441,
     /// A preprocessing directive.
     PreprocessingDirective = 500,
     /// A macro definition.
@@ -785,7 +801,7 @@ pub enum EntityKind {
 impl EntityKind {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
-            1..=50 | 70..=73 | 100..=149 | 200..=279 | 300 | 400..=437 | 500..=503 | 600..=603
+            1..=50 | 70..=73 | 100..=149 | 200..=280 | 300 | 400..=441 | 500..=503 | 600..=603
             | 700 => {
                 Some(unsafe { mem::transmute(raw) })
             }
@@ -871,13 +887,17 @@ pub enum ExceptionSpecification {
     Uninstantiated = 7,
     /// The function has an exception specification that has not yet been parsed.
     Unparsed = 8,
+    /// The function has a `__declspec(nothrow)` specification.
+    ///
+    /// Only produced by `libclang` 9.0 and later.
+    NoThrow = 9,
 }
 
 #[cfg(feature="gte_clang_5_0")]
 impl ExceptionSpecification {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
-            1..=8 => Some(unsafe { mem::transmute(raw) }),
+            1..=9 => Some(unsafe { mem::transmute(raw) }),
             _ => None,
         }
     }
@@ -1549,6 +1569,10 @@ pub enum TypeKind {
     ///
     /// Only produced by `libclang` 8.0 and later.
     OCLIntelSubgroupAVCImeDualRefStreamin = 175,
+    /// Extended vector type, created using `attribute((ext_vector_type(n)))`.
+    ///
+    /// Only produced by `libclang` 9.0 and later.
+    ExtVector = 176,
 }
 
 impl TypeKind {
@@ -2334,10 +2358,26 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_CXXRecord_isAbstract(self.raw) != 0 }
     }
 
-    /// Returns whether this AST entity is an anonymous record declaration.
+    /// Returns whether this AST entity is anonymous.
+    ///
+    /// Prior to `libclang` 9.0, this only returned true if the entity was an anonymous record
+    /// declaration.  As of 9.0, it also returns true for anonymous namespaces. The old behavior is
+    /// available as `is_anonymous_record_decl()` for `libclang` 9.0 and up.
     #[cfg(feature="gte_clang_3_7")]
     pub fn is_anonymous(&self) -> bool {
         unsafe { clang_Cursor_isAnonymous(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an anonymous record declaration.
+    #[cfg(feature="gte_clang_9_0")]
+    pub fn is_anonymous_record_decl(&self) -> bool {
+        unsafe { clang_Cursor_isAnonymousRecordDecl(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is an inline namespace.
+    #[cfg(feature="gte_clang_9_0")]
+    pub fn is_inline_namespace(&self) -> bool {
+        unsafe { clang_Cursor_isInlineNamespace(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a bit field.
@@ -2756,6 +2796,9 @@ builder! {
         /// Sets whether implicit attributes should be visited.
         #[cfg(feature="gte_clang_8_0")]
         pub visit_implicit_attributes: CXTranslationUnit_VisitImplicitAttributes,
+        /// Indicates that non-errors (e.g. warnings) from included files should be ignored.
+        #[cfg(feature="gte_clang_9_0")]
+        pub ignore_non_errors_from_included_files: CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles,
     }
 }
 

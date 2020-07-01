@@ -98,6 +98,8 @@ error! {
         Name = (-5, "the record type does not contain a field with the supplied name"),
         /// The record type has an invalid parent declaration.
         Parent = (-1, "the record type has an invalid parent declaration"),
+        /// The type is undeduced.
+        Undeduced = (-6, "the type is undeduced"),
     }
 }
 
@@ -124,6 +126,8 @@ error! {
         Incomplete = (-2, "the type is an incomplete type"),
         /// The type is a variable size type.
         VariableSize = (-4, "the type is a variable size type"),
+        /// The supplied field name was invalid.
+        InvalidFieldName = (-5, "invalid field name"),
     }
 }
 

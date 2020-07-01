@@ -511,6 +511,6 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     }
 
     let mut data = (tu, Box::new(f) as Box<dyn Callback>);
-    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit };
+    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit: Some(visit) };
     g(visitor) == CXResult_VisitBreak
 }
