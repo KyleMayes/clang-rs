@@ -1,4 +1,4 @@
-## [0.24.0] - UNRELEASED
+## [0.24.0] - 2020-07-01
 
 ### Fixed
 - Fixed undefined behavior caused by transmuting unsupported C enum values into Rust enum values
