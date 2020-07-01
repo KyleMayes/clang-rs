@@ -1,3 +1,15 @@
+## [0.24.0] - UNRELEASED
+
+### Fixed
+- Fixed undefined behavior caused by transmuting unsupported C enum values into Rust enum values
+- Fixed warnings about usage of deprecated `std::mem::uninitialized` function
+
+### Added
+- Added support for `clang` 9.0.x
+
+### Changed
+- Added error conditions to `CursorKind` enum
+
 ## [0.23.0] - 2019-09-07
 
 ### Fixed
