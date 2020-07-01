@@ -1934,7 +1934,7 @@ impl<'tu> Entity<'tu> {
         unsafe { utility::to_string_option(clang_Cursor_getRawCommentText(self.raw)) }
     }
 
-    ///  Returns the parsed comment associated with this declaration, if application.
+    ///  Returns the parsed comment associated with this declaration, if applicable.
     pub fn get_parsed_comment(&self) -> Option<Comment<'tu>> {
         unsafe { clang_Cursor_getParsedComment(self.raw).map(Comment::from_raw) }
     }
