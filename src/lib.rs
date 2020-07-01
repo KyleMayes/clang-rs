@@ -293,6 +293,14 @@ pub enum EntityKind {
     OverloadedDeclRef = 49,
     /// A reference to a variable that occurs in some non-expression context.
     VariableRef = 50,
+    /// Error: An invalid file.
+    InvalidFile = 70,
+    /// Error: An invalid decl which could not be found.
+    InvalidDecl = 71,
+    /// Error: An entity which is not yet supported by libclang, or this wrapper.
+    NotImplemented = 72,
+    /// Error: Invalid code.
+    InvalidCode = 73,
     /// An expression whose specific kind is not exposed via this interface.
     UnexposedExpr = 100,
     /// An expression that refers to some value declaration, such as a function or enumerator.
@@ -777,7 +785,8 @@ pub enum EntityKind {
 impl EntityKind {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
-            1..=50 | 100..=149 | 200..=279 | 300 | 400..=437 | 500..=503 | 600..=603 | 700 => {
+            1..=50 | 70..=73 | 100..=149 | 200..=279 | 300 | 400..=437 | 500..=503 | 600..=603
+            | 700 => {
                 Some(unsafe { mem::transmute(raw) })
             }
             _ => None,
@@ -785,9 +794,16 @@ impl EntityKind {
     }
 
     fn from_raw_infallible(raw: c_int) -> Self {
-        // What to return if the variant isn't recognized and we can't signal this to the caller?
-        // There's no perfect answer, but one of the Unexposed variants is certainly reasonable.
-        Self::from_raw(raw).unwrap_or(EntityKind::UnexposedDecl)
+        Self::from_raw(raw).unwrap_or(EntityKind::NotImplemented)
+    }
+
+    /// Returns whether this entity is valid. If false, the entity represents an error condition.
+    pub fn is_valid(&self) -> bool {
+        match *self as c_int {
+            // 75 is in case a couple more are added
+            70..=75 => false,
+            _ => true,
+        }
     }
 }
 
