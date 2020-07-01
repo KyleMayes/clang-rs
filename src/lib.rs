@@ -2017,13 +2017,13 @@ impl<'tu> Entity<'tu> {
     #[cfg(feature="gte_clang_5_0")]
     pub fn get_external_symbol(&self) -> Option<ExternalSymbol> {
         unsafe {
-            let mut language: CXString = mem::uninitialized();
-            let mut defined: CXString = mem::uninitialized();
+            let mut language = mem::MaybeUninit::uninit();
+            let mut defined = mem::MaybeUninit::uninit();
             let mut generated: c_uint = 0;
-            if clang_Cursor_isExternalSymbol(self.raw, &mut language, &mut defined, &mut generated) != 0 {
+            if clang_Cursor_isExternalSymbol(self.raw, language.as_mut_ptr(), defined.as_mut_ptr(), &mut generated) != 0 {
                 Some(ExternalSymbol {
-                    language: utility::to_string(language),
-                    defined: utility::to_string(defined),
+                    language: utility::to_string(language.assume_init()),
+                    defined: utility::to_string(defined.assume_init()),
                     generated: generated != 0
                 })
             } else {
