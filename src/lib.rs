@@ -1084,16 +1084,6 @@ pub enum PrintingPolicyFlag {
     PrintFullyQualifiedName = 25,
 }
 
-#[cfg(feature="clang_7_0")]
-impl PrintingPolicyFlag {
-    fn from_raw(raw: c_int) -> Option<Self> {
-        match raw {
-            1..=25 => Some(unsafe { mem::transmute(raw) }),
-            _ => None,
-        }
-    }
-}
-
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
