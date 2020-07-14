@@ -74,7 +74,7 @@ impl<'tu> File<'tu> {
     }
 
     /// Returns the contents of this file, if this file has been loaded.
-    #[cfg(feature="gte_clang_6_0")]
+    #[cfg(feature="clang_6_0")]
     pub fn get_contents(&self) -> Option<String> {
         use std::ptr;
         use std::ffi::CStr;

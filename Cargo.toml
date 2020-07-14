@@ -17,31 +17,20 @@ autotests = false
 
 [features]
 
+clang_3_5 = ["clang-sys/clang_3_5"]
+clang_3_6 = ["clang-sys/clang_3_6", "clang_3_5"]
+clang_3_7 = ["clang-sys/clang_3_7", "clang_3_6"]
+clang_3_8 = ["clang-sys/clang_3_8", "clang_3_7"]
+clang_3_9 = ["clang-sys/clang_3_9", "clang_3_8"]
+clang_4_0 = ["clang-sys/clang_4_0", "clang_3_9"]
+clang_5_0 = ["clang-sys/clang_5_0", "clang_4_0"]
+clang_6_0 = ["clang-sys/clang_6_0", "clang_5_0"]
+clang_7_0 = ["clang-sys/clang_7_0", "clang_6_0"]
+clang_8_0 = ["clang-sys/clang_8_0", "clang_7_0"]
+clang_9_0 = ["clang-sys/clang_9_0", "clang_8_0"]
+
 runtime = ["clang-sys/runtime"]
 static = ["clang-sys/static"]
-
-clang_3_5 = ["clang-sys/clang_3_5"]
-clang_3_6 = ["clang-sys/clang_3_6", "gte_clang_3_6"]
-clang_3_7 = ["clang-sys/clang_3_7", "gte_clang_3_6", "gte_clang_3_7"]
-clang_3_8 = ["clang-sys/clang_3_8", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8"]
-clang_3_9 = ["clang-sys/clang_3_9", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9"]
-clang_4_0 = ["clang-sys/clang_4_0", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9", "gte_clang_4_0"]
-clang_5_0 = ["clang-sys/clang_5_0", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9", "gte_clang_4_0", "gte_clang_5_0"]
-clang_6_0 = ["clang-sys/clang_6_0", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9", "gte_clang_4_0", "gte_clang_5_0", "gte_clang_6_0"]
-clang_7_0 = ["clang-sys/clang_7_0", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9", "gte_clang_4_0", "gte_clang_5_0", "gte_clang_6_0", "gte_clang_7_0"]
-clang_8_0 = ["clang-sys/clang_8_0", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9", "gte_clang_4_0", "gte_clang_5_0", "gte_clang_6_0", "gte_clang_7_0", "gte_clang_8_0"]
-clang_9_0 = ["clang-sys/clang_9_0", "gte_clang_3_6", "gte_clang_3_7", "gte_clang_3_8", "gte_clang_3_9", "gte_clang_4_0", "gte_clang_5_0", "gte_clang_6_0", "gte_clang_7_0", "gte_clang_8_0", "gte_clang_9_0"]
-
-gte_clang_3_6 = []
-gte_clang_3_7 = []
-gte_clang_3_8 = []
-gte_clang_3_9 = []
-gte_clang_4_0 = []
-gte_clang_5_0 = []
-gte_clang_6_0 = []
-gte_clang_7_0 = []
-gte_clang_8_0 = []
-gte_clang_9_0 = []
 
 [dependencies]
 

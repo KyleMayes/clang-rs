@@ -8,12 +8,12 @@ pub fn test(clang: &Clang) {
     // File ______________________________________
 
     super::with_file(&clang, "int a = 322;", |_, f| {
-        #[cfg(feature="gte_clang_6_0")]
+        #[cfg(feature="clang_6_0")]
         fn test_get_contents(file: &File) {
             assert_eq!(file.get_contents(), Some("int a = 322;".into()));
         }
 
-        #[cfg(not(feature="gte_clang_6_0"))]
+        #[cfg(not(feature="clang_6_0"))]
         fn test_get_contents(_: &File) { }
 
         test_get_contents(&f);
@@ -38,10 +38,10 @@ pub fn test(clang: &Clang) {
         let index = Index::new(&clang, false, false);
         let tu = index.parser(f).detailed_preprocessing_record(true).parse().unwrap();
 
-        #[cfg(feature="gte_clang_4_0")]
+        #[cfg(feature="clang_4_0")]
         fn test_get_skipped_ranges<'tu>(tu: TranslationUnit<'tu>, f: &Path) {
             let file = tu.get_file(f).unwrap();
-            if cfg!(feature="gte_clang_6_0") {
+            if cfg!(feature="clang_6_0") {
                 assert_eq!(tu.get_skipped_ranges(), &[range!(file, 2, 9, 4, 15)]);
                 assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 9, 4, 15)]);
             } else {
@@ -50,7 +50,7 @@ pub fn test(clang: &Clang) {
             }
         }
 
-        #[cfg(not(feature="gte_clang_4_0"))]
+        #[cfg(not(feature="clang_4_0"))]
         fn test_get_skipped_ranges<'tu>(tu: TranslationUnit<'tu>, f: &Path) {
             let file = tu.get_file(f).unwrap();
             assert_eq!(file.get_skipped_ranges(), &[range!(file, 2, 10, 4, 15)]);
@@ -93,7 +93,7 @@ pub fn test(clang: &Clang) {
 
     super::with_temporary_files(files, |_, fs| {
         // Fails with clang 3.5 on Travis CI for some reason...
-        if cfg!(feature="gte_clang_3_6") {
+        if cfg!(feature="clang_3_6") {
             let index = Index::new(&clang, false, false);
             let tu = index.parser(&fs[2]).arguments(&["-fmodules"]).parse().unwrap();
 

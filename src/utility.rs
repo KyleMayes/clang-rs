@@ -284,7 +284,7 @@ pub fn to_string_option(clang: CXString) -> Option<String> {
     })
 }
 
-#[cfg(feature="gte_clang_3_8")]
+#[cfg(feature="clang_3_8")]
 pub fn to_string_set_option(clang: *mut CXStringSet) -> Option<Vec<String>> {
     unsafe {
         if clang.is_null() || (*clang).Count == 0 {

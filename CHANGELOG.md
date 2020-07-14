@@ -1,3 +1,8 @@
+## [0.25.0] - UNRELEASED
+
+### Removed
+- Removed `gte_clang_*` Cargo features (these were an implementation detail)
+
 ## [0.24.0] - 2020-07-01
 
 ### Fixed
