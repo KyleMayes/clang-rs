@@ -846,7 +846,13 @@ fn test() {
             _ => unreachable!(),
         }
 
-        #[cfg(feature="clang_6_0")]
+        #[cfg(all(feature="clang_6_0", target_os="macos"))]
+        fn test_get_mangled_objc_names(entity: &Entity) {
+            let names = vec!["_OBJC_CLASS_$_A".into(), "_OBJC_METACLASS_$_A".into()];
+            assert_eq!(entity.get_mangled_objc_names(), Some(names));
+        }
+
+        #[cfg(all(feature="clang_6_0", not(target_os="macos")))]
         fn test_get_mangled_objc_names(entity: &Entity) {
             let names = vec!["_OBJC_CLASS_A".into(), "_OBJC_METACLASS_A".into()];
             assert_eq!(entity.get_mangled_objc_names(), Some(names));
@@ -1252,23 +1258,6 @@ fn test() {
     with_types(&clang, source, |ts| {
         assert!(!ts[0].is_variadic());
         assert!(ts[1].is_variadic());
-    });
-
-    let source = "
-        void f(int * _Nullable x, int * _Nonnull y);
-    ";
-
-    with_types(&clang, source, |ts| {
-        #[cfg(feature="clang_8_0")]
-        fn test_get_nullability(ts: &[Type]) {
-            assert_eq!(ts[0].get_nullability(), Some(Nullability::Nullable));
-            assert_eq!(ts[1].get_nullability(), Some(Nullability::NonNull));
-        }
-
-        #[cfg(not(feature="clang_8_0"))]
-        fn test_get_nullability(_: &[Type]) {}
-
-        test_get_nullability(&ts[0].get_argument_types().unwrap());
     });
 
     let source = "
