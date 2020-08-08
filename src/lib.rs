@@ -1107,7 +1107,7 @@ pub enum PrintingPolicyFlag {
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
-#[cfg_attr(feature="cargo-clippy", allow(enum_variant_names))]
+#[cfg_attr(feature="cargo-clippy", allow(clippy::enum_variant_names))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum RefQualifier {
