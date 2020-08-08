@@ -1,4 +1,4 @@
-## [1.0.0] - UNRELEASED
+## [1.0.0] - 2020-08-08
 
 ### Removed
 - Removed `gte_clang_*` Cargo features (these were an implementation detail)
