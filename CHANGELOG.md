@@ -1,4 +1,4 @@
-## [0.25.0] - UNRELEASED
+## [1.0.0] - UNRELEASED
 
 ### Removed
 - Removed `gte_clang_*` Cargo features (these were an implementation detail)
