@@ -6,6 +6,9 @@
 ### Added
 - Added support for `clang` 10.0.x
 
+### Changed
+- Bumped `clang-sys` version to `1`
+
 ## [0.24.0] - 2020-07-01
 
 ### Fixed
