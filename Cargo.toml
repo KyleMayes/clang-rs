@@ -28,6 +28,7 @@ clang_6_0 = ["clang-sys/clang_6_0", "clang_5_0"]
 clang_7_0 = ["clang-sys/clang_7_0", "clang_6_0"]
 clang_8_0 = ["clang-sys/clang_8_0", "clang_7_0"]
 clang_9_0 = ["clang-sys/clang_9_0", "clang_8_0"]
+clang_10_0 = ["clang-sys/clang_10_0", "clang_9_0"]
 
 runtime = ["clang-sys/runtime"]
 static = ["clang-sys/static"]
@@ -44,4 +45,4 @@ harness = true
 
 [package.metadata.docs.rs]
 
-features = ["clang_9_0"]
+features = ["clang_10_0"]

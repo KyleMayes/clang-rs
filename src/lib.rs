@@ -635,6 +635,26 @@ pub enum EntityKind {
     ///
     /// Only produced by 'libclang' 9.0 and later.
     BitCastExpr = 280,
+    /// An OpenMP master task loop directive.
+    ///
+    /// Only produced by `libclang` 10.0 and later.
+    OmpMasterTaskLoopDirective = 281,
+    /// An OpenMP parallel master task loop directive.
+    ///
+    /// Only produced by `libclang` 10.0 and later.
+    OmpParallelMasterTaskLoopDirective = 282,
+    /// An OpenMP master task loop SIMD directive.
+    ///
+    /// Only produced by `libclang` 10.0 and later.
+    OmpMasterTaskLoopSimdDirective = 283,
+    /// An OpenMP parallel master task loop SIMD directive.
+    ///
+    /// Only produced by `libclang` 10.0 and later.
+    OmpParallelMasterTaskLoopSimdDirective = 284,
+    /// An OpenMP parallel master directive.
+    ///
+    /// Only produced by `libclang` 10.0 and later.
+    OmpParallelMasterDirective = 285,
     /// The top-level AST entity which acts as the root for the other entitys.
     TranslationUnit = 300,
     /// An attribute whose specific kind is not exposed via this interface.
@@ -2789,6 +2809,9 @@ builder! {
         /// Indicates that non-errors (e.g. warnings) from included files should be ignored.
         #[cfg(feature="clang_9_0")]
         pub ignore_non_errors_from_included_files: CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles,
+        /// Sets whether the preprocessor will retain excluded conditional blocks.
+        #[cfg(feature="clang_10_0")]
+        pub retain_excluded_conditional_blocks: CXTranslationUnit_RetainExcludedConditionalBlocks,
     }
 }
 

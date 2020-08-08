@@ -3,6 +3,9 @@
 ### Removed
 - Removed `gte_clang_*` Cargo features (these were an implementation detail)
 
+### Added
+- Added support for `clang` 10.0.x
+
 ## [0.24.0] - 2020-07-01
 
 ### Fixed

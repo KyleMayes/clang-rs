@@ -26,6 +26,7 @@ To target a version of `libclang`, enable one of the following Cargo features:
 * `clang_7_0` - requires `libclang` 7.0 or later
 * `clang_8_0` - requires `libclang` 8.0 or later
 * `clang_9_0` - requires `libclang` 9.0 or later
+* `clang_10_0` - requires `libclang` 10.0 or later
 
 If you do not enable one of these features, the API provided by `libclang` 3.5 will be available by
 default.
