@@ -41,3 +41,7 @@ libc = "0.2.39"
 
 name = "tests"
 harness = true
+
+[package.metadata.docs.rs]
+
+features = ["clang_9_0"]
