@@ -1,8 +1,8 @@
 # clang-rs
 
-[![crates.io](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
-[![Travis CI](https://travis-ci.org/KyleMayes/clang-rs.svg?branch=master)](https://travis-ci.org/KyleMayes/clang-rs)
-[![AppVeyor](https://ci.appveyor.com/api/projects/status/umb9enkoy1k8wvxj/branch/master?svg=true)](https://ci.appveyor.com/project/KyleMayes/clang-rs/branch/master)
+[![Crate](https://img.shields.io/crates/v/clang.svg)](https://crates.io/crates/clang)
+[![Documentation](https://docs.rs/clang/badge.svg)](https://docs.rs/clang)
+[![CI](https://github.com/KyleMayes/clang-rs/workflows/CI/badge.svg?branch=master)](https://github.com/KyleMayes/clang-rs/actions?query=workflow%3ACI)
 
 A somewhat idiomatic Rust wrapper for `libclang`.
 
