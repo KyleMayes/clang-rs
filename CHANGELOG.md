@@ -1,3 +1,8 @@
+## [1.0.1] - UNRELEASED
+
+### Fixed
+- Fixed double free caused by `Entity::get_platform_availability`
+
 ## [1.0.0] - 2020-08-08
 
 ### Removed
