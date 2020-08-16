@@ -13,19 +13,6 @@
 // limitations under the License.
 
 //! A somewhat idiomatic Rust wrapper for libclang.
-//!
-//! ## Supported Versions
-//!
-//! * 3.5 - [Documentation](https://kylemayes.github.io/clang-rs/3_5/clang)
-//! * 3.6 - [Documentation](https://kylemayes.github.io/clang-rs/3_6/clang)
-//! * 3.7 - [Documentation](https://kylemayes.github.io/clang-rs/3_7/clang)
-//! * 3.8 - [Documentation](https://kylemayes.github.io/clang-rs/3_8/clang)
-//! * 3.9 - [Documentation](https://kylemayes.github.io/clang-rs/3_9/clang)
-//! * 4.0 - [Documentation](https://kylemayes.github.io/clang-rs/4_0/clang)
-//! * 5.0 - [Documentation](https://kylemayes.github.io/clang-rs/5_0/clang)
-//! * 6.0 - [Documentation](https://kylemayes.github.io/clang-rs/6_0/clang)
-//! * 7.0 - [Documentation](https://kylemayes.github.io/clang-rs/7_0/clang)
-//! * 8.0 - [Documentation](https://kylemayes.github.io/clang-rs/8_0/clang)
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
