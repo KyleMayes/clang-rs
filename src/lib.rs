@@ -2883,17 +2883,15 @@ pub struct PlatformAvailability {
 impl PlatformAvailability {
     //- Constructors -----------------------------
 
-    fn from_raw(mut raw: CXPlatformAvailability) -> PlatformAvailability {
-        let availability = PlatformAvailability {
+    fn from_raw(raw: CXPlatformAvailability) -> PlatformAvailability {
+        PlatformAvailability {
             platform: utility::to_string(raw.Platform),
             unavailable: raw.Unavailable != 0,
             introduced: raw.Introduced.map(Version::from_raw),
             deprecated: raw.Deprecated.map(Version::from_raw),
             obsoleted: raw.Obsoleted.map(Version::from_raw),
             message: utility::to_string_option(raw.Message),
-        };
-        unsafe { clang_disposeCXPlatformAvailability(&mut raw); }
-        availability
+        }
     }
 }
 
