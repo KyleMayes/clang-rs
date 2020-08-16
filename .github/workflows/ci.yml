@@ -16,7 +16,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         clang: [["10.0", "clang_10_0"]]
-        rust: ["1.36.0"]
+        rust: ["1.40.0"]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
