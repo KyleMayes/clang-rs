@@ -1,4 +1,4 @@
-## [1.0.2] - 2020-08-16
+## [1.0.2] - 2020-10-01
 
 ### Fixed
 - Fixed stack overflow caused by displaying errors
