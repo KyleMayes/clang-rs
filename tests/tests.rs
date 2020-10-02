@@ -128,6 +128,10 @@ fn test() {
 
     sonar_test::test(&clang);
 
+    // SourceError _______________________________
+
+    assert_eq!(format!("{}", SourceError::Unknown), "an unknown error occurred");
+
     // Entity ____________________________________
 
     let source = "

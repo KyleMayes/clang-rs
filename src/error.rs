@@ -38,13 +38,7 @@ macro_rules! error {
             $(#[$variantdoc] $variant), +
         }
 
-        impl Error for $name {
-            fn description(&self) -> &str {
-                match *self {
-                    $($name::$variant => $message), +
-                }
-            }
-        }
+        impl Error for $name { }
 
         impl From<$name> for String {
             fn from(error: $name) -> String {
@@ -62,8 +56,10 @@ macro_rules! error {
         }
 
         impl fmt::Display for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "{}", self)
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match *self {
+                    $($name::$variant => write!(f, $message)), +
+                }
             }
         }
     };
