@@ -2,7 +2,6 @@ use clang::*;
 use clang::token::*;
 
 pub fn test(clang: &Clang) {
-    // FIXME: possible libclang bug on Windows
     super::with_translation_unit(&clang, "test.cpp", "int a = 322; ", &[], |_, f, tu| {
         let file = tu.get_file(f).unwrap();
 
@@ -25,18 +24,15 @@ pub fn test(clang: &Clang) {
         assert_token_eq!(tokens[3], Literal, "322", 1, 9, range!(file, 1, 9, 1, 12));
         assert_token_eq!(tokens[4], Punctuation, ";", 1, 12, range!(file, 1, 12, 1, 13));
 
-        #[cfg(not(target_os="linux"))]
-        fn test_annotate<'tu>(_: &'tu TranslationUnit<'tu>, _: &[Token<'tu>]) { }
-
-        #[cfg(target_os="linux")]
         fn test_annotate<'tu>(tu: &'tu TranslationUnit<'tu>, tokens: &[Token<'tu>]) {
-            let entity = tu.get_entity().get_children()[0];
+            let declaration = tu.get_entity().get_children()[0];
+            let literal = declaration.get_children()[0];
             assert_eq!(tu.annotate(tokens), &[
-                Some(entity),
-                Some(entity),
+                Some(declaration),
+                Some(declaration),
+                Some(declaration),
+                Some(literal),
                 None,
-                None,
-                Some(entity.get_children()[0]),
             ]);
         }
 

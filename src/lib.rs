@@ -3081,10 +3081,10 @@ impl<'i> TranslationUnit<'i> {
     /// Returns the AST entities which correspond to the supplied tokens, if any.
     pub fn annotate(&'i self, tokens: &[Token<'i>]) -> Vec<Option<Entity<'i>>> {
         unsafe {
-            let mut raws = vec![CXCursor::default(); tokens.len()];
-            let ptr = tokens.as_ptr() as *mut CXToken;
-            clang_annotateTokens(self.ptr, ptr, tokens.len() as c_uint, raws.as_mut_ptr());
-            raws.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
+            let mut cursors = vec![CXCursor::default(); tokens.len()];
+            let mut tokens = tokens.iter().map(|t| t.raw).collect::<Vec<_>>();
+            clang_annotateTokens(self.ptr, tokens.as_mut_ptr(), tokens.len() as c_uint, cursors.as_mut_ptr());
+            cursors.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
         }
     }
 

@@ -1,3 +1,8 @@
+## [1.0.3] - UNRELEASED
+
+### Fixed
+- Fixed token annotation (`TranslationUnit::annotate`) not returning correct results
+
 ## [1.0.2] - 2020-10-01
 
 ### Fixed

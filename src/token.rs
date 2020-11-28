@@ -54,7 +54,7 @@ pub enum TokenKind {
 /// A lexed piece of a source file.
 #[derive(Copy, Clone)]
 pub struct Token<'tu> {
-    raw: CXToken,
+    pub(crate) raw: CXToken,
     tu: &'tu TranslationUnit<'tu>,
 }
 
