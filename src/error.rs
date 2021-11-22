@@ -19,7 +19,7 @@ use clang_sys::*;
 
 use libc::c_longlong;
 
-use utility::FromError;
+use crate::utility::FromError;
 
 //================================================
 // Macros

@@ -28,7 +28,7 @@ use libc::c_uint;
 
 use super::diagnostic::Diagnostic;
 use super::{Availability, EntityKind, TranslationUnit, Unsaved, Usr};
-use utility;
+use crate::utility;
 
 //================================================
 // Enums
@@ -297,9 +297,9 @@ pub struct CompletionResults {
 impl CompletionResults {
     //- Constructors -----------------------------
 
-    fn from_ptr(ptr: *mut CXCodeCompleteResults) -> CompletionResults {
+    fn from_ptr(ptr: *mut CXCodeCompleteResults) -> Self {
         assert!(!ptr.is_null());
-        CompletionResults { ptr }
+        Self { ptr }
     }
 
     //- Accessors --------------------------------
@@ -354,7 +354,7 @@ impl CompletionResults {
         unsafe {
             let raws = slice::from_raw_parts((*self.ptr).Results, (*self.ptr).NumResults as usize);
             raws.iter()
-                .cloned()
+                .copied()
                 .map(CompletionResult::from_raw)
                 .collect()
         }

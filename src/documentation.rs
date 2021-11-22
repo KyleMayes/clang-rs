@@ -23,7 +23,7 @@ use std::mem;
 use clang_sys::*;
 
 use super::TranslationUnit;
-use utility;
+use crate::utility;
 
 //================================================
 // Enums
@@ -43,7 +43,7 @@ pub enum CommentChild {
     /// An inline command with word-like arguments.
     InlineCommand(InlineCommand),
     /// A paragraph containing inline content.
-    Paragraph(Vec<CommentChild>),
+    Paragraph(Vec<Self>),
     /// A `\param` command.
     ParamCommand(ParamCommand),
     /// A `\tparam` command.
@@ -59,27 +59,27 @@ pub enum CommentChild {
 impl CommentChild {
     //- Constructors -----------------------------
 
-    fn from_raw(raw: CXComment) -> CommentChild {
+    fn from_raw(raw: CXComment) -> Self {
         unsafe {
             match clang_Comment_getKind(raw) {
                 CXComment_Text => {
-                    CommentChild::Text(utility::to_string(clang_TextComment_getText(raw)))
+                    Self::Text(utility::to_string(clang_TextComment_getText(raw)))
                 }
                 CXComment_InlineCommand => {
-                    CommentChild::InlineCommand(InlineCommand::from_raw(raw))
+                    Self::InlineCommand(InlineCommand::from_raw(raw))
                 }
-                CXComment_HTMLStartTag => CommentChild::HtmlStartTag(HtmlStartTag::from_raw(raw)),
+                CXComment_HTMLStartTag => Self::HtmlStartTag(HtmlStartTag::from_raw(raw)),
                 CXComment_HTMLEndTag => {
                     let name = utility::to_string(clang_HTMLTagComment_getTagName(raw));
-                    CommentChild::HtmlEndTag(name)
+                    Self::HtmlEndTag(name)
                 }
                 CXComment_Paragraph => {
-                    CommentChild::Paragraph(Comment::from_raw(raw).get_children())
+                    Self::Paragraph(Comment::from_raw(raw).get_children())
                 }
-                CXComment_BlockCommand => CommentChild::BlockCommand(BlockCommand::from_raw(raw)),
-                CXComment_ParamCommand => CommentChild::ParamCommand(ParamCommand::from_raw(raw)),
+                CXComment_BlockCommand => Self::BlockCommand(BlockCommand::from_raw(raw)),
+                CXComment_ParamCommand => Self::ParamCommand(ParamCommand::from_raw(raw)),
                 CXComment_TParamCommand => {
-                    CommentChild::TParamCommand(TParamCommand::from_raw(raw))
+                    Self::TParamCommand(TParamCommand::from_raw(raw))
                 }
                 CXComment_VerbatimBlockCommand => {
                     let lines = iter!(
@@ -88,11 +88,11 @@ impl CommentChild {
                     )
                     .map(|c| utility::to_string(clang_VerbatimBlockLineComment_getText(c)))
                     .collect();
-                    CommentChild::VerbatimCommand(lines)
+                    Self::VerbatimCommand(lines)
                 }
                 CXComment_VerbatimLine => {
                     let line = utility::to_string(clang_VerbatimLineComment_getText(raw));
-                    CommentChild::VerbatimLineCommand(line)
+                    Self::VerbatimLineCommand(line)
                 }
                 _ => unreachable!(),
             }
@@ -148,7 +148,7 @@ pub struct BlockCommand {
 impl BlockCommand {
     //- Constructors -----------------------------
 
-    unsafe fn from_raw(raw: CXComment) -> BlockCommand {
+    unsafe fn from_raw(raw: CXComment) -> Self {
         let command = utility::to_string(clang_BlockCommandComment_getCommandName(raw));
         let arguments = iter!(
             clang_BlockCommandComment_getNumArgs(raw),
@@ -158,7 +158,7 @@ impl BlockCommand {
         .collect();
         let paragraph = clang_BlockCommandComment_getParagraph(raw);
         let children = Comment::from_raw(paragraph).get_children();
-        BlockCommand {
+        Self {
             command,
             arguments,
             children,
@@ -231,7 +231,7 @@ pub struct HtmlStartTag {
 impl HtmlStartTag {
     //- Constructors -----------------------------
 
-    unsafe fn from_raw(raw: CXComment) -> HtmlStartTag {
+    unsafe fn from_raw(raw: CXComment) -> Self {
         let name = utility::to_string(clang_HTMLTagComment_getTagName(raw));
         let attributes = iter!(
             clang_HTMLStartTag_getNumAttrs(raw),
@@ -241,7 +241,7 @@ impl HtmlStartTag {
         .map(|(n, v)| (utility::to_string(n), utility::to_string(v)))
         .collect();
         let closing = clang_HTMLStartTagComment_isSelfClosing(raw) != 0;
-        HtmlStartTag {
+        Self {
             name,
             attributes,
             closing,
@@ -265,7 +265,7 @@ pub struct InlineCommand {
 impl InlineCommand {
     //- Constructors -----------------------------
 
-    unsafe fn from_raw(raw: CXComment) -> InlineCommand {
+    unsafe fn from_raw(raw: CXComment) -> Self {
         let command = utility::to_string(clang_InlineCommandComment_getCommandName(raw));
         let arguments = iter!(
             clang_InlineCommandComment_getNumArgs(raw),
@@ -277,7 +277,7 @@ impl InlineCommand {
             CXCommentInlineCommandRenderKind_Normal => None,
             other => Some(mem::transmute(other)),
         };
-        InlineCommand {
+        Self {
             command,
             arguments,
             style,
@@ -303,21 +303,21 @@ pub struct ParamCommand {
 impl ParamCommand {
     //- Constructors -----------------------------
 
-    unsafe fn from_raw(raw: CXComment) -> ParamCommand {
-        let index = if clang_ParamCommandComment_isParamIndexValid(raw) != 0 {
-            Some(clang_ParamCommandComment_getParamIndex(raw) as usize)
-        } else {
+    unsafe fn from_raw(raw: CXComment) -> Self {
+        let index = if clang_ParamCommandComment_isParamIndexValid(raw) == 0 {
             None
+        } else {
+            Some(clang_ParamCommandComment_getParamIndex(raw) as usize)
         };
         let parameter = utility::to_string(clang_ParamCommandComment_getParamName(raw));
-        let direction = if clang_ParamCommandComment_isDirectionExplicit(raw) != 0 {
-            Some(mem::transmute(clang_ParamCommandComment_getDirection(raw)))
-        } else {
+        let direction = if clang_ParamCommandComment_isDirectionExplicit(raw) == 0 {
             None
+        } else {
+            Some(mem::transmute(clang_ParamCommandComment_getDirection(raw)))
         };
         let paragraph = clang_BlockCommandComment_getParagraph(raw);
         let children = Comment::from_raw(paragraph).get_children();
-        ParamCommand {
+        Self {
             index,
             parameter,
             direction,
@@ -343,18 +343,18 @@ pub struct TParamCommand {
 impl TParamCommand {
     //- Constructors -----------------------------
 
-    unsafe fn from_raw(raw: CXComment) -> TParamCommand {
-        let position = if clang_TParamCommandComment_isParamPositionValid(raw) != 0 {
+    unsafe fn from_raw(raw: CXComment) -> Self {
+        let position = if clang_TParamCommandComment_isParamPositionValid(raw) == 0 {
+            None
+        } else {
             let depth = clang_TParamCommandComment_getDepth(raw);
             let index = clang_TParamCommandComment_getIndex(raw, depth) as usize;
             Some((depth as usize, index))
-        } else {
-            None
         };
         let parameter = utility::to_string(clang_TParamCommandComment_getParamName(raw));
         let paragraph = clang_BlockCommandComment_getParagraph(raw);
         let children = Comment::from_raw(paragraph).get_children();
-        TParamCommand {
+        Self {
             position,
             parameter,
             children,

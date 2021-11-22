@@ -38,7 +38,7 @@ pub enum DefinitionValue {
 impl DefinitionValue {
     //- Constructors -----------------------------
 
-    fn from_entity(entity: Entity) -> Option<DefinitionValue> {
+    fn from_entity(entity: Entity) -> Option<Self> {
         let mut tokens = entity.get_range().unwrap().tokenize();
         if tokens.last().map_or(false, |t| t.get_spelling() == "#") {
             tokens.pop();
@@ -53,12 +53,12 @@ impl DefinitionValue {
         };
 
         if let Ok(integer) = u64::from_str(&number) {
-            Some(DefinitionValue::Integer(negated, integer))
+            Some(Self::Integer(negated, integer))
         } else if let Ok(real) = f64::from_str(&number) {
             if negated {
-                Some(DefinitionValue::Real(-real))
+                Some(Self::Real(-real))
             } else {
-                Some(DefinitionValue::Real(real))
+                Some(Self::Real(real))
             }
         } else {
             None
@@ -394,10 +394,10 @@ fn next<'tu>(
                     .get_type()
                     .map_or(false, |t| t.get_sizeof().is_ok());
                 let anonymous = declaration.get_display_name().is_none();
-                let same = entity.get_display_name() == declaration.get_display_name();
+                let equal = entity.get_display_name() == declaration.get_display_name();
 
                 seen.insert(name);
-                if complete && (anonymous || same) {
+                if complete && (anonymous || equal) {
                     let name = entity.get_name().unwrap();
                     return Some(Declaration::new(name, declaration, Some(entity)));
                 }

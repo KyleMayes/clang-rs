@@ -22,7 +22,7 @@ use clang_sys::*;
 
 use super::source::{SourceLocation, SourceRange};
 use super::TranslationUnit;
-use utility;
+use crate::utility;
 
 //================================================
 // Enums

@@ -27,7 +27,7 @@ use libc::{c_uint, time_t};
 
 use super::token::Token;
 use super::{Entity, TranslationUnit};
-use utility::{self, Nullable};
+use crate::utility::{self, Nullable};
 
 //================================================
 // Structs
@@ -128,9 +128,7 @@ impl<'tu> File<'tu> {
     ///
     /// * `line` or `column` is `0`
     pub fn get_location(&self, line: u32, column: u32) -> SourceLocation<'tu> {
-        if line == 0 || column == 0 {
-            panic!("`line` or `column` is `0`");
-        }
+        assert!(line != 0 && column != 0, "`line` or `column` is `0`");
 
         let (line, column) = (line, column) as (c_uint, c_uint);
         let location = unsafe { clang_getLocation(self.tu.ptr, self.ptr, line, column) };
@@ -303,7 +301,7 @@ macro_rules! location {
     ($function:ident, $location:expr, $tu:expr) => {{
         fn uninit<T>() -> mem::MaybeUninit<T> {
             mem::MaybeUninit::uninit()
-        };
+        }
         let (mut file, mut line, mut column, mut offset) = (uninit(), uninit(), uninit(), uninit());
         $function(
             $location,
@@ -361,7 +359,7 @@ impl<'tu> SourceLocation<'tu> {
         unsafe {
             fn uninit<T>() -> mem::MaybeUninit<T> {
                 mem::MaybeUninit::uninit()
-            };
+            }
             let (mut file, mut line, mut column) = (uninit(), uninit(), uninit());
             clang_getPresumedLocation(
                 self.raw,

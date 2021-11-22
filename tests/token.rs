@@ -11,7 +11,7 @@ pub fn test(clang: &Clang) {
         macro_rules! assert_token_eq {
             ($token:expr, $kind:ident, $spelling:expr, $line:expr, $column:expr, $range:expr) => {{
                 let token = $token;
-                assert_eq!(token.get_kind(), TokenKind::$kind);
+                assert_eq!(token.get_kind(), Kind::$kind);
                 assert_eq!(token.get_spelling(), $spelling);
                 assert_eq!(token.get_location(), file.get_location($line, $column));
                 assert_eq!(token.get_range(), $range)

@@ -21,20 +21,7 @@
 )]
 #![allow(non_upper_case_globals)]
 
-extern crate clang_sys;
-extern crate libc;
-
-#[macro_use]
-mod utility;
-
-pub mod completion;
-pub mod diagnostic;
-pub mod documentation;
-pub mod source;
-pub mod token;
-
-pub mod sonar;
-
+use clang_sys::*;
 use std::cmp;
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -47,19 +34,29 @@ use std::ptr;
 use std::slice;
 use std::sync::atomic::{self, AtomicBool};
 
-use clang_sys::*;
-
 use libc::{c_int, c_uint, c_ulong};
 
+use crate::source::SourceLocation;
 use completion::{Completer, CompletionString};
 use diagnostic::Diagnostic;
 use documentation::Comment;
-use source::{File, Module, SourceLocation, SourceRange};
+use source::{File, Module, SourceRange};
 use token::Token;
 use utility::{FromError, Nullable};
 
 mod error;
 pub use self::error::*;
+
+#[macro_use]
+pub(crate) mod utility;
+
+pub mod completion;
+pub mod diagnostic;
+pub mod documentation;
+pub mod source;
+pub mod token;
+
+pub mod sonar;
 
 //================================================
 // Enums
@@ -825,7 +822,7 @@ impl EntityKind {
     }
 
     fn from_raw_infallible(raw: c_int) -> Self {
-        Self::from_raw(raw).unwrap_or(EntityKind::NotImplemented)
+        Self::from_raw(raw).unwrap_or(Self::NotImplemented)
     }
 
     /// Returns whether this entity is valid. If false, the entity represents an error condition.
@@ -1589,7 +1586,7 @@ impl TypeKind {
     }
 
     fn from_raw_infallible(raw: c_int) -> Self {
-        Self::from_raw(raw).unwrap_or(TypeKind::Unexposed)
+        Self::from_raw(raw).unwrap_or(Self::Unexposed)
     }
 }
 
@@ -1659,7 +1656,7 @@ impl Clang {
     ///
     /// * an instance of `Clang` already exists
     #[cfg(not(feature = "runtime"))]
-    pub fn new() -> Result<Clang, String> {
+    pub fn new() -> Result<Self, String> {
         if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
             Ok(Clang)
         } else {
@@ -1693,13 +1690,13 @@ pub struct CompilationDatabase {
 
 impl CompilationDatabase {
     /// Creates a compilation database from the database found in the given directory.
-    pub fn from_directory<P: AsRef<Path>>(path: P) -> Result<CompilationDatabase, ()> {
+    pub fn from_directory<P: AsRef<Path>>(path: P) -> Result<Self, ()> {
         let path = utility::from_path(path);
         unsafe {
             let mut error = mem::MaybeUninit::uninit();
             let ptr = clang_CompilationDatabase_fromDirectory(path.as_ptr(), error.as_mut_ptr());
             match error.assume_init() {
-                CXCompilationDatabase_NoError => Ok(CompilationDatabase { ptr }),
+                CXCompilationDatabase_NoError => Ok(Self { ptr }),
                 CXCompilationDatabase_CanNotLoadDatabase => Err(()),
                 _ => unreachable!(),
             }
@@ -1738,9 +1735,9 @@ pub struct CompileCommands {
 }
 
 impl CompileCommands {
-    fn from_ptr(ptr: CXCompileCommands) -> CompileCommands {
+    fn from_ptr(ptr: CXCompileCommands) -> Self {
         assert!(!ptr.is_null());
-        CompileCommands { ptr }
+        Self { ptr }
     }
 
     /// Returns all commands for this search
@@ -2892,7 +2889,7 @@ impl<'tu> Parser<'tu> {
             .iter()
             .map(|a| a.as_ptr())
             .collect::<Vec<_>>();
-        let unsaved = self.unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
+        let unsaved = self.unsaved.iter().map(Unsaved::as_raw).collect::<Vec<_>>();
         unsafe {
             let mut ptr = ptr::null_mut();
             let code = clang_parseTranslationUnit2(
@@ -2932,8 +2929,8 @@ pub struct PlatformAvailability {
 impl PlatformAvailability {
     //- Constructors -----------------------------
 
-    fn from_raw(raw: CXPlatformAvailability) -> PlatformAvailability {
-        PlatformAvailability {
+    fn from_raw(raw: CXPlatformAvailability) -> Self {
+        Self {
             platform: utility::to_string(raw.Platform),
             unavailable: raw.Unavailable != 0,
             introduced: raw.Introduced.map(Version::from_raw),
@@ -3183,7 +3180,7 @@ impl<'i> TranslationUnit<'i> {
     /// * `libclang` crashes
     /// * an unknown error occurs
     pub fn reparse(self, unsaved: &[Unsaved]) -> Result<TranslationUnit<'i>, SourceError> {
-        let unsaved = unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
+        let unsaved = unsaved.iter().map(Unsaved::as_raw).collect::<Vec<_>>();
         unsafe {
             let code = clang_reparseTranslationUnit(
                 self.ptr,
@@ -3581,8 +3578,8 @@ impl Unsaved {
     //- Constructors -----------------------------
 
     /// Constructs a new `Unsaved`.
-    pub fn new<P: AsRef<Path>, C: AsRef<str>>(path: P, contents: C) -> Unsaved {
-        Unsaved {
+    pub fn new<P: AsRef<Path>, C: AsRef<str>>(path: P, contents: C) -> Self {
+        Self {
             path: utility::from_path(path),
             contents: utility::from_string(contents),
         }
@@ -3612,29 +3609,29 @@ impl Usr {
     //- Constructors -----------------------------
 
     /// Constructs a new `Usr` from an Objective-C category.
-    pub fn from_objc_category<C: AsRef<str>>(class: C, category: C) -> Usr {
+    pub fn from_objc_category<C: AsRef<str>>(class: C, category: C) -> Self {
         let class = utility::from_string(class);
         let category = utility::from_string(category);
         let raw = unsafe { clang_constructUSR_ObjCCategory(class.as_ptr(), category.as_ptr()) };
-        Usr(utility::to_string(raw))
+        Self(utility::to_string(raw))
     }
 
     /// Constructs a new `Usr` from an Objective-C class.
-    pub fn from_objc_class<C: AsRef<str>>(class: C) -> Usr {
+    pub fn from_objc_class<C: AsRef<str>>(class: C) -> Self {
         let class = utility::from_string(class);
         unsafe {
-            Usr(utility::to_string(clang_constructUSR_ObjCClass(
+            Self(utility::to_string(clang_constructUSR_ObjCClass(
                 class.as_ptr(),
             )))
         }
     }
 
     /// Constructs a new `Usr` from an Objective-C instance variable.
-    pub fn from_objc_ivar<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
+    pub fn from_objc_ivar<N: AsRef<str>>(class: &Self, name: N) -> Self {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
             unsafe {
-                Usr(utility::to_string(clang_constructUSR_ObjCIvar(
+                Self(utility::to_string(clang_constructUSR_ObjCIvar(
                     name.as_ptr(),
                     s,
                 )))
@@ -3643,21 +3640,21 @@ impl Usr {
     }
 
     /// Constructs a new `Usr` from an Objective-C method.
-    pub fn from_objc_method<N: AsRef<str>>(class: &Usr, name: N, instance: bool) -> Usr {
+    pub fn from_objc_method<N: AsRef<str>>(class: &Self, name: N, instance: bool) -> Self {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
             let instance = instance as c_uint;
             let raw = unsafe { clang_constructUSR_ObjCMethod(name.as_ptr(), instance, s) };
-            Usr(utility::to_string(raw))
+            Self(utility::to_string(raw))
         })
     }
 
     /// Constructs a new `Usr` from an Objective-C property.
-    pub fn from_objc_property<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
+    pub fn from_objc_property<N: AsRef<str>>(class: &Self, name: N) -> Self {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
             unsafe {
-                Usr(utility::to_string(clang_constructUSR_ObjCProperty(
+                Self(utility::to_string(clang_constructUSR_ObjCProperty(
                     name.as_ptr(),
                     s,
                 )))
@@ -3666,10 +3663,10 @@ impl Usr {
     }
 
     /// Constructs a new `Usr` from an Objective-C protocol.
-    pub fn from_objc_protocol<P: AsRef<str>>(protocol: P) -> Usr {
+    pub fn from_objc_protocol<P: AsRef<str>>(protocol: P) -> Self {
         let string = utility::from_string(protocol);
         unsafe {
-            Usr(utility::to_string(clang_constructUSR_ObjCProtocol(
+            Self(utility::to_string(clang_constructUSR_ObjCProtocol(
                 string.as_ptr(),
             )))
         }
@@ -3692,8 +3689,8 @@ pub struct Version {
 impl Version {
     //- Constructors -----------------------------
 
-    fn from_raw(raw: CXVersion) -> Version {
-        Version {
+    fn from_raw(raw: CXVersion) -> Self {
+        Self {
             x: raw.Major as i32,
             y: raw.Minor as i32,
             z: raw.Subminor as i32,

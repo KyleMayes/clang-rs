@@ -162,26 +162,26 @@ pub trait Nullable: Sized {
 
 impl Nullable for *mut c_void {
     fn map<U, F: FnOnce(*mut c_void) -> U>(self, f: F) -> Option<U> {
-        if !self.is_null() {
-            Some(f(self))
-        } else {
+        if self.is_null() {
             None
+        } else {
+            Some(f(self))
         }
     }
 }
 
 impl Nullable for CXComment {
-    fn map<U, F: FnOnce(CXComment) -> U>(self, f: F) -> Option<U> {
-        if !self.ASTNode.is_null() {
-            Some(f(self))
-        } else {
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U> {
+        if self.ASTNode.is_null() {
             None
+        } else {
+            Some(f(self))
         }
     }
 }
 
 impl Nullable for CXCursor {
-    fn map<U, F: FnOnce(CXCursor) -> U>(self, f: F) -> Option<U> {
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U> {
         unsafe {
             let null = clang_getNullCursor();
             if clang_equalCursors(self, null) == 0 && clang_isInvalid(self.kind) == 0 {
@@ -194,7 +194,7 @@ impl Nullable for CXCursor {
 }
 
 impl Nullable for CXSourceLocation {
-    fn map<U, F: FnOnce(CXSourceLocation) -> U>(self, f: F) -> Option<U> {
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U> {
         unsafe {
             if clang_equalLocations(self, clang_getNullLocation()) == 0 {
                 Some(f(self))
@@ -206,7 +206,7 @@ impl Nullable for CXSourceLocation {
 }
 
 impl Nullable for CXSourceRange {
-    fn map<U, F: FnOnce(CXSourceRange) -> U>(self, f: F) -> Option<U> {
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U> {
         unsafe {
             if clang_Range_isNull(self) == 0 {
                 Some(f(self))
@@ -218,27 +218,27 @@ impl Nullable for CXSourceRange {
 }
 
 impl Nullable for CXString {
-    fn map<U, F: FnOnce(CXString) -> U>(self, f: F) -> Option<U> {
-        if !self.data.is_null() {
-            Some(f(self))
-        } else {
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U> {
+        if self.data.is_null() {
             None
+        } else {
+            Some(f(self))
         }
     }
 }
 
 impl Nullable for CXType {
-    fn map<U, F: FnOnce(CXType) -> U>(self, f: F) -> Option<U> {
-        if self.kind != CXType_Invalid {
-            Some(f(self))
-        } else {
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U> {
+        if self.kind == CXType_Invalid {
             None
+        } else {
+            Some(f(self))
         }
     }
 }
 
 impl Nullable for CXVersion {
-    fn map<U, F: FnOnce(CXVersion) -> U>(self, f: F) -> Option<U> {
+    fn map<U, F: FnOnce(Self) -> U>(self, f: F) -> Option<U> {
         if self.Major != -1 && self.Minor != -1 && self.Subminor != -1 {
             Some(f(self))
         } else {
@@ -285,7 +285,7 @@ pub fn to_string(clang: CXString) -> String {
 pub fn to_string_option(clang: CXString) -> Option<String> {
     clang
         .map(to_string)
-        .and_then(|s| if !s.is_empty() { Some(s) } else { None })
+        .and_then(|s| if s.is_empty() { None } else { Some(s) })
 }
 
 #[cfg(feature = "clang_3_8")]
