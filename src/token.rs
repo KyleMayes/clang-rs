@@ -17,11 +17,15 @@
 use std::fmt;
 use std::mem;
 
-use clang_sys::*;
+use clang_sys::{
+    clang_getTokenExtent, clang_getTokenKind, clang_getTokenLocation, clang_getTokenSpelling,
+    CXToken,
+};
 
-use utility;
-use super::{TranslationUnit};
-use super::source::{SourceLocation, SourceRange};
+use super::source::SourceRange;
+use super::TranslationUnit;
+use crate::source::SourceLocation;
+use crate::utility;
 
 //================================================
 // Enums
@@ -32,7 +36,7 @@ use super::source::{SourceLocation, SourceRange};
 /// Indicates the categorization of a token.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
-pub enum TokenKind {
+pub enum Kind {
     /// A comment token.
     Comment = 4,
     /// An identifier token.
@@ -63,13 +67,13 @@ impl<'tu> Token<'tu> {
 
     #[doc(hidden)]
     pub fn from_raw(raw: CXToken, tu: &'tu TranslationUnit<'tu>) -> Token<'tu> {
-        Token{ raw, tu }
+        Token { raw, tu }
     }
 
     //- Accessors --------------------------------
 
     /// Returns the categorization of this token.
-    pub fn get_kind(&self) -> TokenKind {
+    pub fn get_kind(&self) -> Kind {
         unsafe { mem::transmute(clang_getTokenKind(self.raw)) }
     }
 
@@ -91,7 +95,8 @@ impl<'tu> Token<'tu> {
 
 impl<'tu> fmt::Debug for Token<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Token")
+        formatter
+            .debug_struct("Token")
             .field("kind", &self.get_kind())
             .field("spelling", &self.get_spelling())
             .field("range", &self.get_range())
