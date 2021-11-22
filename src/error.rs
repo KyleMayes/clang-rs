@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::error::{Error};
+use std::error::Error;
 use std::fmt;
 
 use clang_sys::*;
 
-use libc::{c_longlong};
+use libc::c_longlong;
 
-use utility::{FromError};
+use utility::FromError;
 
 //================================================
 // Macros

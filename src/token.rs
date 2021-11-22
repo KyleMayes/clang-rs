@@ -19,9 +19,9 @@ use std::mem;
 
 use clang_sys::*;
 
-use utility;
-use super::{TranslationUnit};
 use super::source::{SourceLocation, SourceRange};
+use super::TranslationUnit;
+use utility;
 
 //================================================
 // Enums
@@ -63,7 +63,7 @@ impl<'tu> Token<'tu> {
 
     #[doc(hidden)]
     pub fn from_raw(raw: CXToken, tu: &'tu TranslationUnit<'tu>) -> Token<'tu> {
-        Token{ raw, tu }
+        Token { raw, tu }
     }
 
     //- Accessors --------------------------------
@@ -91,7 +91,8 @@ impl<'tu> Token<'tu> {
 
 impl<'tu> fmt::Debug for Token<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Token")
+        formatter
+            .debug_struct("Token")
             .field("kind", &self.get_kind())
             .field("spelling", &self.get_spelling())
             .field("range", &self.get_range())

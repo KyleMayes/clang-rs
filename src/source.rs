@@ -18,16 +18,16 @@ use std::cmp;
 use std::fmt;
 use std::hash;
 use std::mem;
-use std::slice;
 use std::path::{Path, PathBuf};
+use std::slice;
 
 use clang_sys::*;
 
 use libc::{c_uint, time_t};
 
-use utility::{self, Nullable};
+use super::token::Token;
 use super::{Entity, TranslationUnit};
-use super::token::{Token};
+use utility::{self, Nullable};
 
 //================================================
 // Structs
@@ -74,15 +74,20 @@ impl<'tu> File<'tu> {
     }
 
     /// Returns the contents of this file, if this file has been loaded.
-    #[cfg(feature="clang_6_0")]
+    #[cfg(feature = "clang_6_0")]
     pub fn get_contents(&self) -> Option<String> {
-        use std::ptr;
         use std::ffi::CStr;
+        use std::ptr;
 
         unsafe {
             let c = clang_getFileContents(self.tu.ptr, self.ptr, ptr::null_mut());
             if !c.is_null() {
-                Some(CStr::from_ptr(c).to_str().expect("invalid Rust string").into())
+                Some(
+                    CStr::from_ptr(c)
+                        .to_str()
+                        .expect("invalid Rust string")
+                        .into(),
+                )
             } else {
                 None
             }
@@ -103,7 +108,10 @@ impl<'tu> File<'tu> {
         unsafe {
             let raw = clang_getSkippedRanges(self.tu.ptr, self.ptr);
             let raws = slice::from_raw_parts((*raw).ranges, (*raw).count as usize);
-            let ranges = raws.iter().map(|r| SourceRange::from_raw(*r, self.tu)).collect();
+            let ranges = raws
+                .iter()
+                .map(|r| SourceRange::from_raw(*r, self.tu))
+                .collect();
             clang_disposeSourceRangeList(raw);
             ranges
         }
@@ -159,21 +167,30 @@ impl<'tu> File<'tu> {
     /// Visits the inclusion directives in this file and returns whether visitation was ended by the
     /// callback returning `false`.
     pub fn visit_includes<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(&self, f: F) -> bool {
-        visit(self.tu, f, |v| unsafe { clang_findIncludesInFile(self.tu.ptr, self.ptr, v) })
+        visit(self.tu, f, |v| unsafe {
+            clang_findIncludesInFile(self.tu.ptr, self.ptr, v)
+        })
     }
 
     /// Visits the references to the supplied entity in this file and returns whether visitation was
     /// ended by the callback returning `false`.
     pub fn visit_references<F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool>(
-        &self, entity: Entity<'tu>, f: F
+        &self,
+        entity: Entity<'tu>,
+        f: F,
     ) -> bool {
-        visit(self.tu, f, |v| unsafe { clang_findReferencesInFile(entity.raw, self.ptr, v) })
+        visit(self.tu, f, |v| unsafe {
+            clang_findReferencesInFile(entity.raw, self.ptr, v)
+        })
     }
 }
 
 impl<'tu> fmt::Debug for File<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("File").field("path", &self.get_path()).finish()
+        formatter
+            .debug_struct("File")
+            .field("path", &self.get_path())
+            .finish()
     }
 }
 
@@ -183,7 +200,7 @@ impl<'tu> cmp::PartialEq for File<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for File<'tu> { }
+impl<'tu> cmp::Eq for File<'tu> {}
 
 impl<'tu> hash::Hash for File<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
@@ -251,7 +268,9 @@ impl<'tu> Module<'tu> {
         iter!(
             clang_Module_getNumTopLevelHeaders(self.tu.ptr, self.ptr),
             clang_Module_getTopLevelHeader(self.tu.ptr, self.ptr),
-        ).map(|h| File::from_ptr(h, self.tu)).collect()
+        )
+        .map(|h| File::from_ptr(h, self.tu))
+        .collect()
     }
 
     /// Returns whether this module is a system module.
@@ -262,7 +281,8 @@ impl<'tu> Module<'tu> {
 
 impl<'tu> fmt::Debug for Module<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Module")
+        formatter
+            .debug_struct("Module")
             .field("file", &self.get_file())
             .field("full_name", &self.get_full_name())
             .finish()
@@ -275,13 +295,15 @@ impl<'tu> cmp::PartialEq for Module<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for Module<'tu> { }
+impl<'tu> cmp::Eq for Module<'tu> {}
 
 // SourceLocation ________________________________
 
 macro_rules! location {
-    ($function:ident, $location:expr, $tu:expr) => ({
-        fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() };
+    ($function:ident, $location:expr, $tu:expr) => {{
+        fn uninit<T>() -> mem::MaybeUninit<T> {
+            mem::MaybeUninit::uninit()
+        };
         let (mut file, mut line, mut column, mut offset) = (uninit(), uninit(), uninit(), uninit());
         $function(
             $location,
@@ -296,7 +318,7 @@ macro_rules! location {
             column: column.assume_init() as u32,
             offset: offset.assume_init() as u32,
         }
-    });
+    }};
 }
 
 /// A location in a source file.
@@ -337,14 +359,20 @@ impl<'tu> SourceLocation<'tu> {
     /// account.
     pub fn get_presumed_location(&self) -> (String, u32, u32) {
         unsafe {
-            fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() };
+            fn uninit<T>() -> mem::MaybeUninit<T> {
+                mem::MaybeUninit::uninit()
+            };
             let (mut file, mut line, mut column) = (uninit(), uninit(), uninit());
             clang_getPresumedLocation(
-                self.raw, file.as_mut_ptr(), line.as_mut_ptr(), column.as_mut_ptr());
+                self.raw,
+                file.as_mut_ptr(),
+                line.as_mut_ptr(),
+                column.as_mut_ptr(),
+            );
             (
                 utility::to_string(file.assume_init()),
                 line.assume_init() as u32,
-                column.assume_init() as u32
+                column.assume_init() as u32,
             )
         }
     }
@@ -373,7 +401,8 @@ impl<'tu> SourceLocation<'tu> {
 impl<'tu> fmt::Debug for SourceLocation<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let location = self.get_spelling_location();
-        formatter.debug_struct("SourceLocation")
+        formatter
+            .debug_struct("SourceLocation")
             .field("file", &location.file)
             .field("line", &location.line)
             .field("column", &location.column)
@@ -388,7 +417,7 @@ impl<'tu> cmp::PartialEq for SourceLocation<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for SourceLocation<'tu> { }
+impl<'tu> cmp::Eq for SourceLocation<'tu> {}
 
 impl<'tu> hash::Hash for SourceLocation<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
@@ -456,7 +485,8 @@ impl<'tu> SourceRange<'tu> {
 
 impl<'tu> fmt::Debug for SourceRange<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("SourceRange")
+        formatter
+            .debug_struct("SourceRange")
             .field("start", &self.get_start())
             .field("end", &self.get_end())
             .finish()
@@ -469,7 +499,7 @@ impl<'tu> cmp::PartialEq for SourceRange<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for SourceRange<'tu> { }
+impl<'tu> cmp::Eq for SourceRange<'tu> {}
 
 impl<'tu> hash::Hash for SourceRange<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
@@ -483,8 +513,9 @@ impl<'tu> hash::Hash for SourceRange<'tu> {
 //================================================
 
 fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
-    where F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
-          G: Fn(CXCursorAndRangeVisitor) -> CXResult
+where
+    F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
+    G: Fn(CXCursorAndRangeVisitor) -> CXResult,
 {
     trait Callback<'tu> {
         fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool;
@@ -496,13 +527,19 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
         }
     }
 
-    extern fn visit(data: CXClientData, cursor: CXCursor, range: CXSourceRange) -> CXVisitorResult {
+    extern "C" fn visit(
+        data: CXClientData,
+        cursor: CXCursor,
+        range: CXSourceRange,
+    ) -> CXVisitorResult {
         unsafe {
-            let &mut (tu, ref mut callback):
-                &mut (&TranslationUnit, Box<dyn Callback>) =
-                    &mut *(data as *mut (&TranslationUnit, Box<dyn Callback>));
+            let &mut (tu, ref mut callback): &mut (&TranslationUnit, Box<dyn Callback>) =
+                &mut *(data as *mut (&TranslationUnit, Box<dyn Callback>));
 
-            if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
+            if callback.call(
+                Entity::from_raw(cursor, tu),
+                SourceRange::from_raw(range, tu),
+            ) {
                 CXVisit_Continue
             } else {
                 CXVisit_Break
@@ -511,6 +548,9 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
     }
 
     let mut data = (tu, Box::new(f) as Box<dyn Callback>);
-    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit: Some(visit) };
+    let visitor = CXCursorAndRangeVisitor {
+        context: utility::addressof(&mut data),
+        visit: Some(visit),
+    };
     g(visitor) == CXResult_VisitBreak
 }

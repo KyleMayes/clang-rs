@@ -2,19 +2,19 @@ use clang::*;
 
 pub fn test(clang: &Clang) {
     macro_rules! assert_declaration_eq {
-        ($declaration:expr, $name:expr, SAME) => ({
+        ($declaration:expr, $name:expr, SAME) => {{
             let declaration = $declaration;
             assert_eq!(declaration.name, $name);
             assert_eq!(declaration.entity.get_name(), Some($name.into()));
             assert!(declaration.source.is_none());
-        });
+        }};
 
-        ($declaration:expr, $name:expr, DIFFERENT) => ({
+        ($declaration:expr, $name:expr, DIFFERENT) => {{
             let declaration = $declaration;
             assert_eq!(declaration.name, $name);
             assert_eq!(declaration.entity.get_name(), None);
             assert_eq!(declaration.source.unwrap().get_name(), Some($name.into()));
-        });
+        }};
     }
 
     let source = "
@@ -25,23 +25,27 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_temporary_file("header.h", source, |_, f| {
-        use clang::sonar::{DefinitionValue};
+        use clang::sonar::DefinitionValue;
 
         let index = Index::new(&clang, false, false);
-        let tu = index.parser(f).detailed_preprocessing_record(true).parse().unwrap();
+        let tu = index
+            .parser(f)
+            .detailed_preprocessing_record(true)
+            .parse()
+            .unwrap();
 
-        let definitions = sonar::find_definitions(tu.get_entity().get_children()).filter(|d| {
-            !d.entity.is_in_system_header()
-        }).collect::<Vec<_>>();
+        let definitions = sonar::find_definitions(tu.get_entity().get_children())
+            .filter(|d| !d.entity.is_in_system_header())
+            .collect::<Vec<_>>();
         assert_eq!(definitions.len(), 4);
 
         macro_rules! assert_definition_eq {
-            ($definition:expr, $name:expr, $value:expr) => ({
+            ($definition:expr, $name:expr, $value:expr) => {{
                 let definition = $definition;
                 assert_eq!(definition.name, $name);
                 assert_eq!(definition.value, $value);
                 assert_eq!(definition.entity.get_name(), Some($name.into()));
-            });
+            }};
         }
 
         assert_definition_eq!(&definitions[0], "A", DefinitionValue::Integer(false, 4));
@@ -83,9 +87,9 @@ pub fn test(clang: &Clang) {
     super::with_entity(&clang, source, |e| {
         assert_eq!(sonar::find_typedefs(e.get_children()).count(), 1);
 
-        let enums = sonar::find_enums(e.get_children()).filter(|e| {
-            !e.entity.is_in_system_header()
-        }).collect::<Vec<_>>();
+        let enums = sonar::find_enums(e.get_children())
+            .filter(|e| !e.entity.is_in_system_header())
+            .collect::<Vec<_>>();
         assert_eq!(enums.len(), 4);
 
         assert_declaration_eq!(&enums[0], "A", SAME);
@@ -107,9 +111,9 @@ pub fn test(clang: &Clang) {
     ";
 
     super::with_entity(&clang, source, |e| {
-        let functions = sonar::find_functions(e.get_children()).filter(|f| {
-            !f.entity.is_in_system_header()
-        }).collect::<Vec<_>>();
+        let functions = sonar::find_functions(e.get_children())
+            .filter(|f| !f.entity.is_in_system_header())
+            .collect::<Vec<_>>();
         assert_eq!(functions.len(), 5);
 
         assert_declaration_eq!(&functions[0], "multiple", SAME);
@@ -144,9 +148,9 @@ pub fn test(clang: &Clang) {
     super::with_entity(&clang, source, |e| {
         assert_eq!(sonar::find_typedefs(e.get_children()).count(), 1);
 
-        let structs = sonar::find_structs(e.get_children()).filter(|s| {
-            !s.entity.is_in_system_header()
-        }).collect::<Vec<_>>();
+        let structs = sonar::find_structs(e.get_children())
+            .filter(|s| !s.entity.is_in_system_header())
+            .collect::<Vec<_>>();
         assert_eq!(structs.len(), 4);
 
         assert_declaration_eq!(&structs[0], "A", SAME);
@@ -191,9 +195,9 @@ pub fn test(clang: &Clang) {
         assert_eq!(sonar::find_structs(e.get_children()).count(), 1);
         assert_eq!(sonar::find_unions(e.get_children()).count(), 1);
 
-        let typedefs = sonar::find_typedefs(e.get_children()).filter(|t| {
-            !t.entity.is_in_system_header()
-        }).collect::<Vec<_>>();
+        let typedefs = sonar::find_typedefs(e.get_children())
+            .filter(|t| !t.entity.is_in_system_header())
+            .collect::<Vec<_>>();
         assert_eq!(typedefs.len(), 18);
 
         assert_declaration_eq!(&typedefs[0], "Integer", SAME);
@@ -245,9 +249,9 @@ pub fn test(clang: &Clang) {
     super::with_entity(&clang, source, |e| {
         assert_eq!(sonar::find_typedefs(e.get_children()).count(), 1);
 
-        let unions = sonar::find_unions(e.get_children()).filter(|u| {
-            !u.entity.is_in_system_header()
-        }).collect::<Vec<_>>();
+        let unions = sonar::find_unions(e.get_children())
+            .filter(|u| !u.entity.is_in_system_header())
+            .collect::<Vec<_>>();
         assert_eq!(unions.len(), 4);
 
         assert_declaration_eq!(&unions[0], "A", SAME);
@@ -256,11 +260,14 @@ pub fn test(clang: &Clang) {
         assert_declaration_eq!(&unions[3], "D", SAME);
     });
 
-    #[cfg(target_os="linux")]
+    #[cfg(target_os = "linux")]
     fn test_headers(clang: &Clang) {
         fn test(clang: &Clang, header: &str) {
             let index = Index::new(clang, false, false);
-            let tu = index.parser(header).detailed_preprocessing_record(true).parse();
+            let tu = index
+                .parser(header)
+                .detailed_preprocessing_record(true)
+                .parse();
             if let Ok(tu) = tu {
                 let entities = tu.get_entity().get_children();
                 let _ = sonar::find_definitions(&entities[..]);
@@ -298,8 +305,8 @@ pub fn test(clang: &Clang) {
         test(clang, "/usr/include/wctype.h");
     }
 
-    #[cfg(not(target_os="linux"))]
-    fn test_headers(_: &Clang) { }
+    #[cfg(not(target_os = "linux"))]
+    fn test_headers(_: &Clang) {}
 
     test_headers(clang);
 }

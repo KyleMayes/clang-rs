@@ -14,8 +14,11 @@
 
 //! A somewhat idiomatic Rust wrapper for libclang.
 
-#![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
-
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs
+)]
 #![allow(non_upper_case_globals)]
 
 extern crate clang_sys;
@@ -33,15 +36,15 @@ pub mod token;
 pub mod sonar;
 
 use std::cmp;
+use std::collections::HashMap;
+use std::ffi::CString;
 use std::fmt;
 use std::hash;
+use std::marker::PhantomData;
 use std::mem;
+use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
-use std::collections::{HashMap};
-use std::ffi::{CString};
-use std::marker::{PhantomData};
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{self, AtomicBool};
 
 use clang_sys::*;
@@ -49,10 +52,10 @@ use clang_sys::*;
 use libc::{c_int, c_uint, c_ulong};
 
 use completion::{Completer, CompletionString};
-use diagnostic::{Diagnostic};
-use documentation::{Comment};
+use diagnostic::Diagnostic;
+use documentation::Comment;
 use source::{File, Module, SourceLocation, SourceRange};
-use token::{Token};
+use token::Token;
 use utility::{FromError, Nullable};
 
 mod error;
@@ -768,7 +771,7 @@ pub enum EntityKind {
     /// `__attribute__((clang::convergent))`
     ///
     /// Only produced by `libclang` 9.0 and later.
-    ConvergentAttr  = 438,
+    ConvergentAttr = 438,
     /// Only produced by `libclang` 9.0 and later.
     WarnUnusedAttr = 439,
     /// `__attribute__((nodiscard))`
@@ -808,10 +811,15 @@ pub enum EntityKind {
 impl EntityKind {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
-            1..=50 | 70..=73 | 100..=149 | 200..=280 | 300 | 400..=441 | 500..=503 | 600..=603
-            | 700 => {
-                Some(unsafe { mem::transmute(raw) })
-            }
+            1..=50
+            | 70..=73
+            | 100..=149
+            | 200..=280
+            | 300
+            | 400..=441
+            | 500..=503
+            | 600..=603
+            | 700 => Some(unsafe { mem::transmute(raw) }),
             _ => None,
         }
     }
@@ -847,7 +855,7 @@ pub enum EntityVisitResult {
 // EvaluationResult ______________________________
 
 /// The result of evaluating an expression.
-#[cfg(feature="clang_3_9")]
+#[cfg(feature = "clang_3_9")]
 #[derive(Clone, Debug, PartialEq)]
 pub enum EvaluationResult {
     /// An evaluation result whose specific type is not exposed via this interface.
@@ -874,7 +882,7 @@ pub enum EvaluationResult {
 // ExceptionSpecification ________________________
 
 /// Indicates the exception specification of a function.
-#[cfg(feature="clang_5_0")]
+#[cfg(feature = "clang_5_0")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum ExceptionSpecification {
@@ -900,7 +908,7 @@ pub enum ExceptionSpecification {
     NoThrow = 9,
 }
 
-#[cfg(feature="clang_5_0")]
+#[cfg(feature = "clang_5_0")]
 impl ExceptionSpecification {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
@@ -1010,7 +1018,7 @@ impl MemoryUsage {
 // Nullability ___________________________________
 
 /// Indicates the nullability of a pointer type.
-#[cfg(feature="clang_8_0")]
+#[cfg(feature = "clang_8_0")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Nullability {
@@ -1022,7 +1030,7 @@ pub enum Nullability {
     Unspecified = 2,
 }
 
-#[cfg(feature="clang_8_0")]
+#[cfg(feature = "clang_8_0")]
 impl Nullability {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
@@ -1035,7 +1043,7 @@ impl Nullability {
 // PrintingPolicyFlag ____________________________
 
 /// Flags for the printing policy.
-#[cfg(feature="clang_7_0")]
+#[cfg(feature = "clang_7_0")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum PrintingPolicyFlag {
@@ -1094,7 +1102,7 @@ pub enum PrintingPolicyFlag {
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
-#[cfg_attr(feature="cargo-clippy", allow(clippy::enum_variant_names))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::enum_variant_names))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum RefQualifier {
@@ -1116,7 +1124,7 @@ impl RefQualifier {
 // StorageClass __________________________________
 
 /// Indicates the storage class of a declaration.
-#[cfg(feature="clang_3_6")]
+#[cfg(feature = "clang_3_6")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum StorageClass {
@@ -1139,7 +1147,7 @@ pub enum StorageClass {
     OpenClWorkGroupLocal = 5,
 }
 
-#[cfg(feature="clang_3_6")]
+#[cfg(feature = "clang_3_6")]
 impl StorageClass {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
@@ -1152,7 +1160,7 @@ impl StorageClass {
 // TemplateArgument ______________________________
 
 /// An argument to a template function specialization.
-#[cfg(feature="clang_3_6")]
+#[cfg(feature = "clang_3_6")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TemplateArgument<'tu> {
     /// A declaration for a pointer, reference, or member pointer non-type template parameter.
@@ -1178,7 +1186,7 @@ pub enum TemplateArgument<'tu> {
 // TlsKind _______________________________________
 
 /// Indicates the thread-local storage (TLS) kind of a declaration.
-#[cfg(feature="clang_6_0")]
+#[cfg(feature = "clang_6_0")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum TlsKind {
@@ -1188,7 +1196,7 @@ pub enum TlsKind {
     Static = 2,
 }
 
-#[cfg(feature="clang_6_0")]
+#[cfg(feature = "clang_6_0")]
 impl TlsKind {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
@@ -1588,7 +1596,7 @@ impl TypeKind {
 // Visibility ____________________________________
 
 /// Indicates the linker visibility of an AST element.
-#[cfg(feature="clang_3_8")]
+#[cfg(feature = "clang_3_8")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum Visibility {
@@ -1600,7 +1608,7 @@ pub enum Visibility {
     Protected = 2,
 }
 
-#[cfg(feature="clang_3_8")]
+#[cfg(feature = "clang_3_8")]
 impl Visibility {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
@@ -1634,7 +1642,7 @@ impl Clang {
     /// * an instance of `Clang` already exists
     /// * a `libclang` shared library could not be found
     /// * a `libclang` shared library symbol could not be loaded
-    #[cfg(feature="runtime")]
+    #[cfg(feature = "runtime")]
     pub fn new() -> Result<Clang, String> {
         if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
             load().map(|_| Clang)
@@ -1650,7 +1658,7 @@ impl Clang {
     /// # Failures
     ///
     /// * an instance of `Clang` already exists
-    #[cfg(not(feature="runtime"))]
+    #[cfg(not(feature = "runtime"))]
     pub fn new() -> Result<Clang, String> {
         if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
             Ok(Clang)
@@ -1660,7 +1668,7 @@ impl Clang {
     }
 }
 
-#[cfg(feature="runtime")]
+#[cfg(feature = "runtime")]
 impl Drop for Clang {
     fn drop(&mut self) {
         unload().unwrap();
@@ -1668,7 +1676,7 @@ impl Drop for Clang {
     }
 }
 
-#[cfg(not(feature="runtime"))]
+#[cfg(not(feature = "runtime"))]
 impl Drop for Clang {
     fn drop(&mut self) {
         AVAILABLE.store(true, atomic::Ordering::SeqCst);
@@ -1776,7 +1784,7 @@ impl<'cmds> CompileCommand<'cmds> {
     }
 
     /// Get the filename associated with the command.
-    #[cfg(feature="clang_3_8")]
+    #[cfg(feature = "clang_3_8")]
     pub fn get_filename(&self) -> PathBuf {
         utility::to_path(unsafe { clang_CompileCommand_getFilename(self.ptr) })
     }
@@ -1813,7 +1821,7 @@ impl<'tu> Entity<'tu> {
     //- Accessors --------------------------------
 
     /// Evaluates this AST entity, if possible.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn evaluate(&self) -> Option<EvaluationResult> {
         macro_rules! string {
             ($eval:expr) => {
@@ -1821,7 +1829,7 @@ impl<'tu> Entity<'tu> {
             };
         }
 
-        #[cfg(feature="clang_4_0")]
+        #[cfg(feature = "clang_4_0")]
         unsafe fn evaluate_integer(e: CXEvalResult) -> EvaluationResult {
             if clang_EvalResult_isUnsignedInt(e) != 0 {
                 EvaluationResult::UnsignedInteger(clang_EvalResult_getAsUnsigned(e) as u64)
@@ -1830,7 +1838,7 @@ impl<'tu> Entity<'tu> {
             }
         }
 
-        #[cfg(not(feature="clang_4_0"))]
+        #[cfg(not(feature = "clang_4_0"))]
         unsafe fn evaluate_integer(e: CXEvalResult) -> EvaluationResult {
             EvaluationResult::SignedInteger(clang_EvalResult_getAsInt(e) as i64)
         }
@@ -1867,7 +1875,7 @@ impl<'tu> Entity<'tu> {
         unsafe { utility::to_string_option(clang_getCursorDisplayName(self.raw)) }
     }
 
-    #[cfg(feature="clang_7_0")]
+    #[cfg(feature = "clang_7_0")]
     /// Returns the pretty printer for this declaration.
     pub fn get_pretty_printer(&self) -> PrettyPrinter {
         unsafe { PrettyPrinter::from_raw(clang_getCursorPrintingPolicy(self.raw), self) }
@@ -1898,12 +1906,13 @@ impl<'tu> Entity<'tu> {
         iter_option!(
             clang_Cursor_getNumArguments(self.raw),
             clang_Cursor_getArgument(self.raw),
-        ).map(|i| i.map(|a| Entity::from_raw(a, self.tu)).collect())
+        )
+        .map(|i| i.map(|a| Entity::from_raw(a, self.tu)).collect())
     }
 
     /// Returns the availability of this AST entity.
     pub fn get_availability(&self) -> Availability {
-        Availability::from_raw(unsafe {clang_getCursorAvailability(self.raw) }).unwrap()
+        Availability::from_raw(unsafe { clang_getCursorAvailability(self.raw) }).unwrap()
     }
 
     /// Returns the width of this bit field, if applicable.
@@ -2000,7 +2009,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the exception specification of this AST entity, if applicable.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn get_exception_specification(&self) -> Option<ExceptionSpecification> {
         unsafe {
             match clang_getCursorExceptionSpecificationType(self.raw) {
@@ -2011,17 +2020,23 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the `external_source_symbol` attribute attached to this AST entity, if any.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn get_external_symbol(&self) -> Option<ExternalSymbol> {
         unsafe {
             let mut language = mem::MaybeUninit::uninit();
             let mut defined = mem::MaybeUninit::uninit();
             let mut generated: c_uint = 0;
-            if clang_Cursor_isExternalSymbol(self.raw, language.as_mut_ptr(), defined.as_mut_ptr(), &mut generated) != 0 {
+            if clang_Cursor_isExternalSymbol(
+                self.raw,
+                language.as_mut_ptr(),
+                defined.as_mut_ptr(),
+                &mut generated,
+            ) != 0
+            {
                 Some(ExternalSymbol {
                     language: utility::to_string(language.assume_init()),
                     defined: utility::to_string(defined.assume_init()),
-                    generated: generated != 0
+                    generated: generated != 0,
                 })
             } else {
                 None
@@ -2060,19 +2075,19 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the mangled name of this AST entity, if any.
-    #[cfg(feature="clang_3_6")]
+    #[cfg(feature = "clang_3_6")]
     pub fn get_mangled_name(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_Cursor_getMangling(self.raw)) }
     }
 
     /// Returns the mangled names of this C++ constructor or destructor, if applicable.
-    #[cfg(feature="clang_3_8")]
+    #[cfg(feature = "clang_3_8")]
     pub fn get_mangled_names(&self) -> Option<Vec<String>> {
         unsafe { utility::to_string_set_option(clang_Cursor_getCXXManglings(self.raw)) }
     }
 
     /// Returns the mangled names of this Objective-C class interface or implementation, if applicable.
-    #[cfg(feature="clang_6_0")]
+    #[cfg(feature = "clang_6_0")]
     pub fn get_mangled_objc_names(&self) -> Option<Vec<String>> {
         unsafe { utility::to_string_set_option(clang_Cursor_getObjCManglings(self.raw)) }
     }
@@ -2090,17 +2105,21 @@ impl<'tu> Entity<'tu> {
     /// Returns the source ranges of the name of this AST entity.
     pub fn get_name_ranges(&self) -> Vec<SourceRange<'tu>> {
         unsafe {
-            (0..).map(|i| clang_Cursor_getSpellingNameRange(self.raw, i, 0)).take_while(|r| {
-                if clang_Range_isNull(*r) != 0 {
-                    false
-                } else {
-                    let range = clang_getRangeStart(*r);
-                    let mut file = ptr::null_mut();
-                    let null = ptr::null_mut();
-                    clang_getSpellingLocation(range, &mut file, null, null, null);
-                    !file.is_null()
-                }
-            }).map(|r| SourceRange::from_raw(r, self.tu)).collect()
+            (0..)
+                .map(|i| clang_Cursor_getSpellingNameRange(self.raw, i, 0))
+                .take_while(|r| {
+                    if clang_Range_isNull(*r) != 0 {
+                        false
+                    } else {
+                        let range = clang_getRangeStart(*r);
+                        let mut file = ptr::null_mut();
+                        let null = ptr::null_mut();
+                        clang_getSpellingLocation(range, &mut file, null, null, null);
+                        !file.is_null()
+                    }
+                })
+                .map(|r| SourceRange::from_raw(r, self.tu))
+                .collect()
         }
     }
 
@@ -2115,7 +2134,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the name of the method implementing the getter for this Objective-C property, if applicable
-    #[cfg(feature="clang_8_0")]
+    #[cfg(feature = "clang_8_0")]
     pub fn get_objc_getter_name(&self) -> Option<String> {
         utility::to_string_option(unsafe { clang_Cursor_getObjCPropertyGetterName(self.raw) })
     }
@@ -2141,7 +2160,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the name of the method implementing the setter for this Objective-C property, if applicable
-    #[cfg(feature="clang_8_0")]
+    #[cfg(feature = "clang_8_0")]
     pub fn get_objc_setter_name(&self) -> Option<String> {
         utility::to_string_option(unsafe { clang_Cursor_getObjCPropertySetterName(self.raw) })
     }
@@ -2163,7 +2182,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the the offset of this field, if applicable.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(feature = "clang_3_7")]
     pub fn get_offset_of_field(&self) -> Result<usize, OffsetofError> {
         let offsetof_ = unsafe { clang_Cursor_getOffsetOfField(self.raw) };
         OffsetofError::from_error(offsetof_).map(|_| offsetof_ as usize)
@@ -2175,7 +2194,9 @@ impl<'tu> Entity<'tu> {
         let declarations = iter!(
             clang_getNumOverloadedDecls(self.raw),
             clang_getOverloadedDecl(self.raw),
-        ).map(|e| Entity::from_raw(e, self.tu)).collect::<Vec<_>>();
+        )
+        .map(|e| Entity::from_raw(e, self.tu))
+        .collect::<Vec<_>>();
         if !declarations.is_empty() {
             Some(declarations)
         } else {
@@ -2217,7 +2238,11 @@ impl<'tu> Entity<'tu> {
                 (&mut buffer).as_mut_ptr(),
                 buffer.len() as c_int,
             );
-            Some((0..count as usize).map(|i| PlatformAvailability::from_raw(buffer[i])).collect())
+            Some(
+                (0..count as usize)
+                    .map(|i| PlatformAvailability::from_raw(buffer[i]))
+                    .collect(),
+            )
         }
     }
 
@@ -2233,7 +2258,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the storage class of this declaration, if applicable.
-    #[cfg(feature="clang_3_6")]
+    #[cfg(feature = "clang_3_6")]
     pub fn get_storage_class(&self) -> Option<StorageClass> {
         unsafe {
             match clang_Cursor_getStorageClass(self.raw) {
@@ -2251,7 +2276,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the template arguments for this template function specialization, if applicable.
-    #[cfg(feature="clang_3_6")]
+    #[cfg(feature = "clang_3_6")]
     pub fn get_template_arguments(&self) -> Option<Vec<TemplateArgument<'tu>>> {
         let get_type = &clang_Cursor_getTemplateArgumentType;
         let get_signed = &clang_Cursor_getTemplateArgumentValue;
@@ -2260,28 +2285,29 @@ impl<'tu> Entity<'tu> {
         iter_option!(
             clang_Cursor_getNumTemplateArguments(self.raw),
             clang_Cursor_getTemplateArgumentKind(self.raw),
-        ).map(|i| {
-            i.enumerate().map(|(i, t)| {
-                match t {
+        )
+        .map(|i| {
+            i.enumerate()
+                .map(|(i, t)| match t {
                     CXTemplateArgumentKind_Null => TemplateArgument::Null,
                     CXTemplateArgumentKind_Type => {
                         let type_ = unsafe { get_type(self.raw, i as c_uint) };
                         TemplateArgument::Type(Type::from_raw(type_, self.tu))
-                    },
+                    }
                     CXTemplateArgumentKind_Declaration => TemplateArgument::Declaration,
                     CXTemplateArgumentKind_NullPtr => TemplateArgument::Nullptr,
                     CXTemplateArgumentKind_Integral => {
                         let signed = unsafe { get_signed(self.raw, i as c_uint) };
                         let unsigned = unsafe { get_unsigned(self.raw, i as c_uint) };
                         TemplateArgument::Integral(signed as i64, unsigned as u64)
-                    },
+                    }
                     CXTemplateArgumentKind_Template => TemplateArgument::Template,
                     CXTemplateArgumentKind_TemplateExpansion => TemplateArgument::TemplateExpansion,
                     CXTemplateArgumentKind_Expression => TemplateArgument::Expression,
                     CXTemplateArgumentKind_Pack => TemplateArgument::Pack,
                     _ => unreachable!(),
-                }
-            }).collect()
+                })
+                .collect()
         })
     }
 
@@ -2297,7 +2323,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the thread-local storage (TLS) kind of this declaration, if applicable.
-    #[cfg(feature="clang_6_0")]
+    #[cfg(feature = "clang_6_0")]
     pub fn get_tls_kind(&self) -> Option<TlsKind> {
         unsafe {
             match clang_getCursorTLSKind(self.raw) {
@@ -2328,7 +2354,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns the linker visibility for this AST entity, if any.
-    #[cfg(feature="clang_3_8")]
+    #[cfg(feature = "clang_3_8")]
     pub fn get_visibility(&self) -> Option<Visibility> {
         unsafe {
             match clang_getCursorVisibility(self.raw) {
@@ -2344,13 +2370,13 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns whether this AST entity has any attached attributes.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn has_attributes(&self) -> bool {
         unsafe { clang_Cursor_hasAttrs(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an abstract C++ record.
-    #[cfg(feature="clang_6_0")]
+    #[cfg(feature = "clang_6_0")]
     pub fn is_abstract_record(&self) -> bool {
         unsafe { clang_CXXRecord_isAbstract(self.raw) != 0 }
     }
@@ -2360,19 +2386,19 @@ impl<'tu> Entity<'tu> {
     /// Prior to `libclang` 9.0, this only returned true if the entity was an anonymous record
     /// declaration.  As of 9.0, it also returns true for anonymous namespaces. The old behavior is
     /// available as `is_anonymous_record_decl()` for `libclang` 9.0 and up.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(feature = "clang_3_7")]
     pub fn is_anonymous(&self) -> bool {
         unsafe { clang_Cursor_isAnonymous(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an anonymous record declaration.
-    #[cfg(feature="clang_9_0")]
+    #[cfg(feature = "clang_9_0")]
     pub fn is_anonymous_record_decl(&self) -> bool {
         unsafe { clang_Cursor_isAnonymousRecordDecl(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an inline namespace.
-    #[cfg(feature="clang_9_0")]
+    #[cfg(feature = "clang_9_0")]
     pub fn is_inline_namespace(&self) -> bool {
         unsafe { clang_Cursor_isInlineNamespace(self.raw) != 0 }
     }
@@ -2383,7 +2409,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns whether this AST entity is a builtin macro.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_builtin_macro(&self) -> bool {
         unsafe { clang_Cursor_isMacroBuiltin(self.raw) != 0 }
     }
@@ -2394,25 +2420,25 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns whether this AST entity is a C++ converting constructor.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_converting_constructor(&self) -> bool {
         unsafe { clang_CXXConstructor_isConvertingConstructor(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a C++ copy constructor.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_copy_constructor(&self) -> bool {
         unsafe { clang_CXXConstructor_isCopyConstructor(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a C++ default constructor.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_default_constructor(&self) -> bool {
         unsafe { clang_CXXConstructor_isDefaultConstructor(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a C++ defaulted constructor or method.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_defaulted(&self) -> bool {
         unsafe { clang_CXXMethod_isDefaulted(self.raw) != 0 }
     }
@@ -2432,30 +2458,30 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns whether this AST entity is a function-like macro.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_function_like_macro(&self) -> bool {
         unsafe { clang_Cursor_isMacroFunctionLike(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an inline function.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_inline_function(&self) -> bool {
         unsafe { clang_Cursor_isFunctionInlined(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is an invalid declaration.
-    #[cfg(feature="clang_7_0")]
+    #[cfg(feature = "clang_7_0")]
     pub fn is_invalid_declaration(&self) -> bool {
         unsafe { clang_isInvalidDeclaration(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a C++ default constructor.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn is_move_constructor(&self) -> bool {
         unsafe { clang_CXXConstructor_isMoveConstructor(self.raw) != 0 }
     }
 
-    #[cfg(feature="clang_3_8")]
+    #[cfg(feature = "clang_3_8")]
     /// Returns whether this AST entity is a mutable field in a C++ struct or class.
     pub fn is_mutable(&self) -> bool {
         unsafe { clang_CXXField_isMutable(self.raw) != 0 }
@@ -2473,7 +2499,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns whether this AST entity is a scoped enum.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn is_scoped(&self) -> bool {
         unsafe { clang_EnumDecl_isScoped(self.raw) != 0 }
     }
@@ -2505,21 +2531,23 @@ impl<'tu> Entity<'tu> {
     /// is the parent of that AST entity. The return value of the callback determines how visitation
     /// will proceed.
     pub fn visit_children<F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult>(
-        &self, f: F
+        &self,
+        f: F,
     ) -> bool {
         trait EntityCallback<'tu> {
             fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult;
         }
 
-        impl<'tu, F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult>
-        EntityCallback<'tu> for F {
+        impl<'tu, F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult> EntityCallback<'tu> for F {
             fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult {
                 self(entity, parent)
             }
         }
 
-        extern fn visit(
-            cursor: CXCursor, parent: CXCursor, data: CXClientData
+        extern "C" fn visit(
+            cursor: CXCursor,
+            parent: CXCursor,
+            data: CXClientData,
         ) -> CXChildVisitResult {
             unsafe {
                 let &mut (tu, ref mut callback) =
@@ -2587,7 +2615,8 @@ impl<'tu> Entity<'tu> {
 
 impl<'tu> fmt::Debug for Entity<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Entity")
+        formatter
+            .debug_struct("Entity")
             .field("kind", &self.get_kind())
             .field("display_name", &self.get_display_name())
             .field("location", &self.get_location())
@@ -2601,7 +2630,7 @@ impl<'tu> cmp::PartialEq for Entity<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for Entity<'tu> { }
+impl<'tu> cmp::Eq for Entity<'tu> {}
 
 impl<'tu> hash::Hash for Entity<'tu> {
     fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
@@ -2617,7 +2646,7 @@ impl<'tu> hash::Hash for Entity<'tu> {
 // ExternalSymbol ________________________________
 
 /// An `external_source_symbol` attribute.
-#[cfg(feature="clang_5_0")]
+#[cfg(feature = "clang_5_0")]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ExternalSymbol {
     /// The `language` string from this attribute.
@@ -2641,7 +2670,10 @@ impl<'c> Index<'c> {
 
     fn from_ptr(ptr: CXIndex) -> Index<'c> {
         assert!(!ptr.is_null());
-        Index { ptr, _marker: PhantomData }
+        Index {
+            ptr,
+            _marker: PhantomData,
+        }
     }
 
     /// Constructs a new `Index`.
@@ -2660,10 +2692,12 @@ impl<'c> Index<'c> {
     }
 
     /// Sets the invocation emission path for this index.
-    #[cfg(feature="clang_6_0")]
+    #[cfg(feature = "clang_6_0")]
     pub fn set_invocation_emission_path<P: AsRef<Path>>(&'c self, path: P) {
         let path = utility::from_path(path);
-        unsafe { clang_CXIndex_setInvocationEmissionPathOption(self.ptr, path.as_ptr()); }
+        unsafe {
+            clang_CXIndex_setInvocationEmissionPathOption(self.ptr, path.as_ptr());
+        }
     }
 
     /// Returns the thread options for this index.
@@ -2675,19 +2709,24 @@ impl<'c> Index<'c> {
 
     /// Sets the thread options for this index.
     pub fn set_thread_options(&mut self, options: ThreadOptions) {
-        unsafe { clang_CXIndex_setGlobalOptions(self.ptr, options.into()); }
+        unsafe {
+            clang_CXIndex_setGlobalOptions(self.ptr, options.into());
+        }
     }
 }
 
 impl<'c> Drop for Index<'c> {
     fn drop(&mut self) {
-        unsafe { clang_disposeIndex(self.ptr); }
+        unsafe {
+            clang_disposeIndex(self.ptr);
+        }
     }
 }
 
 impl<'c> fmt::Debug for Index<'c> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Index")
+        formatter
+            .debug_struct("Index")
             .field("thread_options", &self.get_thread_options())
             .finish()
     }
@@ -2807,7 +2846,13 @@ impl<'tu> Parser<'tu> {
 
     fn new<F: Into<PathBuf>>(index: &'tu Index<'tu>, file: F) -> Parser<'tu> {
         let flags: CXTranslationUnit_Flags = 0;
-        Parser { index, file: file.into(), arguments: vec![], unsaved: vec![], flags }
+        Parser {
+            index,
+            file: file.into(),
+            arguments: vec![],
+            unsaved: vec![],
+            flags,
+        }
     }
 
     //- Mutators ---------------------------------
@@ -2842,7 +2887,11 @@ impl<'tu> Parser<'tu> {
     /// * `libclang` crashes
     /// * an unknown error occurs
     pub fn parse(&self) -> Result<TranslationUnit<'tu>, SourceError> {
-        let arguments = self.arguments.iter().map(|a| a.as_ptr()).collect::<Vec<_>>();
+        let arguments = self
+            .arguments
+            .iter()
+            .map(|a| a.as_ptr())
+            .collect::<Vec<_>>();
         let unsaved = self.unsaved.iter().map(|u| u.as_raw()).collect::<Vec<_>>();
         unsafe {
             let mut ptr = ptr::null_mut();
@@ -2898,13 +2947,13 @@ impl PlatformAvailability {
 // PrettyPrinter _________________________________
 
 /// Pretty prints declarations.
-#[cfg(feature="clang_7_0")]
+#[cfg(feature = "clang_7_0")]
 #[derive(Debug)]
 pub struct PrettyPrinter<'e> {
     ptr: CXPrintingPolicy,
     entity: &'e Entity<'e>,
 }
-#[cfg(feature="clang_7_0")]
+#[cfg(feature = "clang_7_0")]
 impl<'e> PrettyPrinter<'e> {
     //- Constructors -----------------------------
 
@@ -2923,7 +2972,9 @@ impl<'e> PrettyPrinter<'e> {
     /// Sets the specified flag value.
     pub fn set_flag(&self, flag: PrintingPolicyFlag, value: bool) -> &Self {
         let value = if value { 1 } else { 0 };
-        unsafe { clang_PrintingPolicy_setProperty(self.ptr, flag as c_int, value); }
+        unsafe {
+            clang_PrintingPolicy_setProperty(self.ptr, flag as c_int, value);
+        }
         self
     }
 
@@ -2946,7 +2997,7 @@ impl<'e> PrettyPrinter<'e> {
     }
 }
 
-#[cfg(feature="clang_7_0")]
+#[cfg(feature = "clang_7_0")]
 impl<'e> Drop for PrettyPrinter<'e> {
     fn drop(&mut self) {
         unsafe { clang_PrintingPolicy_dispose(self.ptr) }
@@ -2956,7 +3007,7 @@ impl<'e> Drop for PrettyPrinter<'e> {
 // Target ________________________________________
 
 /// Information about the target for a translation unit.
-#[cfg(feature="clang_5_0")]
+#[cfg(feature = "clang_5_0")]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Target {
     /// The normalized target triple for the target.
@@ -2965,7 +3016,7 @@ pub struct Target {
     pub pointer_width: usize,
 }
 
-#[cfg(feature="clang_5_0")]
+#[cfg(feature = "clang_5_0")]
 impl Target {
     //- Constructors -----------------------------
 
@@ -3007,7 +3058,10 @@ impl<'i> TranslationUnit<'i> {
 
     fn from_ptr(ptr: CXTranslationUnit) -> TranslationUnit<'i> {
         assert!(!ptr.is_null());
-        TranslationUnit { ptr, _marker: PhantomData }
+        TranslationUnit {
+            ptr,
+            _marker: PhantomData,
+        }
     }
 
     /// Constructs a new `TranslationUnit` from an AST file.
@@ -3015,9 +3069,7 @@ impl<'i> TranslationUnit<'i> {
     /// # Failures
     ///
     /// * an unknown error occurs
-    pub fn from_ast<F: AsRef<Path>>(
-        index: &'i Index, file: F
-    ) -> Result<TranslationUnit<'i>, ()> {
+    pub fn from_ast<F: AsRef<Path>>(index: &'i Index, file: F) -> Result<TranslationUnit<'i>, ()> {
         let path = utility::from_path(file);
         let ptr = unsafe { clang_createTranslationUnit(index.ptr, path.as_ptr()) };
         ptr.map(TranslationUnit::from_ptr).ok_or(())
@@ -3027,9 +3079,12 @@ impl<'i> TranslationUnit<'i> {
 
     /// Returns the diagnostics for this translation unit.
     pub fn get_diagnostics(&'i self) -> Vec<Diagnostic<'i>> {
-        iter!(clang_getNumDiagnostics(self.ptr), clang_getDiagnostic(self.ptr),).map(|d| {
-            Diagnostic::from_ptr(d, self)
-        }).collect()
+        iter!(
+            clang_getNumDiagnostics(self.ptr),
+            clang_getDiagnostic(self.ptr),
+        )
+        .map(|d| Diagnostic::from_ptr(d, self))
+        .collect()
     }
 
     /// Returns the entity for this translation unit.
@@ -3061,19 +3116,22 @@ impl<'i> TranslationUnit<'i> {
     ///
     /// This will always return an empty `Vec` if the translation unit was not constructed with a
     /// detailed preprocessing record.
-    #[cfg(feature="clang_4_0")]
+    #[cfg(feature = "clang_4_0")]
     pub fn get_skipped_ranges(&'i self) -> Vec<SourceRange<'i>> {
         unsafe {
             let raw = clang_getAllSkippedRanges(self.ptr);
             let raws = slice::from_raw_parts((*raw).ranges, (*raw).count as usize);
-            let ranges = raws.iter().map(|r| SourceRange::from_raw(*r, self)).collect();
+            let ranges = raws
+                .iter()
+                .map(|r| SourceRange::from_raw(*r, self))
+                .collect();
             clang_disposeSourceRangeList(raw);
             ranges
         }
     }
 
     /// Returns information about the target for this translation unit.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn get_target(&self) -> Target {
         unsafe { Target::from_raw(clang_getTranslationUnitTargetInfo(self.ptr)) }
     }
@@ -3083,8 +3141,16 @@ impl<'i> TranslationUnit<'i> {
         unsafe {
             let mut cursors = vec![CXCursor::default(); tokens.len()];
             let mut tokens = tokens.iter().map(|t| t.raw).collect::<Vec<_>>();
-            clang_annotateTokens(self.ptr, tokens.as_mut_ptr(), tokens.len() as c_uint, cursors.as_mut_ptr());
-            cursors.iter().map(|e| e.map(|e| Entity::from_raw(e, self))).collect()
+            clang_annotateTokens(
+                self.ptr,
+                tokens.as_mut_ptr(),
+                tokens.len() as c_uint,
+                cursors.as_mut_ptr(),
+            );
+            cursors
+                .iter()
+                .map(|e| e.map(|e| Entity::from_raw(e, self)))
+                .collect()
         }
     }
 
@@ -3132,14 +3198,17 @@ impl<'i> TranslationUnit<'i> {
 
 impl<'i> Drop for TranslationUnit<'i> {
     fn drop(&mut self) {
-        unsafe { clang_disposeTranslationUnit(self.ptr); }
+        unsafe {
+            clang_disposeTranslationUnit(self.ptr);
+        }
     }
 }
 
 impl<'i> fmt::Debug for TranslationUnit<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let spelling = unsafe { clang_getTranslationUnitSpelling(self.ptr) };
-        formatter.debug_struct("TranslationUnit")
+        formatter
+            .debug_struct("TranslationUnit")
             .field("spelling", &utility::to_string(spelling))
             .finish()
     }
@@ -3210,17 +3279,15 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns the address space of this type.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn get_address_space(&self) -> usize {
         unsafe { clang_getAddressSpace(self.raw) as usize }
     }
 
     /// Returns the argument types for this function or method type, if applicable.
     pub fn get_argument_types(&self) -> Option<Vec<Type<'tu>>> {
-        iter_option!(
-            clang_getNumArgTypes(self.raw),
-            clang_getArgType(self.raw),
-        ).map(|i| i.map(|t| Type::from_raw(t, self.tu)).collect())
+        iter_option!(clang_getNumArgTypes(self.raw), clang_getArgType(self.raw),)
+            .map(|i| i.map(|t| Type::from_raw(t, self.tu)).collect())
     }
 
     /// Returns the calling convention specified for this function type, if applicable.
@@ -3251,7 +3318,7 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns the type named by this elaborated type, if applicable.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn get_elaborated_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_Type_getNamedType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
@@ -3262,7 +3329,7 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns the exception specification of this type, if applicable.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn get_exception_specification(&self) -> Option<ExceptionSpecification> {
         unsafe {
             match clang_getExceptionSpecificationType(self.raw) {
@@ -3273,7 +3340,7 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns the fields in this record type, if applicable.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(feature = "clang_3_7")]
     pub fn get_fields(&self) -> Option<Vec<Entity<'tu>>> {
         if self.get_kind() == TypeKind::Record {
             let mut fields = vec![];
@@ -3288,13 +3355,13 @@ impl<'tu> Type<'tu> {
     }
 
     /// Return the type that was modified by this attributed type.
-    #[cfg(feature="clang_8_0")]
+    #[cfg(feature = "clang_8_0")]
     pub fn get_modified_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_Type_getModifiedType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the nullability of this pointer type, if applicable.
-    #[cfg(feature="clang_8_0")]
+    #[cfg(feature = "clang_8_0")]
     pub fn get_nullability(&self) -> Option<Nullability> {
         unsafe {
             match clang_Type_getNullability(self.raw) {
@@ -3305,33 +3372,37 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns the encoding of this Objective-C type, if applicable.
-    #[cfg(feature="clang_3_9")]
+    #[cfg(feature = "clang_3_9")]
     pub fn get_objc_encoding(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_Type_getObjCEncoding(self.raw)) }
     }
 
     /// Returns the base type of this Objective-C type, if applicable.
-    #[cfg(feature="clang_8_0")]
+    #[cfg(feature = "clang_8_0")]
     pub fn get_objc_object_base_type(&self) -> Option<Type> {
         unsafe { clang_Type_getObjCObjectBaseType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
     /// Returns the declarations for all protocol references for this Objective-C type, if applicable.
-    #[cfg(feature="clang_8_0")]
+    #[cfg(feature = "clang_8_0")]
     pub fn get_objc_protocol_declarations(&self) -> Vec<Entity<'tu>> {
         iter!(
             clang_Type_getNumObjCProtocolRefs(self.raw),
             clang_Type_getObjCProtocolDecl(self.raw),
-        ).map(|c| Entity::from_raw(c, self.tu)).collect()
+        )
+        .map(|c| Entity::from_raw(c, self.tu))
+        .collect()
     }
 
     /// Returns the type arguments for this Objective-C type, if applicable.
-    #[cfg(feature="clang_8_0")]
+    #[cfg(feature = "clang_8_0")]
     pub fn get_objc_type_arguments(&self) -> Vec<Type<'tu>> {
         iter!(
             clang_Type_getNumObjCTypeArgs(self.raw),
             clang_Type_getObjCTypeArg(self.raw),
-        ).map(|t| Type::from_raw(t, self.tu)).collect()
+        )
+        .map(|t| Type::from_raw(t, self.tu))
+        .collect()
     }
 
     /// Returns the pointee type for this pointer type, if applicable.
@@ -3370,11 +3441,12 @@ impl<'tu> Type<'tu> {
         iter_option!(
             clang_Type_getNumTemplateArguments(self.raw),
             clang_Type_getTemplateArgumentAsType(self.raw),
-        ).map(|i| i.map(|t| t.map(|t| Type::from_raw(t, self.tu))).collect())
+        )
+        .map(|i| i.map(|t| t.map(|t| Type::from_raw(t, self.tu))).collect())
     }
 
     /// Returns the typedef name of this type, if applicable.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn get_typedef_name(&self) -> Option<String> {
         unsafe { utility::to_string_option(clang_getTypedefName(self.raw)) }
     }
@@ -3388,7 +3460,7 @@ impl<'tu> Type<'tu> {
     pub fn is_elaborated(&self) -> Option<bool> {
         if self.raw.kind == 119 {
             Some(true)
-        } else if cfg!(feature="clang_3_9") {
+        } else if cfg!(feature = "clang_3_9") {
             Some(false)
         } else {
             None
@@ -3406,7 +3478,7 @@ impl<'tu> Type<'tu> {
     }
 
     /// Returns whether this type is a transparent tag typedef.
-    #[cfg(feature="clang_5_0")]
+    #[cfg(feature = "clang_5_0")]
     pub fn is_transparent_tag(&self) -> bool {
         unsafe { clang_Type_isTransparentTagTypedef(self.raw) != 0 }
     }
@@ -3424,7 +3496,7 @@ impl<'tu> Type<'tu> {
     /// Visits the fields in this record type, returning `None` if this type is not a record type
     /// and returning `Some(b)` otherwise where `b` indicates whether visitation was ended by the
     /// callback returning `false`.
-    #[cfg(feature="clang_3_7")]
+    #[cfg(feature = "clang_3_7")]
     pub fn visit_fields<F: FnMut(Entity<'tu>) -> bool>(&self, f: F) -> Option<bool> {
         if self.get_kind() != TypeKind::Record {
             return None;
@@ -3440,7 +3512,7 @@ impl<'tu> Type<'tu> {
             }
         }
 
-        extern fn visit(cursor: CXCursor, data: CXClientData) -> CXVisitorResult {
+        extern "C" fn visit(cursor: CXCursor, data: CXClientData) -> CXVisitorResult {
             unsafe {
                 let &mut (tu, ref mut callback) =
                     &mut *(data as *mut (&TranslationUnit, Box<dyn Callback>));
@@ -3480,7 +3552,8 @@ impl<'tu> Type<'tu> {
 
 impl<'tu> fmt::Debug for Type<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Type")
+        formatter
+            .debug_struct("Type")
             .field("kind", &self.get_kind())
             .field("display_name", &self.get_display_name())
             .finish()
@@ -3493,7 +3566,7 @@ impl<'tu> cmp::PartialEq for Type<'tu> {
     }
 }
 
-impl<'tu> cmp::Eq for Type<'tu> { }
+impl<'tu> cmp::Eq for Type<'tu> {}
 
 // Unsaved _______________________________________
 
@@ -3509,7 +3582,10 @@ impl Unsaved {
 
     /// Constructs a new `Unsaved`.
     pub fn new<P: AsRef<Path>, C: AsRef<str>>(path: P, contents: C) -> Unsaved {
-        Unsaved { path: utility::from_path(path), contents: utility::from_string(contents) }
+        Unsaved {
+            path: utility::from_path(path),
+            contents: utility::from_string(contents),
+        }
     }
 
     //- Accessors --------------------------------
@@ -3546,14 +3622,23 @@ impl Usr {
     /// Constructs a new `Usr` from an Objective-C class.
     pub fn from_objc_class<C: AsRef<str>>(class: C) -> Usr {
         let class = utility::from_string(class);
-        unsafe { Usr(utility::to_string(clang_constructUSR_ObjCClass(class.as_ptr()))) }
+        unsafe {
+            Usr(utility::to_string(clang_constructUSR_ObjCClass(
+                class.as_ptr(),
+            )))
+        }
     }
 
     /// Constructs a new `Usr` from an Objective-C instance variable.
     pub fn from_objc_ivar<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
-            unsafe { Usr(utility::to_string(clang_constructUSR_ObjCIvar(name.as_ptr(), s))) }
+            unsafe {
+                Usr(utility::to_string(clang_constructUSR_ObjCIvar(
+                    name.as_ptr(),
+                    s,
+                )))
+            }
         })
     }
 
@@ -3571,14 +3656,23 @@ impl Usr {
     pub fn from_objc_property<N: AsRef<str>>(class: &Usr, name: N) -> Usr {
         utility::with_string(&class.0, |s| {
             let name = utility::from_string(name);
-            unsafe { Usr(utility::to_string(clang_constructUSR_ObjCProperty(name.as_ptr(), s))) }
+            unsafe {
+                Usr(utility::to_string(clang_constructUSR_ObjCProperty(
+                    name.as_ptr(),
+                    s,
+                )))
+            }
         })
     }
 
     /// Constructs a new `Usr` from an Objective-C protocol.
     pub fn from_objc_protocol<P: AsRef<str>>(protocol: P) -> Usr {
         let string = utility::from_string(protocol);
-        unsafe { Usr(utility::to_string(clang_constructUSR_ObjCProtocol(string.as_ptr()))) }
+        unsafe {
+            Usr(utility::to_string(clang_constructUSR_ObjCProtocol(
+                string.as_ptr(),
+            )))
+        }
     }
 }
 
@@ -3599,7 +3693,11 @@ impl Version {
     //- Constructors -----------------------------
 
     fn from_raw(raw: CXVersion) -> Version {
-        Version { x: raw.Major as i32, y: raw.Minor as i32, z: raw.Subminor as i32 }
+        Version {
+            x: raw.Major as i32,
+            y: raw.Minor as i32,
+            z: raw.Subminor as i32,
+        }
     }
 }
 

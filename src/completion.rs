@@ -14,21 +14,21 @@
 
 //! Code completion.
 
+use std::cmp::{self, Ordering};
 use std::fmt;
+use std::marker::PhantomData;
 use std::mem;
+use std::path::PathBuf;
 use std::ptr;
 use std::slice;
-use std::cmp::{self, Ordering};
-use std::marker::{PhantomData};
-use std::path::{PathBuf};
 
 use clang_sys::*;
 
-use libc::{c_uint};
+use libc::c_uint;
 
-use utility;
+use super::diagnostic::Diagnostic;
 use super::{Availability, EntityKind, TranslationUnit, Unsaved, Usr};
-use super::diagnostic::{Diagnostic};
+use utility;
 
 //================================================
 // Enums
@@ -102,14 +102,14 @@ impl<'r> CompletionChunk<'r> {
             CompletionChunk::RightParenthesis => Some(")".into()),
             CompletionChunk::LeftSquareBracket => Some("[".into()),
             CompletionChunk::RightSquareBracket => Some("]".into()),
-            CompletionChunk::CurrentParameter(ref text) |
-            CompletionChunk::Informative(ref text) |
-            CompletionChunk::Placeholder(ref text) |
-            CompletionChunk::ResultType(ref text) |
-            CompletionChunk::TypedText(ref text) |
-            CompletionChunk::Text(ref text) |
-            CompletionChunk::HorizontalSpace(ref text) |
-            CompletionChunk::VerticalSpace(ref text) => Some(text.clone()),
+            CompletionChunk::CurrentParameter(ref text)
+            | CompletionChunk::Informative(ref text)
+            | CompletionChunk::Placeholder(ref text)
+            | CompletionChunk::ResultType(ref text)
+            | CompletionChunk::TypedText(ref text)
+            | CompletionChunk::Text(ref text)
+            | CompletionChunk::HorizontalSpace(ref text)
+            | CompletionChunk::VerticalSpace(ref text) => Some(text.clone()),
             CompletionChunk::Optional(_) => None,
         }
     }
@@ -153,11 +153,21 @@ impl<'tu> Completer<'tu> {
 
     #[doc(hidden)]
     pub fn new<F: Into<PathBuf>>(
-        tu: &'tu TranslationUnit<'tu>, file: F, line: u32, column: u32
+        tu: &'tu TranslationUnit<'tu>,
+        file: F,
+        line: u32,
+        column: u32,
     ) -> Completer<'tu> {
         let file = file.into();
         let flags = unsafe { clang_defaultCodeCompleteOptions() };
-        Completer { tu, file, line, column, unsaved: vec![], flags }
+        Completer {
+            tu,
+            file,
+            line,
+            column,
+            unsaved: vec![],
+            flags,
+        }
     }
 
     //- Mutators ---------------------------------
@@ -258,7 +268,10 @@ impl<'r> CompletionResult<'r> {
 
     fn from_raw(raw: CXCompletionResult) -> CompletionResult<'r> {
         let kind = unsafe { mem::transmute(raw.CursorKind) };
-        CompletionResult { kind, string: CompletionString::from_ptr(raw.CompletionString) }
+        CompletionResult {
+            kind,
+            string: CompletionString::from_ptr(raw.CompletionString),
+        }
     }
 }
 
@@ -297,7 +310,9 @@ impl CompletionResults {
         iter!(
             clang_codeCompleteGetNumDiagnostics(self.ptr),
             clang_codeCompleteGetDiagnostic(self.ptr),
-        ).map(|d| Diagnostic::from_ptr(d, tu)).collect()
+        )
+        .map(|d| Diagnostic::from_ptr(d, tu))
+        .collect()
     }
 
     /// Returns the code completion context for this set of code completion results, if any.
@@ -338,20 +353,26 @@ impl CompletionResults {
     pub fn get_results(&self) -> Vec<CompletionResult> {
         unsafe {
             let raws = slice::from_raw_parts((*self.ptr).Results, (*self.ptr).NumResults as usize);
-            raws.iter().cloned().map(CompletionResult::from_raw).collect()
+            raws.iter()
+                .cloned()
+                .map(CompletionResult::from_raw)
+                .collect()
         }
     }
 }
 
 impl Drop for CompletionResults {
     fn drop(&mut self) {
-        unsafe { clang_disposeCodeCompleteResults(self.ptr); }
+        unsafe {
+            clang_disposeCodeCompleteResults(self.ptr);
+        }
     }
 }
 
 impl fmt::Debug for CompletionResults {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompletionResults")
+        formatter
+            .debug_struct("CompletionResults")
             .field("results", &self.get_results())
             .finish()
     }
@@ -363,7 +384,7 @@ impl fmt::Debug for CompletionResults {
 #[derive(Copy, Clone)]
 pub struct CompletionString<'r> {
     ptr: CXCompletionString,
-    _marker: PhantomData<&'r CompletionResults>
+    _marker: PhantomData<&'r CompletionResults>,
 }
 
 impl<'r> CompletionString<'r> {
@@ -372,7 +393,10 @@ impl<'r> CompletionString<'r> {
     #[doc(hidden)]
     pub fn from_ptr(ptr: CXCompletionString) -> CompletionString<'r> {
         assert!(!ptr.is_null());
-        CompletionString { ptr, _marker: PhantomData }
+        CompletionString {
+            ptr,
+            _marker: PhantomData,
+        }
     }
 
     //- Accessors --------------------------------
@@ -388,7 +412,9 @@ impl<'r> CompletionString<'r> {
         iter!(
             clang_getCompletionNumAnnotations(self.ptr),
             clang_getCompletionAnnotation(self.ptr),
-        ).map(utility::to_string).collect()
+        )
+        .map(utility::to_string)
+        .collect()
     }
 
     /// Returns the availability of this completion string.
@@ -423,12 +449,14 @@ impl<'r> CompletionString<'r> {
         iter!(
             clang_getNumCompletionChunks(self.ptr),
             clang_getCompletionChunkKind(self.ptr),
-        ).enumerate().map(|(i, k)| {
+        )
+        .enumerate()
+        .map(|(i, k)| {
             macro_rules! text {
-                ($variant:ident) => ({
+                ($variant:ident) => {{
                     let text = unsafe { clang_getCompletionChunkText(self.ptr, i as c_uint) };
                     CompletionChunk::$variant(utility::to_string(text))
-                });
+                }};
             }
 
             match k {
@@ -456,16 +484,18 @@ impl<'r> CompletionString<'r> {
                     let i = i as c_uint;
                     let ptr = unsafe { clang_getCompletionChunkCompletionString(self.ptr, i) };
                     CompletionChunk::Optional(CompletionString::from_ptr(ptr))
-                },
+                }
                 _ => panic!("unexpected completion chunk kind: {:?}", k),
             }
-        }).collect()
+        })
+        .collect()
     }
 }
 
 impl<'r> fmt::Debug for CompletionString<'r> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("CompletionString")
+        formatter
+            .debug_struct("CompletionString")
             .field("chunks", &self.get_chunks())
             .finish()
     }
@@ -477,7 +507,7 @@ impl<'r> cmp::PartialEq for CompletionString<'r> {
     }
 }
 
-impl<'r> cmp::Eq for CompletionString<'r> { }
+impl<'r> cmp::Eq for CompletionString<'r> {}
 
 impl<'r> cmp::PartialOrd for CompletionString<'r> {
     fn partial_cmp(&self, other: &CompletionString<'r>) -> Option<Ordering> {
