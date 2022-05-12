@@ -1620,7 +1620,7 @@ static AVAILABLE: AtomicBool = AtomicBool::new(true);
 
 /// An empty type which prevents the use of this library from multiple threads simultaneously.
 #[derive(Debug)]
-pub struct Clang;
+pub struct Clang(());
 
 impl Clang {
     //- Constructors -----------------------------
@@ -1637,7 +1637,7 @@ impl Clang {
     #[cfg(feature="runtime")]
     pub fn new() -> Result<Clang, String> {
         if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
-            load().map(|_| Clang)
+            load().map(|_| Clang(()))
         } else {
             Err("an instance of `Clang` already exists".into())
         }
@@ -1653,7 +1653,7 @@ impl Clang {
     #[cfg(not(feature="runtime"))]
     pub fn new() -> Result<Clang, String> {
         if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
-            Ok(Clang)
+            Ok(Clang(()))
         } else {
             Err("an instance of `Clang` already exists".into())
         }
