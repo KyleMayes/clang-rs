@@ -1293,6 +1293,31 @@ fn test() {
         test_objc_object_type(&children);
     });
 
+    let source = "
+        void f(void)  __attribute__((availability(ios,unavailable))) __attribute__((availability(macos,introduced=10.1.1,deprecated=10.2,obsoleted=11)));
+    ";
+    with_entity(&clang, source, |e| {
+        let platform_availability = e.get_children().first().unwrap().get_platform_availability().unwrap();
+        assert_eq!(platform_availability, vec![
+            PlatformAvailability {
+                platform: "ios".to_string(),
+                unavailable: true,
+                introduced: None,
+                deprecated: None,
+                obsoleted: None,
+                message: None,
+            },
+            PlatformAvailability {
+                platform: "macos".to_string(),
+                unavailable: false,
+                introduced: Some(Version { x: 10, y: Some(1), z: Some(1) }),
+                deprecated: Some(Version { x: 10, y: Some(2), z: None }),
+                obsoleted: Some(Version { x: 11, y: None, z: None }),
+                message: None,
+            },
+        ])
+    });
+
     // Usr _______________________________________
 
     let class = Usr::from_objc_class("A");

@@ -236,7 +236,7 @@ impl Nullable for CXType {
 
 impl Nullable for CXVersion {
     fn map<U, F: FnOnce(CXVersion) -> U>(self, f: F) -> Option<U> {
-        if self.Major != -1 && self.Minor != -1 && self.Subminor != -1 {
+        if self.Major >= 0 {
             Some(f(self))
         } else {
             None
