@@ -1,4 +1,4 @@
-## [2.0.0] - UNRELEASED
+## [2.0.0] - 2022-05-18
 
 ### Changed
 - Made `Clang` struct impossible to construct directly
