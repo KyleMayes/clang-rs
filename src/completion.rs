@@ -116,10 +116,7 @@ impl<'r> CompletionChunk<'r> {
 
     /// Returns whether this completion chunk is optional.
     pub fn is_optional(&self) -> bool {
-        match *self {
-            CompletionChunk::Optional(_) => true,
-            _ => false,
-        }
+        matches!(*self, CompletionChunk::Optional(_))
     }
 }
 

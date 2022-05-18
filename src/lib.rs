@@ -16,7 +16,7 @@
 
 #![warn(missing_copy_implementations, missing_debug_implementations, missing_docs)]
 
-#![allow(non_upper_case_globals)]
+#![allow(non_upper_case_globals, clippy::result_unit_err)]
 
 extern crate clang_sys;
 extern crate libc;
@@ -823,11 +823,8 @@ impl EntityKind {
 
     /// Returns whether this entity is valid. If false, the entity represents an error condition.
     pub fn is_valid(&self) -> bool {
-        match *self as c_int {
-            // 75 is in case a couple more are added
-            70..=75 => false,
-            _ => true,
-        }
+        // 75 is in case a couple more are added
+        !matches!(*self as c_int, 70..=75)
     }
 }
 

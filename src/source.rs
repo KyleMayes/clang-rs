@@ -281,7 +281,7 @@ impl<'tu> cmp::Eq for Module<'tu> { }
 
 macro_rules! location {
     ($function:ident, $location:expr, $tu:expr) => ({
-        fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() };
+        fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() }
         let (mut file, mut line, mut column, mut offset) = (uninit(), uninit(), uninit(), uninit());
         $function(
             $location,
@@ -337,7 +337,7 @@ impl<'tu> SourceLocation<'tu> {
     /// account.
     pub fn get_presumed_location(&self) -> (String, u32, u32) {
         unsafe {
-            fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() };
+            fn uninit<T>() -> mem::MaybeUninit<T> { mem::MaybeUninit::uninit() }
             let (mut file, mut line, mut column) = (uninit(), uninit(), uninit());
             clang_getPresumedLocation(
                 self.raw, file.as_mut_ptr(), line.as_mut_ptr(), column.as_mut_ptr());
