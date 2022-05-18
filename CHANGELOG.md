@@ -1,3 +1,13 @@
+## [2.0.0] - UNRELEASED
+
+### Changed
+- Made `Clang` struct impossible to construct directly
+- Disabled `Send` and `Sync` for `Clang` struct
+- Make `y` and `z` components of `Version` struct optional
+
+### Fixed
+- Fix null check for `Version` struct to only check sign of major version
+
 ## [1.0.3] - 2020-11-29
 
 ### Fixed
