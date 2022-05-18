@@ -39,6 +39,7 @@ use std::mem;
 use std::ptr;
 use std::slice;
 use std::collections::{HashMap};
+use std::convert::TryInto;
 use std::ffi::{CString};
 use std::marker::{PhantomData};
 use std::path::{Path, PathBuf};
@@ -3588,18 +3589,22 @@ impl Usr {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Version {
     /// The `x` component of the version number.
-    pub x: i32,
+    pub x: u32,
     /// The `y` component of the version number.
-    pub y: i32,
+    pub y: Option<u32>,
     /// The `z` component of the version number.
-    pub z: i32,
+    pub z: Option<u32>,
 }
 
 impl Version {
     //- Constructors -----------------------------
 
     fn from_raw(raw: CXVersion) -> Version {
-        Version { x: raw.Major as i32, y: raw.Minor as i32, z: raw.Subminor as i32 }
+        Version {
+            x: raw.Major as u32,
+            y: raw.Minor.try_into().ok(),
+            z: raw.Subminor.try_into().ok()
+        }
     }
 }
 
