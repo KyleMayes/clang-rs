@@ -43,7 +43,6 @@ use std::convert::TryInto;
 use std::ffi::{CString};
 use std::marker::{PhantomData};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{self, AtomicBool};
 
 use clang_sys::*;
 
@@ -769,7 +768,7 @@ pub enum EntityKind {
     /// `__attribute__((clang::convergent))`
     ///
     /// Only produced by `libclang` 9.0 and later.
-    ConvergentAttr  = 438,
+    ConvergentAttr = 438,
     /// Only produced by `libclang` 9.0 and later.
     WarnUnusedAttr = 439,
     /// `__attribute__((nodiscard))`
@@ -1614,13 +1613,13 @@ impl Visibility {
 
 // Clang _________________________________________
 
-type PhantomUnsendUnsync = PhantomData<*mut ()>;
-
-static AVAILABLE: AtomicBool = AtomicBool::new(true);
-
 /// An empty type which prevents the use of this library from multiple threads simultaneously.
 #[derive(Debug)]
-pub struct Clang(PhantomUnsendUnsync);
+#[non_exhaustive]
+pub struct Clang {
+    #[cfg(feature = "runtime")]
+    libclang: Option<std::rc::Rc<clang_sys::SharedLibrary>>,
+}
 
 impl Clang {
     //- Constructors -----------------------------
@@ -1631,16 +1630,12 @@ impl Clang {
     ///
     /// # Failures
     ///
-    /// * an instance of `Clang` already exists
     /// * a `libclang` shared library could not be found
     /// * a `libclang` shared library symbol could not be loaded
-    #[cfg(feature="runtime")]
+    #[cfg(feature = "runtime")]
     pub fn new() -> Result<Clang, String> {
-        if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
-            load().map(|_| Clang(PhantomData))
-        } else {
-            Err("an instance of `Clang` already exists".into())
-        }
+        let library = load()?;
+        Ok(Clang { libclang: Some(library) })
     }
 
     /// Constructs a new `Clang`.
@@ -1650,28 +1645,21 @@ impl Clang {
     /// # Failures
     ///
     /// * an instance of `Clang` already exists
-    #[cfg(not(feature="runtime"))]
+    #[cfg(not(feature = "runtime"))]
     pub fn new() -> Result<Clang, String> {
-        if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
-            Ok(Clang(PhantomData))
-        } else {
-            Err("an instance of `Clang` already exists".into())
+        Ok(Clang {})
+    }
+}
+
+impl Drop for Clang {
+    fn drop(&mut self) {
+        #[cfg(feature = "runtime")]
+        {
+            // Drop the contained reference so the `unload` call below can actually
+            // succeed for the last `Clang` instance.
+            drop(self.libclang.take());
+            let _ = unload();
         }
-    }
-}
-
-#[cfg(feature="runtime")]
-impl Drop for Clang {
-    fn drop(&mut self) {
-        unload().unwrap();
-        AVAILABLE.store(true, atomic::Ordering::SeqCst);
-    }
-}
-
-#[cfg(not(feature="runtime"))]
-impl Drop for Clang {
-    fn drop(&mut self) {
-        AVAILABLE.store(true, atomic::Ordering::SeqCst);
     }
 }
 
