@@ -1618,7 +1618,7 @@ impl Visibility {
 #[non_exhaustive]
 pub struct Clang {
     #[cfg(feature = "runtime")]
-    libclang: Option<std::rc::Rc<clang_sys::SharedLibrary>>,
+    libclang: Option<std::sync::Arc<clang_sys::SharedLibrary>>,
 }
 
 impl Clang {
@@ -1634,7 +1634,11 @@ impl Clang {
     /// * a `libclang` shared library symbol could not be loaded
     #[cfg(feature = "runtime")]
     pub fn new() -> Result<Clang, String> {
-        let library = load()?;
+        if !clang_sys::is_loaded() {
+            clang_sys::load()?;
+        }
+
+        let mut library = clang_sys::get_library().unwrap();
         Ok(Clang { libclang: Some(library) })
     }
 
@@ -1655,10 +1659,11 @@ impl Drop for Clang {
     fn drop(&mut self) {
         #[cfg(feature = "runtime")]
         {
-            // Drop the contained reference so the `unload` call below can actually
-            // succeed for the last `Clang` instance.
+            // Drop the contained reference so the `unload` call below actually
+            // unloads the the last `libclang` instance.
             drop(self.libclang.take());
-            let _ = unload();
+
+            let _ = clang_sys::unload();
         }
     }
 }

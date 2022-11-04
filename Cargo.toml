@@ -46,6 +46,3 @@ harness = true
 [package.metadata.docs.rs]
 
 features = ["clang_10_0"]
-
-[patch.crates-io]
-clang-sys = { git = "https://github.com/reitermarkus/clang-sys", branch = "load-api" }
