@@ -1672,9 +1672,13 @@ impl Drop for Clang {
         {
             // Drop the contained reference so the `unload` call below actually
             // unloads the the last `libclang` instance.
-            drop(self.libclang.take());
+            let libclang = self.libclang.take().unwrap();
+            let unload = std::sync::Arc::strong_count(&libclang) == 1;
+            drop(libclang);
 
-            let _ = clang_sys::unload();
+            if unload {
+                let _ = clang_sys::unload();
+            }
         }
     }
 }
