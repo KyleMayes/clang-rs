@@ -32,6 +32,7 @@ pub mod token;
 
 pub mod sonar;
 
+use std::cell::Cell;
 use std::cmp;
 use std::fmt;
 use std::hash;
@@ -1615,6 +1616,10 @@ impl Visibility {
 
 type PhantomUnsendUnsync = PhantomData<*mut ()>;
 
+thread_local! {
+  static CLANG_ACTIVE: Cell<bool> = Cell::new(false);
+}
+
 /// An empty type which prevents the use of this library from multiple threads simultaneously.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -1627,38 +1632,36 @@ pub struct Clang {
 impl Clang {
     //- Constructors -----------------------------
 
-    /// Constructs a new `Clang`.
+    /// Constructs a new `Clang` instance.
     ///
-    /// Only one instance of `Clang` is allowed per thread.
+    /// Only one `Clang` instance is allowed per thread.
     ///
     /// # Failures
     ///
-    /// * a `libclang` shared library could not be found
-    /// * a `libclang` shared library symbol could not be loaded
-    #[cfg(feature = "runtime")]
+    /// * a `Clang` instance already exists for this thread
+    #[cfg_attr(feature = "runtime", doc = "* a `libclang` shared library could not be found")]
+    #[cfg_attr(feature = "runtime", doc = "* a `libclang` shared library symbol could not be loaded")]
     pub fn new() -> Result<Clang, String> {
-        if !clang_sys::is_loaded() {
-            clang_sys::load()?;
+        CLANG_ACTIVE.with(|clang_active| {
+            if clang_active.get() {
+                Err("an instance of `Clang` already exists".to_string())
+            } else {
+                clang_active.set(true);
+                Ok(())
+            }
+        })?;
+
+        #[cfg(feature = "runtime")]
+        {
+            if !clang_sys::is_loaded() {
+                clang_sys::load()?;
+            }
         }
 
-        let library = clang_sys::get_library().unwrap();
         Ok(Clang {
-            libclang: Some(library),
-            unsend_unsync: PhantomUnsendUnsync,
-        })
-    }
-
-    /// Constructs a new `Clang`.
-    ///
-    /// Only one instance of `Clang` is allowed per thread.
-    ///
-    /// # Failures
-    ///
-    /// * an instance of `Clang` already exists
-    #[cfg(not(feature = "runtime"))]
-    pub fn new() -> Result<Clang, String> {
-        Ok(Clang {
-            unsend_unsync: PhantomUnsendUnsync,
+            #[cfg(feature = "runtime")]
+            libclang: Some(clang_sys::get_library().unwrap()),
+            unsend_unsync: PhantomData,
         })
     }
 }
