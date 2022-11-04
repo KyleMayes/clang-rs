@@ -1613,12 +1613,15 @@ impl Visibility {
 
 // Clang _________________________________________
 
+type PhantomUnsendUnsync = PhantomData<*mut ()>;
+
 /// An empty type which prevents the use of this library from multiple threads simultaneously.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Clang {
     #[cfg(feature = "runtime")]
     libclang: Option<std::sync::Arc<clang_sys::SharedLibrary>>,
+    unsend_unsync: PhantomUnsendUnsync,
 }
 
 impl Clang {
@@ -1626,7 +1629,7 @@ impl Clang {
 
     /// Constructs a new `Clang`.
     ///
-    /// Only one instance of `Clang` is allowed at a time.
+    /// Only one instance of `Clang` is allowed per thread.
     ///
     /// # Failures
     ///
@@ -1639,19 +1642,24 @@ impl Clang {
         }
 
         let mut library = clang_sys::get_library().unwrap();
-        Ok(Clang { libclang: Some(library) })
+        Ok(Clang {
+            libclang: Some(library),
+            unsend_unsync: PhantomUnsendUnsync,
+        })
     }
 
     /// Constructs a new `Clang`.
     ///
-    /// Only one instance of `Clang` is allowed at a time.
+    /// Only one instance of `Clang` is allowed per thread.
     ///
     /// # Failures
     ///
     /// * an instance of `Clang` already exists
     #[cfg(not(feature = "runtime"))]
     pub fn new() -> Result<Clang, String> {
-        Ok(Clang {})
+        Ok(Clang {
+            unsend_unsync: PhantomUnsendUnsync,
+        })
     }
 }
 
