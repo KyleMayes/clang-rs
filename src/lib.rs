@@ -1641,7 +1641,7 @@ impl Clang {
             clang_sys::load()?;
         }
 
-        let mut library = clang_sys::get_library().unwrap();
+        let library = clang_sys::get_library().unwrap();
         Ok(Clang {
             libclang: Some(library),
             unsend_unsync: PhantomUnsendUnsync,
