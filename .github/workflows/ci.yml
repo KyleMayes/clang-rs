@@ -19,11 +19,11 @@ jobs:
         rust: ["1.40.0"]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       # LLVM and Clang
       - name: Cache LLVM and Clang
         id: cache-llvm
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}
           key: ${{ matrix.os }}-llvm-${{ matrix.clang[0] }}
