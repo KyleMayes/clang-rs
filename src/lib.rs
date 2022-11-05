@@ -2505,7 +2505,7 @@ impl<'tu> Entity<'tu> {
     /// is the parent of that AST entity. The return value of the callback determines how visitation
     /// will proceed.
     pub fn visit_children<F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult>(
-        &self, f: F
+        &self, mut f: F
     ) -> bool {
         trait EntityCallback<'tu> {
             fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult;
@@ -2523,7 +2523,7 @@ impl<'tu> Entity<'tu> {
         ) -> CXChildVisitResult {
             unsafe {
                 let &mut (tu, ref mut callback) =
-                    &mut *(data as *mut (&TranslationUnit, Box<dyn EntityCallback>));
+                    &mut *(data as *mut (&TranslationUnit, &mut dyn EntityCallback));
 
                 let entity = Entity::from_raw(cursor, tu);
                 let parent = Entity::from_raw(parent, tu);
@@ -2531,7 +2531,7 @@ impl<'tu> Entity<'tu> {
             }
         }
 
-        let mut data = (self.tu, Box::new(f) as Box<dyn EntityCallback>);
+        let mut data = (self.tu, &mut f as &mut dyn EntityCallback);
         unsafe { clang_visitChildren(self.raw, visit, utility::addressof(&mut data)) != 0 }
     }
 
