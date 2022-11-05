@@ -35,23 +35,15 @@ jobs:
           cached: ${{ steps.cache-llvm.outputs.cache-hit }}
       # Rust
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
+        uses: dtolnay/rust-toolchain@1.40.0
       # Test
       - name: Cargo Test (Dynamic)
-        uses: actions-rs/cargo@v1
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/lib
           LLVM_CONFIG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/bin/llvm-config
-        with:
-          command: test
-          args: --verbose --features ${{ matrix.clang[1] }} -- --nocapture
+        run: cargo test --verbose --features ${{ matrix.clang[1] }} -- --nocapture
       - name: Cargo Test (Runtime)
-        uses: actions-rs/cargo@v1
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/lib
           LLVM_CONFIG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/bin/llvm-config
-        with:
-          command: test
-          args: --verbose --features "${{ matrix.clang[1] }} runtime" -- --nocapture
+        run: cargo test --verbose --features "${{ matrix.clang[1] }} runtime" -- --nocapture
