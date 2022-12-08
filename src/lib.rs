@@ -1668,6 +1668,10 @@ impl Clang {
 
 impl Drop for Clang {
     fn drop(&mut self) {
+        CLANG_ACTIVE.with(|clang_active| {
+            clang_active.set(false);
+        });
+
         #[cfg(feature = "runtime")]
         {
             // Drop the contained reference so the `unload` call below actually
