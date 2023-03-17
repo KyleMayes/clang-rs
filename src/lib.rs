@@ -2885,7 +2885,7 @@ impl PlatformAvailability {
 
     fn from_raw(raw: CXPlatformAvailability) -> PlatformAvailability {
         PlatformAvailability {
-            platform: utility::to_string(raw.Platform),
+            platform: unsafe { utility::to_string(raw.Platform) },
             unavailable: raw.Unavailable != 0,
             introduced: raw.Introduced.map(Version::from_raw),
             deprecated: raw.Deprecated.map(Version::from_raw),
@@ -3140,7 +3140,7 @@ impl<'i> fmt::Debug for TranslationUnit<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let spelling = unsafe { clang_getTranslationUnitSpelling(self.ptr) };
         formatter.debug_struct("TranslationUnit")
-            .field("spelling", &utility::to_string(spelling))
+            .field("spelling", unsafe { &utility::to_string(spelling) })
             .finish()
     }
 }
@@ -3540,7 +3540,7 @@ impl Usr {
         let class = utility::from_string(class);
         let category = utility::from_string(category);
         let raw = unsafe { clang_constructUSR_ObjCCategory(class.as_ptr(), category.as_ptr()) };
-        Usr(utility::to_string(raw))
+        Usr(unsafe { utility::to_string(raw) })
     }
 
     /// Constructs a new `Usr` from an Objective-C class.
@@ -3563,7 +3563,7 @@ impl Usr {
             let name = utility::from_string(name);
             let instance = instance as c_uint;
             let raw = unsafe { clang_constructUSR_ObjCMethod(name.as_ptr(), instance, s) };
-            Usr(utility::to_string(raw))
+            Usr(unsafe { utility::to_string(raw) })
         })
     }
 
