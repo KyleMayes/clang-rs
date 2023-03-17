@@ -257,7 +257,7 @@ pub fn from_path<P: AsRef<Path>>(path: P) -> CString {
 }
 
 pub fn to_path(clang: CXString) -> PathBuf {
-    let rust_string = to_string(clang);
+    let rust_string = unsafe { to_string(clang) };
     PathBuf::from(rust_string)
 }
 
@@ -266,12 +266,10 @@ pub fn from_string<S: AsRef<str>>(string: S) -> CString {
 }
 
 pub unsafe fn to_string(clang: CXString) -> String {
-     {
         let c = CStr::from_ptr(clang_getCString(clang));
         let rust = c.to_str().expect("invalid Rust string").into();
         clang_disposeString(clang);
         rust
-    }
 }
 
 pub fn to_string_option(clang: CXString) -> Option<String> {
