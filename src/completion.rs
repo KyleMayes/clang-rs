@@ -424,7 +424,7 @@ impl<'r> CompletionString<'r> {
             macro_rules! text {
                 ($variant:ident) => ({
                     let text = unsafe { clang_getCompletionChunkText(self.ptr, i as c_uint) };
-                    CompletionChunk::$variant(utility::to_string(text))
+                    CompletionChunk::$variant(unsafe { utility::to_string(text) })
                 });
             }
 
