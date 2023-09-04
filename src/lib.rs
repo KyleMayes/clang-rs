@@ -2417,6 +2417,12 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_CXXMethod_isDefaulted(self.raw) != 0 }
     }
 
+    /// Returns whether this AST entity is a C++ deleted method.
+    #[cfg(feature="clang_16_0")]
+    pub fn is_deleted(&self) -> bool {
+        unsafe { clang_CXXMethod_isDeleted(self.raw) != 0 }
+    }
+
     /// Returns whether this AST entity is a declaration and also the definition of that
     /// declaration.
     pub fn is_definition(&self) -> bool {
@@ -2496,6 +2502,18 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is a virtual method.
     pub fn is_virtual_method(&self) -> bool {
         unsafe { clang_CXXMethod_isVirtual(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a copy-assignment operator.
+    #[cfg(feature="clang_16_0")]
+    pub fn is_copy_assignment_operator(&self) -> bool {
+        unsafe { clang_CXXMethod_isCopyAssignmentOperator(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a move-assignment operator.
+    #[cfg(feature="clang_16_0")]
+    pub fn is_move_assignment_operator(&self) -> bool {
+        unsafe { clang_CXXMethod_isMoveAssignmentOperator(self.raw) != 0 }
     }
 
     /// Visits the children of this AST entity recursively and returns whether visitation was ended
@@ -3337,6 +3355,20 @@ impl<'tu> Type<'tu> {
     /// Returns the pointee type for this pointer type, if applicable.
     pub fn get_pointee_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getPointeeType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the unqualified variant of this type, removing as little sugar as possible, or, if
+    /// this is type is not qualified, returns this type.
+    #[cfg(feature="clang_16_0")]
+    pub fn get_unqualified_type(&self) -> Type<'tu> {
+        unsafe { Type::from_raw(clang_getUnqualifiedType(self.raw), self.tu) }
+    }
+
+    /// Returns the type that this reference refers to, or, if this is not a reference type, returns
+    /// this type.
+    #[cfg(feature="clang_16_0")]
+    pub fn get_non_reference_type(&self) -> Type<'tu> {
+        unsafe { Type::from_raw(clang_getNonReferenceType(self.raw), self.tu) }
     }
 
     /// Returns the ref qualifier for this C++ function or method type, if applicable.
