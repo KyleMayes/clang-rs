@@ -1403,6 +1403,32 @@ fn test() {
         ])
     });
 
+    let source = "
+        int a = 322;
+        const b = 456;
+        int& c = a;
+        const int& d = b;
+        int&& e = a;
+        int&& f = c;
+    ";
+
+    with_types(&clang, source, |ts| {
+        #[cfg(feature="clang_16_0")]
+        fn test_get_non_reference_type(ts: &[Type]) {
+            assert_eq!(ts[0].get_non_reference_type(), ts[0]);
+            assert_eq!(ts[1].get_non_reference_type(), ts[1]);
+            assert_eq!(ts[2].get_non_reference_type(), ts[0]);
+            assert_eq!(ts[3].get_non_reference_type(), ts[1]);
+            assert_eq!(ts[4].get_non_reference_type(), ts[0]);
+            assert_eq!(ts[5].get_non_reference_type(), ts[0]);
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_get_non_reference_type(_: &[Type]) {}
+
+        test_get_non_reference_type(&ts[..])
+    });
+
     // Usr _______________________________________
 
     let class = Usr::from_objc_class("A");
