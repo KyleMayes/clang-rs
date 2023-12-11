@@ -980,8 +980,8 @@ fn test() {
 
         #[cfg(feature="clang_16_0")]
         fn test_get_unqualified_type<'tu>(children: &[Entity<'tu>]) {
-            let types = children.map(|it| it.get_type().unwrap()).collect::<Vec<_>>();
-            assert_eq!(types[3].get_unqualified_type(), types[2]);
+            let types = children.iter().map(|it| it.get_type().unwrap()).collect::<Vec<_>>();
+            assert_eq!(types[3].get_unqualified_type(), types[0]);
             assert_eq!(types[2].get_unqualified_type(), types[0]);
             assert_eq!(types[1].get_unqualified_type(), types[0]);
             assert_eq!(types[0].get_unqualified_type(), types[0]);
