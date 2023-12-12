@@ -36,7 +36,6 @@ use std::cmp;
 use std::fmt;
 use std::hash;
 use std::mem;
-use std::mem::size_of;
 use std::ptr;
 use std::slice;
 use std::collections::{HashMap};
@@ -49,6 +48,9 @@ use std::sync::atomic::{self, AtomicBool};
 use clang_sys::*;
 
 use libc::{c_int, c_uint, c_ulong};
+
+#[cfg(feature="clang_17_0")]
+use libc::c_uchar;
 
 use completion::{Completer, CompletionString};
 use diagnostic::{Diagnostic};
@@ -167,6 +169,31 @@ impl CallingConvention {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
             1..=15 | 200 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+}
+
+// Choice ________________________________________
+
+/// Indicates if an option should be enabled or disabled.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg(feature = "clang_17_0")]
+pub enum Choice {
+    /// Use the default value of an option.
+    Default = 0,
+    /// Enable the option.
+    Enabled = 1,
+    /// Disable the option.
+    Disabled = 2,
+}
+
+#[cfg(feature = "clang_17_0")]
+impl Choice {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            1..=2 => Some(unsafe { mem::transmute(raw) }),
             _ => None,
         }
     }
@@ -645,7 +672,7 @@ pub enum EntityKind {
     /// Only produced by `libclang` 10.0 and later.
     OmpParallelMasterDirective = 285,
     /// The top-level AST entity which acts as the root for the other entitys.
-    TranslationUnit = 300,
+    TranslationUnit = if cfg!(feature="clang_16_0") { 350 } else { 300 },
     /// An attribute whose specific kind is not exposed via this interface.
     UnexposedAttr = 400,
     /// An attribute applied to an Objective-C IBAction.
@@ -810,7 +837,7 @@ pub enum EntityKind {
 impl EntityKind {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
-            1..=50 | 70..=73 | 100..=149 | 200..=280 | 300 | 400..=441 | 500..=503 | 600..=603
+            1..=50 | 70..=73 | 100..=149 | 200..=280 | 300 | 350 | 400..=441 | 500..=503 | 600..=603
             | 700 => {
                 Some(unsafe { mem::transmute(raw) })
             }
@@ -2680,6 +2707,7 @@ impl<'c> Index<'c> {
     /// Constructs a new `Index` with options.
     ///
     /// `options` determines the options associated with the newly created `Index`.
+    #[cfg(feature="clang_17_0")]
     pub fn new_with_options(_: &'c Clang, options: &IndexOptions) -> Index<'c> {
         unsafe { Index::from_ptr(clang_createIndexWithOptions(options.as_raw())) }
     }
@@ -2725,19 +2753,27 @@ impl<'c> fmt::Debug for Index<'c> {
     }
 }
 
-// IndexOptions _______________________________________
+// IndexOptions __________________________________
 
 /// Options to explicitly initialize an `Index`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg(feature="clang_17_0")]
 pub struct IndexOptions {
-    pub thread_background_priority_for_indexing: CXChoice,
-    pub thread_background_priority_for_editing: CXChoice,
+    /// An enumerator indicating the indexing priority policy.
+    pub thread_background_priority_for_indexing: Choice,
+    /// An enumerator indicating the editing priority policy.
+    pub thread_background_priority_for_editing: Choice,
+    /// Specifies if declarations in precompiled headers should be ignored.
     pub exclude_declarations_from_pch: bool,
+    /// Specifies if diagnostics should be displayed.
     pub display_diagnostics: bool,
+    /// Specifies if precompiled headers should be stored in memory.
     pub store_preambles_in_memory: bool,
-    pub preamble_storage_path: CString,
-    pub invocation_emission_path: CString,
+    /// Path to directory where temporary precompiled headers should be stored.
+    /// Ignored if `store_preambles_in_memory` is `true`.
+    pub preamble_storage_path: Option<CString>,
+    /// Path to a directory where certain `libclang` invocations will place logs.
+    pub invocation_emission_path: Option<CString>,
 }
 
 #[cfg(feature="clang_17_0")]
@@ -2745,8 +2781,24 @@ impl IndexOptions {
     //- Constructors -----------------------------
 
     /// Constructs a new `IndexOptions`.
-    pub fn new<P: AsRef<Path>, C: AsRef<str>>(path: P, contents: C) -> Unsaved {
-        Unsaved { path: utility::from_path(path), contents: utility::from_string(contents) }
+    pub fn new(
+        thread_background_priority_for_indexing: Choice,
+        thread_background_priority_for_editing: Choice,
+        exclude_declarations_from_pch: bool,
+        display_diagnostics: bool,
+        store_preambles_in_memory: bool,
+        preamble_storage_path: Option<&Path>,
+        invocation_emission_path: Option<&Path>
+    ) -> IndexOptions {
+        IndexOptions {
+            thread_background_priority_for_indexing,
+            thread_background_priority_for_editing,
+            exclude_declarations_from_pch,
+            display_diagnostics,
+            store_preambles_in_memory,
+            preamble_storage_path: preamble_storage_path.map(utility::from_path),
+            invocation_emission_path: invocation_emission_path.map(utility::from_path)
+        }
     }
 
     //- Accessors --------------------------------
@@ -2767,12 +2819,12 @@ impl IndexOptions {
         }
 
         CXIndexOptions {
-            Size: size_of::<CXIndexOptions>() as c_uint,
-            ThreadBackgroundPriorityForIndexing: self.thread_background_priority_for_indexing,
-            ThreadBackgroundPriorityForEditing: self.thread_background_priority_for_editing,
+            Size: mem::size_of::<CXIndexOptions>() as c_uint,
+            ThreadBackgroundPriorityForIndexing: self.thread_background_priority_for_indexing as c_uchar,
+            ThreadBackgroundPriorityForEditing: self.thread_background_priority_for_editing as c_uchar,
             flags,
-            PreambleStoragePath: self.preamble_storage_path.as_ptr(),
-            InvocationEmissionPath: self.invocation_emission_path.as_ptr(),
+            PreambleStoragePath: self.preamble_storage_path.as_ref().map_or_else(ptr::null, |s| s.as_ptr()),
+            InvocationEmissionPath: self.invocation_emission_path.as_ref().map_or_else(ptr::null, |s| s.as_ptr()),
         }
     }
 }
