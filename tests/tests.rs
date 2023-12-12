@@ -337,8 +337,8 @@ fn test() {
         assert_eq!(children.len(), 2);
 
         assert_eq!(children[0].get_bit_field_width(), None);
-        assert_eq!(children[0].get_name(), None);
-        assert_eq!(children[0].get_display_name(), None);
+        assert!(children[0].get_name().is_some_and(|n| n.starts_with("(anonymous struct at ")));
+        assert!(children[0].get_display_name().is_some_and(|n| n.starts_with("(anonymous struct at ")));
         assert!(!children[0].is_bit_field());
 
         if !cfg!(target_os="windows") {
@@ -800,6 +800,39 @@ fn test() {
 
         assert!(!children[1].is_dynamic_call());
         assert!(children[2].is_dynamic_call());
+    });
+
+    let source = "
+        class A {
+            A(int b);
+            operator int();
+
+            explicit A(float b);
+            explicit operator float();
+
+            explicit(1 + 4 == 8) A(short b);
+            explicit(1 + 4 == 5) operator(short b);
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_17_0")]
+        fn test_is_explicit(children: &[Entity]) {
+            assert!(!children[0].is_explicit());
+            assert!(!children[1].is_explicit());
+            assert!(children[2].is_explicit());
+            assert!(children[3].is_explicit());
+            assert!(!children[4].is_explicit());
+            assert!(children[5].is_explicit());
+        }
+
+        #[cfg(not(feature="clang_17_0"))]
+        fn test_is_explicit(_: &[Entity]) { }
+
+        let children = e.get_children();
+        assert_eq!(children.len(), 6);
+
+        test_is_explicit(&children[..]);
     });
 
     let source = r#"

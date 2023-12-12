@@ -36,6 +36,7 @@ use std::cmp;
 use std::fmt;
 use std::hash;
 use std::mem;
+use std::mem::size_of;
 use std::ptr;
 use std::slice;
 use std::collections::{HashMap};
@@ -2437,6 +2438,12 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_Cursor_isDynamicCall(self.raw) != 0 }
     }
 
+    /// Returns whether this AST entity is a constructor or conversion method declared explicit.
+    #[cfg(feature="clang_17_0")]
+    pub fn is_explicit(&self) -> bool {
+        unsafe { clang_CXXMethod_isExplicit(self.raw) != 0 }
+    }
+
     /// Returns whether this AST entity is a function-like macro.
     #[cfg(feature="clang_3_9")]
     pub fn is_function_like_macro(&self) -> bool {
@@ -2670,6 +2677,13 @@ impl<'c> Index<'c> {
         unsafe { Index::from_ptr(clang_createIndex(exclude as c_int, diagnostics as c_int)) }
     }
 
+    /// Constructs a new `Index` with options.
+    ///
+    /// `options` determines the options associated with the newly created `Index`.
+    pub fn new_with_options(_: &'c Clang, options: &IndexOptions) -> Index<'c> {
+        unsafe { Index::from_ptr(clang_createIndexWithOptions(options.as_raw())) }
+    }
+
     //- Accessors --------------------------------
 
     /// Returns a parser for the supplied file.
@@ -2708,6 +2722,58 @@ impl<'c> fmt::Debug for Index<'c> {
         formatter.debug_struct("Index")
             .field("thread_options", &self.get_thread_options())
             .finish()
+    }
+}
+
+// IndexOptions _______________________________________
+
+/// Options to explicitly initialize an `Index`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg(feature="clang_17_0")]
+pub struct IndexOptions {
+    pub thread_background_priority_for_indexing: CXChoice,
+    pub thread_background_priority_for_editing: CXChoice,
+    pub exclude_declarations_from_pch: bool,
+    pub display_diagnostics: bool,
+    pub store_preambles_in_memory: bool,
+    pub preamble_storage_path: CString,
+    pub invocation_emission_path: CString,
+}
+
+#[cfg(feature="clang_17_0")]
+impl IndexOptions {
+    //- Constructors -----------------------------
+
+    /// Constructs a new `IndexOptions`.
+    pub fn new<P: AsRef<Path>, C: AsRef<str>>(path: P, contents: C) -> Unsaved {
+        Unsaved { path: utility::from_path(path), contents: utility::from_string(contents) }
+    }
+
+    //- Accessors --------------------------------
+
+    fn as_raw(&self) -> CXIndexOptions {
+        let mut flags = 0;
+        
+        if self.exclude_declarations_from_pch {
+            flags |= CXIndexOptions_ExcludeDeclarationsFromPCH;
+        }
+
+        if self.display_diagnostics {
+            flags |= CXIndexOptions_DisplayDiagnostics;
+        }
+
+        if self.store_preambles_in_memory {
+            flags |= CXIndexOptions_StorePreamblesInMemory;
+        }
+
+        CXIndexOptions {
+            Size: size_of::<CXIndexOptions>() as c_uint,
+            ThreadBackgroundPriorityForIndexing: self.thread_background_priority_for_indexing,
+            ThreadBackgroundPriorityForEditing: self.thread_background_priority_for_editing,
+            flags,
+            PreambleStoragePath: self.preamble_storage_path.as_ptr(),
+            InvocationEmissionPath: self.invocation_emission_path.as_ptr(),
+        }
     }
 }
 

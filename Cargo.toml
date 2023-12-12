@@ -30,13 +30,14 @@ clang_8_0 = ["clang-sys/clang_8_0", "clang_7_0"]
 clang_9_0 = ["clang-sys/clang_9_0", "clang_8_0"]
 clang_10_0 = ["clang-sys/clang_10_0", "clang_9_0"]
 clang_16_0 = ["clang-sys/clang_16_0", "clang_10_0"]
+clang_17_0 = ["clang-sys/clang_17_0", "clang_16_0"]
 
 runtime = ["clang-sys/runtime"]
 static = ["clang-sys/static"]
 
 [dependencies]
 
-clang-sys = "1"
+clang-sys = { path = "../clang-sys" }
 libc = "0.2.39"
 
 [[test]]
@@ -46,4 +47,4 @@ harness = true
 
 [package.metadata.docs.rs]
 
-features = ["clang_10_0"]
+features = ["clang_17_0"]
