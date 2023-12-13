@@ -114,6 +114,102 @@ impl Availability {
     }
 }
 
+// BinaryOperatorKind ____________________________
+
+/// Indicates the kind of binary operators.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg(feature = "clang_17_0")]
+pub enum BinaryOperatorKind {
+    /// The cursor is not a BinaryOperator.
+    Invalid = 0,
+    /// A C++ pointer to member operator.
+    PtrMemD = 1,
+    /// A C++ pointer to member operator.
+    PtrMemI = 2,
+    /// The multiplication operator.
+    Mul = 3,
+    /// The division operator.
+    Div = 4,
+    /// The remainder (modulo) operator.
+    Rem = 5,
+    /// The addition operator.
+    Add = 6,
+    /// The subtraction operator.
+    Sub = 7,
+    /// The bitwise left shift operator.
+    Shl = 8,
+    /// The bitwise right shift operator.
+    Shr = 9,
+    /// The C++ three-way comparison (spaceship) operator. 
+    Cmp = 10,
+    /// The less than operator.
+    LT = 11,
+    /// The greater than operator.
+    GT = 12,
+    /// The less than or equal operator.
+    LE = 13,
+    /// The greater than or equal operator.
+    GE = 14,
+    /// The equal comparison operator.
+    EQ = 15,
+    /// The not equal operator.
+    NE = 16,
+    /// The bitwise AND operator.
+    And = 17,
+    /// The bitwise XOR operator.
+    Xor = 18,
+    /// The bitwise OR operator.
+    Or = 19,
+    /// The logical (comparison) AND operator.
+    LAnd = 20,
+    /// The logical (comparison) OR operator.
+    LOr = 21,
+    /// The assignment operator.
+    Assign = 22,
+    /// The multiplication assignment operator.
+    MulAssign = 23,
+    /// The division assignment operator.
+    DivAssign = 24,
+    /// The remainder (modulo) assignment operator.
+    RemAssign = 25,
+    /// The addition assignment operator.
+    AddAssign = 26,
+    /// The subtraction assignment operator.
+    SubAssign = 27,
+    /// The bitwise left shift assignment operator.
+    ShlAssign = 28,
+    /// The bitwise right shift assignment operator.
+    ShrAssign = 29,
+    /// The bitwise AND assignment operator.
+    AndAssign = 30,
+    /// The bitwise XOR assignment operator.
+    XorAssign = 31,
+    /// The bitwise OR assignment operator.
+    OrAssign = 32,
+    /// The comma operator.
+    Comma = 33,
+}
+
+#[cfg(feature = "clang_17_0")]
+impl BinaryOperatorKind {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            0..=33 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+    
+    fn from_raw_infallible(raw: c_int) -> Self {
+        Self::from_raw(raw).unwrap_or(BinaryOperatorKind::Invalid)
+    }
+
+    /// Returns the name of this operator, if any.
+    pub fn get_name(&self) -> Option<String> {
+        unsafe { utility::to_string_option(clang_getBinaryOperatorKindSpelling(*self as CXBinaryOperatorKind)) }
+    }
+}
+
 // CallingConvention _____________________________
 
 /// Indicates the calling convention specified for a function type.
@@ -1601,6 +1697,64 @@ impl TypeKind {
     }
 }
 
+// UnaryOperatorKind _____________________________
+
+/// Indicates the kind of unary operators.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg(feature = "clang_17_0")]
+pub enum UnaryOperatorKind {
+    /// The cursor is not a UnaryOperator.
+    Invalid = 0,
+    /// The postfix increment operator.
+    PostInc = 1,
+    /// The postfix decrement operator.
+    PostDec = 2,
+    /// The prefix increment operator.
+    PreInc = 3,
+    /// The prefix decrement operator.
+    PreDec = 4,
+    /// The address of (reference) operator.
+    AddrOf = 5,
+    /// The dereference operator.
+    Deref = 6,
+    /// The plus operator.
+    Plus = 7,
+    /// The minus operator.
+    Minus = 8,
+    /// The bitwise NOT operator.
+    Not = 9,
+    /// The logical NOT operator.
+    LNot = 10,
+    /// The `__real expr` operator.
+    Real = 11,
+    /// The `__imag expr` operator.
+    Imag = 12,
+    /// The extension marker operator.
+    Extension = 13,
+    /// The C++ `co_await` operator
+    Coawait = 14,
+}
+
+#[cfg(feature = "clang_17_0")]
+impl UnaryOperatorKind {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            0..=14 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+
+    fn from_raw_infallible(raw: c_int) -> Self {
+        Self::from_raw(raw).unwrap_or(UnaryOperatorKind::Invalid)
+    }
+
+    /// Returns the name of this operator, if any.
+    pub fn get_name(&self) -> Option<String> {
+        unsafe { utility::to_string_option(clang_getUnaryOperatorKindSpelling(*self as CXUnaryOperatorKind)) }
+    }
+}
+
 // Visibility ____________________________________
 
 /// Indicates the linker visibility of an AST element.
@@ -1922,6 +2076,12 @@ impl<'tu> Entity<'tu> {
     /// Returns the availability of this AST entity.
     pub fn get_availability(&self) -> Availability {
         Availability::from_raw(unsafe {clang_getCursorAvailability(self.raw) }).unwrap()
+    }
+    
+    /// Returns the binary operator kind of this binary operator.
+    #[cfg(feature = "clang_17_0")]
+    pub fn get_binary_operator_kind(&self) -> BinaryOperatorKind {
+        BinaryOperatorKind::from_raw_infallible(unsafe { clang_getCursorBinaryOperatorKind(self.raw) })
     }
 
     /// Returns the width of this bit field, if applicable.
@@ -2338,6 +2498,12 @@ impl<'tu> Entity<'tu> {
     /// Returns the underlying type of this typedef declaration, if applicable.
     pub fn get_typedef_underlying_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getTypedefDeclUnderlyingType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the unary operator kind of this unary operator.
+    #[cfg(feature = "clang_17_0")]
+    pub fn get_unary_operator_kind(&self) -> UnaryOperatorKind {
+        UnaryOperatorKind::from_raw_infallible(unsafe { clang_getCursorUnaryOperatorKind(self.raw) })
     }
 
     /// Returns the USR for this AST entity, if any.

@@ -918,6 +918,62 @@ fn test() {
     });
 
     let source = "
+        int main() {
+            int a, b;
+            a = 322;
+            b = a + 322;
+            b <<= 9;
+            return 0;
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_17_0")]
+        fn test_binary_operator_kind<'tu>(children: &[Entity<'tu>]) {
+            assert_eq!(children[1].get_binary_operator_kind(), BinaryOperatorKind::Assign);
+            assert_eq!(children[2].get_binary_operator_kind(), BinaryOperatorKind::Assign);
+            assert_eq!(children[2].get_children()[1].get_binary_operator_kind(), BinaryOperatorKind::Add);
+            assert_eq!(children[3].get_binary_operator_kind(), BinaryOperatorKind::ShlAssign);            
+            assert_eq!(children[4].get_binary_operator_kind(), BinaryOperatorKind::Invalid);            
+        }
+
+        #[cfg(not(feature="clang_17_0"))]
+        fn test_binary_operator_kind<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children()[0].get_children();
+        assert_eq!(children.len(), 5);
+
+        test_binary_operator_kind(&children);
+    });
+
+    let source = "
+        int main() {
+            int a = 322;
+            int *b = &a;
+            a = -*b;
+            return 0;
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_17_0")]
+        fn test_unary_operator_kind<'tu>(children: &[Entity<'tu>]) {
+            assert_eq!(children[1].get_children()[0].get_children()[0].get_unary_operator_kind(), UnaryOperatorKind::AddrOf);
+            assert_eq!(children[2].get_children()[1].get_unary_operator_kind(), UnaryOperatorKind::Minus);
+            assert_eq!(children[2].get_children()[1].get_children()[0].get_children()[0].get_unary_operator_kind(), UnaryOperatorKind::Deref);
+            assert_eq!(children[3].get_unary_operator_kind(), UnaryOperatorKind::Invalid);
+        }
+
+        #[cfg(not(feature="clang_17_0"))]
+        fn test_unary_operator_kind<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children()[0].get_children();
+        assert_eq!(children.len(), 4);
+
+        test_unary_operator_kind(&children);
+    });
+
+    let source = "
         void a() { }
         void b(...) { }
     ";
