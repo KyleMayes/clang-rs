@@ -189,16 +189,6 @@ pub enum Choice {
     Disabled = 2,
 }
 
-#[cfg(feature = "clang_17_0")]
-impl Choice {
-    fn from_raw(raw: c_int) -> Option<Self> {
-        match raw {
-            1..=2 => Some(unsafe { mem::transmute(raw) }),
-            _ => None,
-        }
-    }
-}
-
 // EntityKind ____________________________________
 
 /// Indicates the categorization of an AST entity.

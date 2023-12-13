@@ -444,16 +444,20 @@ fn test() {
         #[cfg(feature="clang_17_0")]
         fn test_index_with_options(clang: &Clang, fs: &[PathBuf]) {
             let options = IndexOptions::new(
-                Choice::Default,
-                Choice::Default,
+                Choice::Enabled,
+                Choice::Disabled,
+                true,
                 false,
-                false,
-                false,
+                true,
                 None,
                 None
             );
 
             let index = Index::new_with_options(&clang, &options);
+            
+            assert!(index.get_thread_options().indexing);
+            assert!(!index.get_thread_options().editing);
+
             let tu = index.parser(&fs[1]).detailed_preprocessing_record(true).parse().unwrap();
 
             let last = tu.get_entity().get_children().iter().last().unwrap().clone();
