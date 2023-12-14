@@ -126,7 +126,7 @@ fn test() {
     source_test::test(&clang);
     token_test::test(&clang);
 
-    // sonar_test::test(&clang);
+    sonar_test::test(&clang);
 
     // SourceError _______________________________
 
