@@ -337,8 +337,8 @@ fn test() {
         assert_eq!(children.len(), 2);
 
         assert_eq!(children[0].get_bit_field_width(), None);
-        assert_eq!(children[0].get_name(), None);
-        assert_eq!(children[0].get_display_name(), None);
+        assert!(children[0].get_name().is_some_and(|n| n.starts_with("(anonymous struct at ")));
+        assert!(children[0].get_display_name().is_some_and(|n| n.starts_with("(anonymous struct at ")));
         assert!(!children[0].is_bit_field());
 
         if !cfg!(target_os="windows") {
@@ -437,6 +437,40 @@ fn test() {
         assert_eq!(last.get_file(), tu.get_file(&fs[0]));
 
         assert_eq!(tu.get_file(&fs[1]).unwrap().get_includes(), &[last]);
+    });
+
+    with_temporary_files(files, |_, fs| {
+        
+        #[cfg(feature="clang_17_0")]
+        fn test_index_with_options(clang: &Clang, fs: &[PathBuf]) {
+            let options = IndexOptions::new(
+                Choice::Enabled,
+                Choice::Disabled,
+                true,
+                false,
+                true,
+                None,
+                None
+            );
+
+            let index = Index::new_with_options(&clang, &options);
+            
+            assert!(index.get_thread_options().indexing);
+            assert!(!index.get_thread_options().editing);
+
+            let tu = index.parser(&fs[1]).detailed_preprocessing_record(true).parse().unwrap();
+
+            let last = tu.get_entity().get_children().iter().last().unwrap().clone();
+            assert_eq!(last.get_kind(), EntityKind::InclusionDirective);
+            assert_eq!(last.get_file(), tu.get_file(&fs[0]));
+
+            assert_eq!(tu.get_file(&fs[1]).unwrap().get_includes(), &[last]);
+        }
+
+        #[cfg(not(feature="clang_17_0"))]
+        fn test_index_with_options(_clang: &Clang, _fs: &[PathBuf]) {}
+
+        test_index_with_options(&clang, &fs[..]);
     });
 
     let source = "
@@ -723,6 +757,66 @@ fn test() {
 
     let source = "
         struct A {
+            void a();
+            void b() = delete;
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_16_0")]
+        fn test_is_deleted<'tu>(children: &[Entity<'tu>]) {
+            assert!(!children[0].is_deleted());
+            assert!(children[1].is_deleted());
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_is_deleted<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 2);
+
+        test_is_deleted(&children);
+    });
+
+    let source = "
+        struct A {
+            A& operator=(A other) { return *this; }
+            A& operator=(A& other) { return *this; }
+            A& operator=(const A& other) { return *this; }
+            A& operator=(volatile A& other) { return *this; }
+            A& operator=(const volatile A& other) { return *this; }
+
+            A& operator=(const A&& other) { return *this; }
+            A& operator=(volatile A&& other) { return *this; }
+            A& operator=(const volatile A&& other) { return *this; }
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_16_0")]
+        fn test_assignment_operators<'tu>(children: &[Entity<'tu>]) {
+            for (i, child) in children.iter().enumerate() {
+                if i < 5 {
+                    assert!(child.is_copy_assignment_operator());
+                    assert!(!child.is_move_assignment_operator());
+                } else {
+                    assert!(child.is_move_assignment_operator());
+                    assert!(!child.is_copy_assignment_operator());
+                }
+            }
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_assignment_operators<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 8);
+
+        test_assignment_operators(&children);
+    });
+
+    let source = "
+        struct A {
             void a() { }
             virtual void b() { }
         };
@@ -740,6 +834,34 @@ fn test() {
 
         assert!(!children[1].is_dynamic_call());
         assert!(children[2].is_dynamic_call());
+    });
+
+    let source = "
+        class A {
+            A(int b);
+            operator int();
+
+            explicit A(float b);
+            explicit operator float();
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_17_0")]
+        fn test_is_explicit(children: &[Entity]) {
+            assert!(!children[0].is_explicit());
+            assert!(!children[1].is_explicit());
+            assert!(children[2].is_explicit());
+            assert!(children[3].is_explicit());
+        }
+
+        #[cfg(not(feature="clang_17_0"))]
+        fn test_is_explicit(_: &[Entity]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 4);
+
+        test_is_explicit(&children[..]);
     });
 
     let source = r#"
@@ -793,6 +915,62 @@ fn test() {
         assert_eq!(children.len(), 2);
 
         test_is_mutable(&children);
+    });
+
+    let source = "
+        int main() {
+            int a, b;
+            a = 322;
+            b = a + 322;
+            b <<= 9;
+            return 0;
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_17_0")]
+        fn test_binary_operator_kind<'tu>(children: &[Entity<'tu>]) {
+            assert_eq!(children[1].get_binary_operator_kind(), BinaryOperatorKind::Assign);
+            assert_eq!(children[2].get_binary_operator_kind(), BinaryOperatorKind::Assign);
+            assert_eq!(children[2].get_children()[1].get_binary_operator_kind(), BinaryOperatorKind::Add);
+            assert_eq!(children[3].get_binary_operator_kind(), BinaryOperatorKind::ShlAssign);            
+            assert_eq!(children[4].get_binary_operator_kind(), BinaryOperatorKind::Invalid);            
+        }
+
+        #[cfg(not(feature="clang_17_0"))]
+        fn test_binary_operator_kind<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children()[0].get_children();
+        assert_eq!(children.len(), 5);
+
+        test_binary_operator_kind(&children);
+    });
+
+    let source = "
+        int main() {
+            int a = 322;
+            int *b = &a;
+            a = -*b;
+            return 0;
+        }
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_17_0")]
+        fn test_unary_operator_kind<'tu>(children: &[Entity<'tu>]) {
+            assert_eq!(children[1].get_children()[0].get_children()[0].get_unary_operator_kind(), UnaryOperatorKind::AddrOf);
+            assert_eq!(children[2].get_children()[1].get_unary_operator_kind(), UnaryOperatorKind::Minus);
+            assert_eq!(children[2].get_children()[1].get_children()[0].get_children()[0].get_unary_operator_kind(), UnaryOperatorKind::Deref);
+            assert_eq!(children[3].get_unary_operator_kind(), UnaryOperatorKind::Invalid);
+        }
+
+        #[cfg(not(feature="clang_17_0"))]
+        fn test_unary_operator_kind<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children()[0].get_children();
+        assert_eq!(children.len(), 4);
+
+        test_unary_operator_kind(&children);
     });
 
     let source = "
@@ -906,6 +1084,31 @@ fn test() {
         fn test_is_invalid_declaration(_: Entity) {}
 
         test_is_invalid_declaration(children[0]);
+    });
+
+    let source = "
+        int x = 0;
+        const int x = 0;
+        volatile int x = 0;
+        const volatile int x = 0;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+
+        #[cfg(feature="clang_16_0")]
+        fn test_get_unqualified_type<'tu>(children: &[Entity<'tu>]) {
+            let types = children.iter().map(|it| it.get_type().unwrap()).collect::<Vec<_>>();
+            assert_eq!(types[3].get_unqualified_type(), types[0]);
+            assert_eq!(types[2].get_unqualified_type(), types[0]);
+            assert_eq!(types[1].get_unqualified_type(), types[0]);
+            assert_eq!(types[0].get_unqualified_type(), types[0]);
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_get_unqualified_type<'tu>(_: &[Entity<'tu>]) {}
+
+        test_get_unqualified_type(&children);
     });
 
     let source = "
@@ -1316,6 +1519,32 @@ fn test() {
                 message: None,
             },
         ])
+    });
+
+    let source = "
+        int a = 322;
+        const b = 456;
+        int& c = a;
+        const int& d = b;
+        int&& e = a;
+        int&& f = c;
+    ";
+
+    with_types(&clang, source, |ts| {
+        #[cfg(feature="clang_16_0")]
+        fn test_get_non_reference_type(ts: &[Type]) {
+            assert_eq!(ts[0].get_non_reference_type(), ts[0]);
+            assert_eq!(ts[1].get_non_reference_type(), ts[1]);
+            assert_eq!(ts[2].get_non_reference_type(), ts[0]);
+            assert_eq!(ts[3].get_non_reference_type(), ts[1]);
+            assert_eq!(ts[4].get_non_reference_type(), ts[0]);
+            assert_eq!(ts[5].get_non_reference_type(), ts[0]);
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_get_non_reference_type(_: &[Type]) {}
+
+        test_get_non_reference_type(&ts[..])
     });
 
     // Usr _______________________________________

@@ -49,6 +49,9 @@ use clang_sys::*;
 
 use libc::{c_int, c_uint, c_ulong};
 
+#[cfg(feature="clang_17_0")]
+use libc::c_uchar;
+
 use completion::{Completer, CompletionString};
 use diagnostic::{Diagnostic};
 use documentation::{Comment};
@@ -111,6 +114,102 @@ impl Availability {
     }
 }
 
+// BinaryOperatorKind ____________________________
+
+/// Indicates the kind of binary operators.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg(feature = "clang_17_0")]
+pub enum BinaryOperatorKind {
+    /// The cursor is not a BinaryOperator.
+    Invalid = 0,
+    /// A C++ pointer to member operator.
+    PtrMemD = 1,
+    /// A C++ pointer to member operator.
+    PtrMemI = 2,
+    /// The multiplication operator.
+    Mul = 3,
+    /// The division operator.
+    Div = 4,
+    /// The remainder (modulo) operator.
+    Rem = 5,
+    /// The addition operator.
+    Add = 6,
+    /// The subtraction operator.
+    Sub = 7,
+    /// The bitwise left shift operator.
+    Shl = 8,
+    /// The bitwise right shift operator.
+    Shr = 9,
+    /// The C++ three-way comparison (spaceship) operator. 
+    Cmp = 10,
+    /// The less than operator.
+    LT = 11,
+    /// The greater than operator.
+    GT = 12,
+    /// The less than or equal operator.
+    LE = 13,
+    /// The greater than or equal operator.
+    GE = 14,
+    /// The equal comparison operator.
+    EQ = 15,
+    /// The not equal operator.
+    NE = 16,
+    /// The bitwise AND operator.
+    And = 17,
+    /// The bitwise XOR operator.
+    Xor = 18,
+    /// The bitwise OR operator.
+    Or = 19,
+    /// The logical (comparison) AND operator.
+    LAnd = 20,
+    /// The logical (comparison) OR operator.
+    LOr = 21,
+    /// The assignment operator.
+    Assign = 22,
+    /// The multiplication assignment operator.
+    MulAssign = 23,
+    /// The division assignment operator.
+    DivAssign = 24,
+    /// The remainder (modulo) assignment operator.
+    RemAssign = 25,
+    /// The addition assignment operator.
+    AddAssign = 26,
+    /// The subtraction assignment operator.
+    SubAssign = 27,
+    /// The bitwise left shift assignment operator.
+    ShlAssign = 28,
+    /// The bitwise right shift assignment operator.
+    ShrAssign = 29,
+    /// The bitwise AND assignment operator.
+    AndAssign = 30,
+    /// The bitwise XOR assignment operator.
+    XorAssign = 31,
+    /// The bitwise OR assignment operator.
+    OrAssign = 32,
+    /// The comma operator.
+    Comma = 33,
+}
+
+#[cfg(feature = "clang_17_0")]
+impl BinaryOperatorKind {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            0..=33 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+    
+    fn from_raw_infallible(raw: c_int) -> Self {
+        Self::from_raw(raw).unwrap_or(BinaryOperatorKind::Invalid)
+    }
+
+    /// Returns the name of this operator, if any.
+    pub fn get_name(&self) -> Option<String> {
+        unsafe { utility::to_string_option(clang_getBinaryOperatorKindSpelling(*self as CXBinaryOperatorKind)) }
+    }
+}
+
 // CallingConvention _____________________________
 
 /// Indicates the calling convention specified for a function type.
@@ -169,6 +268,21 @@ impl CallingConvention {
             _ => None,
         }
     }
+}
+
+// Choice ________________________________________
+
+/// Indicates if an option should be enabled or disabled.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg(feature = "clang_17_0")]
+pub enum Choice {
+    /// Use the default value of an option.
+    Default = 0,
+    /// Enable the option.
+    Enabled = 1,
+    /// Disable the option.
+    Disabled = 2,
 }
 
 // EntityKind ____________________________________
@@ -644,7 +758,7 @@ pub enum EntityKind {
     /// Only produced by `libclang` 10.0 and later.
     OmpParallelMasterDirective = 285,
     /// The top-level AST entity which acts as the root for the other entitys.
-    TranslationUnit = 300,
+    TranslationUnit = if cfg!(feature="clang_16_0") { 350 } else { 300 },
     /// An attribute whose specific kind is not exposed via this interface.
     UnexposedAttr = 400,
     /// An attribute applied to an Objective-C IBAction.
@@ -809,7 +923,7 @@ pub enum EntityKind {
 impl EntityKind {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
-            1..=50 | 70..=73 | 100..=149 | 200..=280 | 300 | 400..=441 | 500..=503 | 600..=603
+            1..=50 | 70..=73 | 100..=149 | 200..=280 | 300 | 350 | 400..=441 | 500..=503 | 600..=603
             | 700 => {
                 Some(unsafe { mem::transmute(raw) })
             }
@@ -1583,6 +1697,64 @@ impl TypeKind {
     }
 }
 
+// UnaryOperatorKind _____________________________
+
+/// Indicates the kind of unary operators.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg(feature = "clang_17_0")]
+pub enum UnaryOperatorKind {
+    /// The cursor is not a UnaryOperator.
+    Invalid = 0,
+    /// The postfix increment operator.
+    PostInc = 1,
+    /// The postfix decrement operator.
+    PostDec = 2,
+    /// The prefix increment operator.
+    PreInc = 3,
+    /// The prefix decrement operator.
+    PreDec = 4,
+    /// The address of (reference) operator.
+    AddrOf = 5,
+    /// The dereference operator.
+    Deref = 6,
+    /// The plus operator.
+    Plus = 7,
+    /// The minus operator.
+    Minus = 8,
+    /// The bitwise NOT operator.
+    Not = 9,
+    /// The logical NOT operator.
+    LNot = 10,
+    /// The `__real expr` operator.
+    Real = 11,
+    /// The `__imag expr` operator.
+    Imag = 12,
+    /// The extension marker operator.
+    Extension = 13,
+    /// The C++ `co_await` operator
+    Coawait = 14,
+}
+
+#[cfg(feature = "clang_17_0")]
+impl UnaryOperatorKind {
+    fn from_raw(raw: c_int) -> Option<Self> {
+        match raw {
+            0..=14 => Some(unsafe { mem::transmute(raw) }),
+            _ => None,
+        }
+    }
+
+    fn from_raw_infallible(raw: c_int) -> Self {
+        Self::from_raw(raw).unwrap_or(UnaryOperatorKind::Invalid)
+    }
+
+    /// Returns the name of this operator, if any.
+    pub fn get_name(&self) -> Option<String> {
+        unsafe { utility::to_string_option(clang_getUnaryOperatorKindSpelling(*self as CXUnaryOperatorKind)) }
+    }
+}
+
 // Visibility ____________________________________
 
 /// Indicates the linker visibility of an AST element.
@@ -1904,6 +2076,12 @@ impl<'tu> Entity<'tu> {
     /// Returns the availability of this AST entity.
     pub fn get_availability(&self) -> Availability {
         Availability::from_raw(unsafe {clang_getCursorAvailability(self.raw) }).unwrap()
+    }
+    
+    /// Returns the binary operator kind of this binary operator.
+    #[cfg(feature = "clang_17_0")]
+    pub fn get_binary_operator_kind(&self) -> BinaryOperatorKind {
+        BinaryOperatorKind::from_raw_infallible(unsafe { clang_getCursorBinaryOperatorKind(self.raw) })
     }
 
     /// Returns the width of this bit field, if applicable.
@@ -2322,6 +2500,12 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_getTypedefDeclUnderlyingType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
     }
 
+    /// Returns the unary operator kind of this unary operator.
+    #[cfg(feature = "clang_17_0")]
+    pub fn get_unary_operator_kind(&self) -> UnaryOperatorKind {
+        UnaryOperatorKind::from_raw_infallible(unsafe { clang_getCursorUnaryOperatorKind(self.raw) })
+    }
+
     /// Returns the USR for this AST entity, if any.
     pub fn get_usr(&self) -> Option<Usr> {
         unsafe { utility::to_string_option(clang_getCursorUSR(self.raw)).map(Usr) }
@@ -2417,6 +2601,12 @@ impl<'tu> Entity<'tu> {
         unsafe { clang_CXXMethod_isDefaulted(self.raw) != 0 }
     }
 
+    /// Returns whether this AST entity is a C++ deleted method.
+    #[cfg(feature="clang_16_0")]
+    pub fn is_deleted(&self) -> bool {
+        unsafe { clang_CXXMethod_isDeleted(self.raw) != 0 }
+    }
+
     /// Returns whether this AST entity is a declaration and also the definition of that
     /// declaration.
     pub fn is_definition(&self) -> bool {
@@ -2429,6 +2619,12 @@ impl<'tu> Entity<'tu> {
     /// receiver is an object instance, not `super` or a specific class.
     pub fn is_dynamic_call(&self) -> bool {
         unsafe { clang_Cursor_isDynamicCall(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a constructor or conversion method declared explicit.
+    #[cfg(feature="clang_17_0")]
+    pub fn is_explicit(&self) -> bool {
+        unsafe { clang_CXXMethod_isExplicit(self.raw) != 0 }
     }
 
     /// Returns whether this AST entity is a function-like macro.
@@ -2496,6 +2692,18 @@ impl<'tu> Entity<'tu> {
     /// Returns whether this AST entity is a virtual method.
     pub fn is_virtual_method(&self) -> bool {
         unsafe { clang_CXXMethod_isVirtual(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a copy-assignment operator.
+    #[cfg(feature="clang_16_0")]
+    pub fn is_copy_assignment_operator(&self) -> bool {
+        unsafe { clang_CXXMethod_isCopyAssignmentOperator(self.raw) != 0 }
+    }
+
+    /// Returns whether this AST entity is a move-assignment operator.
+    #[cfg(feature="clang_16_0")]
+    pub fn is_move_assignment_operator(&self) -> bool {
+        unsafe { clang_CXXMethod_isMoveAssignmentOperator(self.raw) != 0 }
     }
 
     /// Visits the children of this AST entity recursively and returns whether visitation was ended
@@ -2652,6 +2860,14 @@ impl<'c> Index<'c> {
         unsafe { Index::from_ptr(clang_createIndex(exclude as c_int, diagnostics as c_int)) }
     }
 
+    /// Constructs a new `Index` with options.
+    ///
+    /// `options` determines the options associated with the newly created `Index`.
+    #[cfg(feature="clang_17_0")]
+    pub fn new_with_options(_: &'c Clang, options: &IndexOptions) -> Index<'c> {
+        unsafe { Index::from_ptr(clang_createIndexWithOptions(options.as_raw())) }
+    }
+
     //- Accessors --------------------------------
 
     /// Returns a parser for the supplied file.
@@ -2690,6 +2906,82 @@ impl<'c> fmt::Debug for Index<'c> {
         formatter.debug_struct("Index")
             .field("thread_options", &self.get_thread_options())
             .finish()
+    }
+}
+
+// IndexOptions __________________________________
+
+/// Options to explicitly initialize an `Index`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg(feature="clang_17_0")]
+pub struct IndexOptions {
+    /// An enumerator indicating the indexing priority policy.
+    pub thread_background_priority_for_indexing: Choice,
+    /// An enumerator indicating the editing priority policy.
+    pub thread_background_priority_for_editing: Choice,
+    /// Specifies if declarations in precompiled headers should be ignored.
+    pub exclude_declarations_from_pch: bool,
+    /// Specifies if diagnostics should be displayed.
+    pub display_diagnostics: bool,
+    /// Specifies if precompiled headers should be stored in memory.
+    pub store_preambles_in_memory: bool,
+    /// Path to directory where temporary precompiled headers should be stored.
+    /// Ignored if `store_preambles_in_memory` is `true`.
+    pub preamble_storage_path: Option<CString>,
+    /// Path to a directory where certain `libclang` invocations will place logs.
+    pub invocation_emission_path: Option<CString>,
+}
+
+#[cfg(feature="clang_17_0")]
+impl IndexOptions {
+    //- Constructors -----------------------------
+
+    /// Constructs a new `IndexOptions`.
+    pub fn new(
+        thread_background_priority_for_indexing: Choice,
+        thread_background_priority_for_editing: Choice,
+        exclude_declarations_from_pch: bool,
+        display_diagnostics: bool,
+        store_preambles_in_memory: bool,
+        preamble_storage_path: Option<&Path>,
+        invocation_emission_path: Option<&Path>
+    ) -> IndexOptions {
+        IndexOptions {
+            thread_background_priority_for_indexing,
+            thread_background_priority_for_editing,
+            exclude_declarations_from_pch,
+            display_diagnostics,
+            store_preambles_in_memory,
+            preamble_storage_path: preamble_storage_path.map(utility::from_path),
+            invocation_emission_path: invocation_emission_path.map(utility::from_path)
+        }
+    }
+
+    //- Accessors --------------------------------
+
+    fn as_raw(&self) -> CXIndexOptions {
+        let mut flags = 0;
+        
+        if self.exclude_declarations_from_pch {
+            flags |= CXIndexOptions_ExcludeDeclarationsFromPCH;
+        }
+
+        if self.display_diagnostics {
+            flags |= CXIndexOptions_DisplayDiagnostics;
+        }
+
+        if self.store_preambles_in_memory {
+            flags |= CXIndexOptions_StorePreamblesInMemory;
+        }
+
+        CXIndexOptions {
+            Size: mem::size_of::<CXIndexOptions>() as c_uint,
+            ThreadBackgroundPriorityForIndexing: self.thread_background_priority_for_indexing as c_uchar,
+            ThreadBackgroundPriorityForEditing: self.thread_background_priority_for_editing as c_uchar,
+            flags,
+            PreambleStoragePath: self.preamble_storage_path.as_ref().map_or_else(ptr::null, |s| s.as_ptr()),
+            InvocationEmissionPath: self.invocation_emission_path.as_ref().map_or_else(ptr::null, |s| s.as_ptr()),
+        }
     }
 }
 
@@ -3337,6 +3629,20 @@ impl<'tu> Type<'tu> {
     /// Returns the pointee type for this pointer type, if applicable.
     pub fn get_pointee_type(&self) -> Option<Type<'tu>> {
         unsafe { clang_getPointeeType(self.raw).map(|t| Type::from_raw(t, self.tu)) }
+    }
+
+    /// Returns the unqualified variant of this type, removing as little sugar as possible, or, if
+    /// this is type is not qualified, returns this type.
+    #[cfg(feature="clang_16_0")]
+    pub fn get_unqualified_type(&self) -> Type<'tu> {
+        unsafe { Type::from_raw(clang_getUnqualifiedType(self.raw), self.tu) }
+    }
+
+    /// Returns the type that this reference refers to, or, if this is not a reference type, returns
+    /// this type.
+    #[cfg(feature="clang_16_0")]
+    pub fn get_non_reference_type(&self) -> Type<'tu> {
+        unsafe { Type::from_raw(clang_getNonReferenceType(self.raw), self.tu) }
     }
 
     /// Returns the ref qualifier for this C++ function or method type, if applicable.

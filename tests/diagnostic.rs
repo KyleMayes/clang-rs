@@ -40,10 +40,13 @@ pub fn test(clang: &Clang) {
         ], &[
         ]);
 
-        let text = "missing 'typename' prior to dependent type name 'T::U'";
-        assert_diagnostic_eq!(diagnostics[1], Severity::Error, text, file.get_location(3, 50), &[
-            range!(file, 3, 50, 3, 54)
-        ], &[
+        let (severity, text, range) = if cfg!(feature="clang_16_0") {
+            (Severity::Warning, "missing 'typename' prior to dependent type name T::U; implicit 'typename' is a C++20 extension", Vec::new())
+        } else {
+            (Severity::Error, "missing 'typename' prior to dependent type name 'T::U'", vec![range!(file, 3, 50, 3, 54)])
+        };
+
+        assert_diagnostic_eq!(diagnostics[1], severity, text, file.get_location(3, 50), range, &[
             FixIt::Insertion(file.get_location(3, 50), "typename ".into())
         ]);
 
