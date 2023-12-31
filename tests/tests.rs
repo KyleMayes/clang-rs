@@ -723,6 +723,66 @@ fn test() {
 
     let source = "
         struct A {
+            void a();
+            void b() = delete;
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_16_0")]
+        fn test_is_deleted<'tu>(children: &[Entity<'tu>]) {
+            assert!(!children[0].is_deleted());
+            assert!(children[1].is_deleted());
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_is_deleted<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 2);
+
+        test_is_deleted(&children);
+    });
+
+    let source = "
+        struct A {
+            A& operator=(A other) { return *this; }
+            A& operator=(A& other) { return *this; }
+            A& operator=(const A& other) { return *this; }
+            A& operator=(volatile A& other) { return *this; }
+            A& operator=(const volatile A& other) { return *this; }
+
+            A& operator=(const A&& other) { return *this; }
+            A& operator=(volatile A&& other) { return *this; }
+            A& operator=(const volatile A&& other) { return *this; }
+        };
+    ";
+
+    with_entity(&clang, source, |e| {
+        #[cfg(feature="clang_16_0")]
+        fn test_assignment_operators<'tu>(children: &[Entity<'tu>]) {
+            for (i, child) in children.iter().enumerate() {
+                if i < 5 {
+                    assert!(child.is_copy_assignment_operator());
+                    assert!(!child.is_move_assignment_operator());
+                } else {
+                    assert!(child.is_move_assignment_operator());
+                    assert!(!child.is_copy_assignment_operator());
+                }
+            }
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_assignment_operators<'tu>(_: &[Entity<'tu>]) { }
+
+        let children = e.get_children()[0].get_children();
+        assert_eq!(children.len(), 8);
+
+        test_assignment_operators(&children);
+    });
+
+    let source = "
+        struct A {
             void a() { }
             virtual void b() { }
         };
@@ -906,6 +966,31 @@ fn test() {
         fn test_is_invalid_declaration(_: Entity) {}
 
         test_is_invalid_declaration(children[0]);
+    });
+
+    let source = "
+        int x = 0;
+        const int x = 0;
+        volatile int x = 0;
+        const volatile int x = 0;
+    ";
+
+    with_entity(&clang, source, |e| {
+        let children = e.get_children();
+
+        #[cfg(feature="clang_16_0")]
+        fn test_get_unqualified_type<'tu>(children: &[Entity<'tu>]) {
+            let types = children.map(|it| it.get_type().unwrap()).collect::<Vec<_>>();
+            assert_eq!(types[3].get_unqualified_type(), types[2]);
+            assert_eq!(types[2].get_unqualified_type(), types[0]);
+            assert_eq!(types[1].get_unqualified_type(), types[0]);
+            assert_eq!(types[0].get_unqualified_type(), types[0]);
+        }
+
+        #[cfg(not(feature="clang_16_0"))]
+        fn test_get_unqualified_type<'tu>(_: &[Entity<'tu>]) {}
+
+        test_get_unqualified_type(&children);
     });
 
     let source = "
