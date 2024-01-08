@@ -32,6 +32,7 @@ pub mod token;
 
 pub mod sonar;
 
+use std::cell::Cell;
 use std::cmp;
 use std::fmt;
 use std::hash;
@@ -43,7 +44,6 @@ use std::convert::TryInto;
 use std::ffi::{CString};
 use std::marker::{PhantomData};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{self, AtomicBool};
 
 use clang_sys::*;
 
@@ -769,7 +769,7 @@ pub enum EntityKind {
     /// `__attribute__((clang::convergent))`
     ///
     /// Only produced by `libclang` 9.0 and later.
-    ConvergentAttr  = 438,
+    ConvergentAttr = 438,
     /// Only produced by `libclang` 9.0 and later.
     WarnUnusedAttr = 439,
     /// `__attribute__((nodiscard))`
@@ -1616,62 +1616,74 @@ impl Visibility {
 
 type PhantomUnsendUnsync = PhantomData<*mut ()>;
 
-static AVAILABLE: AtomicBool = AtomicBool::new(true);
+thread_local! {
+  static CLANG_ACTIVE: Cell<bool> = Cell::new(false);
+}
 
 /// An empty type which prevents the use of this library from multiple threads simultaneously.
 #[derive(Debug)]
-pub struct Clang(PhantomUnsendUnsync);
+#[non_exhaustive]
+pub struct Clang {
+    #[cfg(feature = "runtime")]
+    libclang: Option<std::sync::Arc<clang_sys::SharedLibrary>>,
+    unsend_unsync: PhantomUnsendUnsync,
+}
 
 impl Clang {
     //- Constructors -----------------------------
 
-    /// Constructs a new `Clang`.
+    /// Constructs a new `Clang` instance.
     ///
-    /// Only one instance of `Clang` is allowed at a time.
-    ///
-    /// # Failures
-    ///
-    /// * an instance of `Clang` already exists
-    /// * a `libclang` shared library could not be found
-    /// * a `libclang` shared library symbol could not be loaded
-    #[cfg(feature="runtime")]
-    pub fn new() -> Result<Clang, String> {
-        if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
-            load().map(|_| Clang(PhantomData))
-        } else {
-            Err("an instance of `Clang` already exists".into())
-        }
-    }
-
-    /// Constructs a new `Clang`.
-    ///
-    /// Only one instance of `Clang` is allowed at a time.
+    /// Only one `Clang` instance is allowed per thread.
     ///
     /// # Failures
     ///
-    /// * an instance of `Clang` already exists
-    #[cfg(not(feature="runtime"))]
+    /// * a `Clang` instance already exists for this thread
+    #[cfg_attr(feature = "runtime", doc = "* a `libclang` shared library could not be found")]
+    #[cfg_attr(feature = "runtime", doc = "* a `libclang` shared library symbol could not be loaded")]
     pub fn new() -> Result<Clang, String> {
-        if AVAILABLE.swap(false, atomic::Ordering::SeqCst) {
-            Ok(Clang(PhantomData))
-        } else {
-            Err("an instance of `Clang` already exists".into())
+        CLANG_ACTIVE.with(|clang_active| {
+            if clang_active.get() {
+                Err("an instance of `Clang` already exists".to_string())
+            } else {
+                clang_active.set(true);
+                Ok(())
+            }
+        })?;
+
+        #[cfg(feature = "runtime")]
+        {
+            if !clang_sys::is_loaded() {
+                clang_sys::load()?;
+            }
         }
+
+        Ok(Clang {
+            #[cfg(feature = "runtime")]
+            libclang: Some(clang_sys::get_library().unwrap()),
+            unsend_unsync: PhantomData,
+        })
     }
 }
 
-#[cfg(feature="runtime")]
 impl Drop for Clang {
     fn drop(&mut self) {
-        unload().unwrap();
-        AVAILABLE.store(true, atomic::Ordering::SeqCst);
-    }
-}
+        CLANG_ACTIVE.with(|clang_active| {
+            clang_active.set(false);
+        });
 
-#[cfg(not(feature="runtime"))]
-impl Drop for Clang {
-    fn drop(&mut self) {
-        AVAILABLE.store(true, atomic::Ordering::SeqCst);
+        #[cfg(feature = "runtime")]
+        {
+            // Drop the contained reference so the `unload` call below actually
+            // unloads the the last `libclang` instance.
+            let libclang = self.libclang.take().unwrap();
+            let unload = std::sync::Arc::strong_count(&libclang) == 1;
+            drop(libclang);
+
+            if unload {
+                let _ = clang_sys::unload();
+            }
+        }
     }
 }
 
