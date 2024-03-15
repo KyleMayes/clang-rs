@@ -446,9 +446,15 @@ impl<'tu> SourceRange<'tu> {
             let (mut raw, mut count) = (mem::MaybeUninit::uninit(), mem::MaybeUninit::uninit());
             clang_tokenize(self.tu.ptr, self.raw, raw.as_mut_ptr(), count.as_mut_ptr());
             let (raw, count) = (raw.assume_init(), count.assume_init());
-            let raws = slice::from_raw_parts(raw, count as usize);
+            let raws = if raw.is_null() {
+                &[]
+            } else {
+                slice::from_raw_parts(raw, count as usize)
+            };
             let tokens = raws.iter().map(|t| Token::from_raw(*t, self.tu)).collect();
-            clang_disposeTokens(self.tu.ptr, raw, count);
+            if !raw.is_null() {
+                clang_disposeTokens(self.tu.ptr, raw, count);
+            }
             tokens
         }
     }
