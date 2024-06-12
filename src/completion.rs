@@ -385,7 +385,7 @@ impl<'r> CompletionString<'r> {
         iter!(
             clang_getCompletionNumAnnotations(self.ptr),
             clang_getCompletionAnnotation(self.ptr),
-        ).map(utility::to_string).collect()
+        ).map(|cxs| unsafe { utility::to_string(cxs) }).collect()
     }
 
     /// Returns the availability of this completion string.
