@@ -149,7 +149,7 @@ impl BlockCommand {
         let arguments = iter!(
             clang_BlockCommandComment_getNumArgs(raw),
             clang_BlockCommandComment_getArgText(raw),
-        ).map(utility::to_string).collect();
+        ).map(|cxs| unsafe { utility::to_string(cxs) }).collect();
         let paragraph = clang_BlockCommandComment_getParagraph(raw);
         let children = Comment::from_raw(paragraph).get_children();
         BlockCommand { command, arguments, children }
@@ -249,7 +249,7 @@ impl InlineCommand {
         let arguments = iter!(
             clang_InlineCommandComment_getNumArgs(raw),
             clang_InlineCommandComment_getArgText(raw),
-        ).map(utility::to_string).collect();
+        ).map(|cxs| unsafe { utility::to_string(cxs) }).collect();
         let style = match clang_InlineCommandComment_getRenderKind(raw) {
             CXCommentInlineCommandRenderKind_Normal => None,
             other => Some(mem::transmute(other)),
