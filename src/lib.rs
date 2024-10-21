@@ -1787,7 +1787,7 @@ impl<'cmds> CompileCommand<'cmds> {
             clang_CompileCommand_getNumArgs(self.ptr),
             clang_CompileCommand_getArg(self.ptr),
         )
-        .map(utility::to_string)
+        .map(|s| unsafe { utility::to_string(s) } )
         .collect()
     }
 
