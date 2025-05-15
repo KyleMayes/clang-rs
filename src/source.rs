@@ -14,10 +14,12 @@
 
 //! Source files, locations, and ranges.
 
+use std::any::Any;
 use std::cmp;
 use std::fmt;
 use std::hash;
 use std::mem;
+use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::slice;
 use std::path::{Path, PathBuf};
 
@@ -488,35 +490,43 @@ impl<'tu> hash::Hash for SourceRange<'tu> {
 // Functions
 //================================================
 
-fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
+fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, mut f: F, g: G) -> bool
     where F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
           G: Fn(CXCursorAndRangeVisitor) -> CXResult
 {
-    trait Callback<'tu> {
-        fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool;
+    struct State<'a, 'tu> {
+        tu: &'tu TranslationUnit<'tu>,
+        callback: &'a mut dyn FnMut(Entity<'tu>, SourceRange<'tu>) -> bool,
+        panic: Option<Box<dyn Any + Send>>,
     }
 
-    impl<'tu, F: FnMut(Entity<'tu>, SourceRange<'tu>) -> bool> Callback<'tu> for F {
-        fn call(&mut self, entity: Entity<'tu>, range: SourceRange<'tu>) -> bool {
-            self(entity, range)
-        }
-    }
-
-    extern fn visit(data: CXClientData, cursor: CXCursor, range: CXSourceRange) -> CXVisitorResult {
+    extern "C" fn visit(data: CXClientData, cursor: CXCursor, range: CXSourceRange) -> CXVisitorResult {
         unsafe {
-            let &mut (tu, ref mut callback):
-                &mut (&TranslationUnit, Box<dyn Callback>) =
-                    &mut *(data as *mut (&TranslationUnit, Box<dyn Callback>));
-
-            if callback.call(Entity::from_raw(cursor, tu), SourceRange::from_raw(range, tu)) {
-                CXVisit_Continue
-            } else {
-                CXVisit_Break
+            let state = &mut *(data as *mut State);
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                let entity = Entity::from_raw(cursor, state.tu);
+                let range = SourceRange::from_raw(range, state.tu);
+                (state.callback)(entity, range)
+            }));
+            
+            match result {
+                Ok(true) => CXVisit_Continue,
+                Ok(false) => CXVisit_Break,
+                Err(panic) => {
+                    state.panic = Some(panic);
+                    CXVisit_Break
+                }
             }
         }
     }
 
-    let mut data = (tu, Box::new(f) as Box<dyn Callback>);
-    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut data), visit: Some(visit) };
-    g(visitor) == CXResult_VisitBreak
+    let mut state = State { tu, callback: &mut f, panic: None, };
+    let visitor = CXCursorAndRangeVisitor { context: utility::addressof(&mut state), visit: Some(visit) };
+    let result = g(visitor) == CXResult_VisitBreak;
+    
+    if let Some(panic) = state.panic {
+        resume_unwind(panic);
+    }
+    
+    result
 }
