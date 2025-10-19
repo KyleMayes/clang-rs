@@ -1092,7 +1092,7 @@ pub enum PrintingPolicyFlag {
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
-#[cfg_attr(feature="cargo-clippy", allow(clippy::enum_variant_names))]
+#[allow(clippy::enum_variant_names)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum RefQualifier {
@@ -1787,7 +1787,7 @@ impl<'cmds> CompileCommand<'cmds> {
             clang_CompileCommand_getNumArgs(self.ptr),
             clang_CompileCommand_getArg(self.ptr),
         )
-        .map(utility::to_string)
+        .map(|s| unsafe { utility::to_string(s) })
         .collect()
     }
 
@@ -2518,7 +2518,7 @@ impl<'tu> Entity<'tu> {
             }
         }
 
-        extern fn visit(
+        extern "C" fn visit(
             cursor: CXCursor, parent: CXCursor, data: CXClientData
         ) -> CXChildVisitResult {
             unsafe {

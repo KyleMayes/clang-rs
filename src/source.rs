@@ -502,7 +502,7 @@ fn visit<'tu, F, G>(tu: &'tu TranslationUnit<'tu>, f: F, g: G) -> bool
         }
     }
 
-    extern fn visit(data: CXClientData, cursor: CXCursor, range: CXSourceRange) -> CXVisitorResult {
+    extern "C" fn visit(data: CXClientData, cursor: CXCursor, range: CXSourceRange) -> CXVisitorResult {
         unsafe {
             let &mut (tu, ref mut callback):
                 &mut (&TranslationUnit, Box<dyn Callback>) =
