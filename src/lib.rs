@@ -1833,6 +1833,11 @@ impl<'tu> Entity<'tu> {
         Entity { raw, tu }
     }
 
+    /// Return the raw data for this entity.
+    pub fn as_raw(&self) -> (CXCursor, &'tu TranslationUnit<'tu>) {
+        (self.raw, self.tu)
+    }
+
     //- Accessors --------------------------------
 
     /// Evaluates this AST entity, if possible.
@@ -3093,6 +3098,10 @@ impl<'i> TranslationUnit<'i> {
         }
     }
 
+    pub fn as_raw(&self) -> CXTranslationUnit {
+        self.ptr
+    }
+
     /// Constructs a new `TranslationUnit` from an AST file.
     ///
     /// # Failures
@@ -3257,6 +3266,11 @@ impl<'tu> Type<'tu> {
 
     fn from_raw(raw: CXType, tu: &'tu TranslationUnit<'tu>) -> Type<'tu> {
         Type { raw, tu }
+    }
+
+    /// Return the raw data for this type.
+    pub fn as_raw(&self) -> (CXType, &'tu TranslationUnit<'tu>) {
+        (self.raw, self.tu)
     }
 
     //- Accessors --------------------------------
