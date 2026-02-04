@@ -3605,11 +3605,24 @@ impl<'tu> fmt::Debug for Type<'tu> {
 
 impl<'tu> cmp::PartialEq for Type<'tu> {
     fn eq(&self, other: &Type<'tu>) -> bool {
-        unsafe { clang_equalTypes(self.raw, other.raw) != 0 }
+        let is_eq = self.raw.kind == other.raw.kind
+            && self.raw.data == other.raw.data
+            && self.tu.ptr == other.tu.ptr;
+        let clang_is_eq = unsafe { clang_equalTypes(self.raw, other.raw) != 0 };
+        assert_eq!(is_eq, clang_is_eq, "{self:?}, {other:?}");
+        is_eq
     }
 }
 
 impl<'tu> cmp::Eq for Type<'tu> {}
+
+impl<'tu> hash::Hash for Type<'tu> {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
+        self.raw.kind.hash(hasher);
+        self.raw.data.hash(hasher);
+        self.tu.ptr.hash(hasher);
+    }
+}
 
 // Unsaved _______________________________________
 
