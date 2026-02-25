@@ -267,7 +267,7 @@ pub fn from_string<S: AsRef<str>>(string: S) -> CString {
 
 pub unsafe fn to_string(clang: CXString) -> String {
         let c = CStr::from_ptr(clang_getCString(clang));
-        let rust = c.to_str().expect("invalid Rust string").into();
+        let rust = c.to_string_lossy().into();
         clang_disposeString(clang);
         rust
 }
