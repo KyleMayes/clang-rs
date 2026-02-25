@@ -15,17 +15,17 @@ jobs:
       matrix:
         include:
           - name: macOS
-            os: macos-15-intel # TODO: 1.40 and KyleMayes/install-llvm-action don't have support for Aarch64
+            os: macos-15-intel # TODO: KyleMayes/install-llvm-action doesn't have support for Aarch64
             clang: ["10.0", "clang_10_0"]
-            rust: "1.40.0"
+            rust: "1.60.0"
           - name: Ubuntu
             os: ubuntu-latest
             clang: ["10.0", "clang_10_0"]
-            rust: "1.40.0" # MSRV
+            rust: "1.60.0" # MSRV
           - name: Windows
             os: windows-latest
             clang: ["10.0", "clang_10_0"]
-            rust: "1.40.0" # MSRV
+            rust: "1.60.0" # MSRV
 
     steps:
       - uses: actions/checkout@v6
