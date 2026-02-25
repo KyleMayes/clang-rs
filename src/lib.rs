@@ -32,6 +32,7 @@ pub mod token;
 
 pub mod sonar;
 
+use std::any::Any;
 use std::cmp;
 use std::fmt;
 use std::hash;
@@ -42,6 +43,7 @@ use std::collections::{HashMap};
 use std::convert::TryInto;
 use std::ffi::{CString};
 use std::marker::{PhantomData};
+use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{self, AtomicBool};
 
@@ -2507,32 +2509,47 @@ impl<'tu> Entity<'tu> {
     pub fn visit_children<F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult>(
         &self, mut f: F
     ) -> bool {
-        trait EntityCallback<'tu> {
-            fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult;
+        struct State<'a, 'tu> {
+            parent: &'a Entity<'tu>,
+            callback: &'a mut dyn FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult,
+            panic: Option<Box<dyn Any + Send>>,
         }
 
-        impl<'tu, F: FnMut(Entity<'tu>, Entity<'tu>) -> EntityVisitResult>
-        EntityCallback<'tu> for F {
-            fn call(&mut self, entity: Entity<'tu>, parent: Entity<'tu>) -> EntityVisitResult {
-                self(entity, parent)
-            }
-        }
-
-        extern fn visit(
+        extern "C" fn visit(
             cursor: CXCursor, parent: CXCursor, data: CXClientData
         ) -> CXChildVisitResult {
             unsafe {
-                let &mut (tu, ref mut callback) =
-                    &mut *(data as *mut (&TranslationUnit, &mut dyn EntityCallback));
+                let state = &mut *(data as *mut State);
 
-                let entity = Entity::from_raw(cursor, tu);
-                let parent = Entity::from_raw(parent, tu);
-                callback.call(entity, parent) as c_int
+                let entity = Entity::from_raw(cursor, state.parent.tu);
+                let parent = Entity::from_raw(parent, state.parent.tu);
+                let result = catch_unwind(AssertUnwindSafe(|| {
+                    (state.callback)(entity, parent)
+                }));
+                
+                match result {
+                    Ok(r) => r as c_int,
+                    Err(panic) => {
+                        state.panic = Some(panic);
+                        CXChildVisit_Break
+                    }
+                }
             }
         }
 
-        let mut data = (self.tu, &mut f as &mut dyn EntityCallback);
-        unsafe { clang_visitChildren(self.raw, visit, utility::addressof(&mut data)) != 0 }
+        let mut state = State {
+            parent: self,
+            callback: &mut f,
+            panic: None,
+        };
+
+        let r = unsafe { clang_visitChildren(self.raw, visit, utility::addressof(&mut state)) };
+        
+        if let Some(panic) = state.panic {
+            resume_unwind(panic);
+        }
+        
+        r != 0
     }
 
     //- Categorization ---------------------------
