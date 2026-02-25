@@ -13,6 +13,8 @@ description = "A somewhat idiomatic Rust wrapper for libclang."
 documentation = "https://docs.rs/clang"
 repository = "https://github.com/KyleMayes/clang-rs"
 
+rust-version = "1.71"
+
 autotests = false
 
 [features]

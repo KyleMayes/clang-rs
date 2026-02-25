@@ -5,43 +5,55 @@ on:
     branches:
       - master
   pull_request:
-    branches:
-      - master
 
 jobs:
   ci:
-    name: CI
+    name: Test ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-        clang: [["10.0", "clang_10_0"]]
-        rust: ["1.40.0"]
+        include:
+          - name: macOS
+            os: macos-latest
+            clang: ["14.0", "clang_10_0"]
+            rust: "1.71.0"
+          - name: Ubuntu
+            os: ubuntu-latest
+            clang: ["14.0", "clang_10_0"]
+            rust: "1.71.0"
+          - name: Windows
+            os: windows-latest
+            clang: ["14.0", "clang_10_0"]
+            rust: "1.71.0"
+
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v6
+
       # LLVM and Clang
-      - name: Cache LLVM and Clang
-        id: cache-llvm
-        uses: actions/cache@v3
-        with:
-          path: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}
-          key: ${{ matrix.os }}-llvm-${{ matrix.clang[0] }}
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2.0.3
         with:
           version: ${{ matrix.clang[0] }}
           directory: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}
-          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+
       # Rust
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.40.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      # Cargo
+      - name: Generate lockfile
+        run: cargo generate-lockfile
+
       # Test
       - name: Cargo Test (Dynamic)
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/lib
           LLVM_CONFIG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/bin/llvm-config
         run: cargo test --verbose --features ${{ matrix.clang[1] }} -- --nocapture
+
       - name: Cargo Test (Runtime)
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/lib
