@@ -273,7 +273,7 @@ pub unsafe fn to_string(clang: CXString) -> String {
 }
 
 pub fn to_string_option(clang: CXString) -> Option<String> {
-    clang.map(to_string).and_then(|s| {
+    clang.map(|cxs| unsafe { to_string(cxs) }).and_then(|s| {
         if !s.is_empty() {
             Some(s)
         } else {
