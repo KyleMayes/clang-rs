@@ -16,15 +16,15 @@ jobs:
         include:
           - name: macOS
             os: macos-15-intel # TODO: KyleMayes/install-llvm-action doesn't have support for Aarch64
-            clang: ["14.0", "clang_14_0"]
+            clang: ["14.0", "clang_10_0"]
             rust: "1.63.0"
           - name: Ubuntu
             os: ubuntu-latest
-            clang: ["14.0", "clang_14_0"]
+            clang: ["14.0", "clang_10_0"]
             rust: "1.63.0"
           - name: Windows
             os: windows-latest
-            clang: ["14.0", "clang_14_0"]
+            clang: ["14.0", "clang_10_0"]
             rust: "1.63.0"
 
     steps:
