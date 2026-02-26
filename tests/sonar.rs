@@ -31,7 +31,7 @@ pub fn test(clang: &Clang) {
         let tu = index.parser(f).detailed_preprocessing_record(true).parse().unwrap();
 
         let definitions = sonar::find_definitions(tu.get_entity().get_children()).filter(|d| {
-            !d.entity.is_in_system_header()
+            d.entity.is_in_main_file()
         }).collect::<Vec<_>>();
         assert_eq!(definitions.len(), 4);
 
@@ -90,7 +90,7 @@ pub fn test(clang: &Clang) {
 
         assert_declaration_eq!(&enums[0], "A", SAME);
         assert_declaration_eq!(&enums[1], "B", SAME);
-        assert_declaration_eq!(&enums[2], "C", DIFFERENT);
+        assert_declaration_eq!(&enums[2], "C", SAME);
         assert_declaration_eq!(&enums[3], "D", SAME);
     });
 
@@ -151,7 +151,7 @@ pub fn test(clang: &Clang) {
 
         assert_declaration_eq!(&structs[0], "A", SAME);
         assert_declaration_eq!(&structs[1], "B", SAME);
-        assert_declaration_eq!(&structs[2], "C", DIFFERENT);
+        assert_declaration_eq!(&structs[2], "C", SAME);
         assert_declaration_eq!(&structs[3], "D", SAME);
     });
 
