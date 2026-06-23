@@ -1589,6 +1589,8 @@ pub enum TypeKind {
     ///
     /// Only produced by `libclang` 9.0 and later.
     ExtVector = 176,
+    /// An entity which is not yet supported by this wrapper.
+    NotImplemented = 1000,
 }
 
 impl TypeKind {
@@ -1600,7 +1602,7 @@ impl TypeKind {
     }
 
     fn from_raw_infallible(raw: c_int) -> Self {
-        Self::from_raw(raw).unwrap_or(TypeKind::Unexposed)
+        Self::from_raw(raw).unwrap_or(TypeKind::NotImplemented)
     }
 }
 
