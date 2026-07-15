@@ -264,7 +264,11 @@ fn search_directories(directory: &Path, filenames: &[String]) -> Vec<(PathBuf, S
 pub fn search_libclang_directories(filenames: &[String], variable: &str) -> Vec<(PathBuf, String)> {
     // Search only the path indicated by the relevant environment variable
     // (e.g., `LIBCLANG_PATH`) if it is set.
-    if let Ok(path) = env::var(variable).map(|d| Path::new(&d).to_path_buf()) {
+    if let Some(path) = env::var(variable)
+        .map(|d| Path::new(&d).to_path_buf())
+        .ok()
+        .or_else(|| option_env!("LIBCLANG_PATH_OVERRIDE").map(|x| x.into()))
+    {
         // Check if the path is a matching file.
         if let Some(parent) = path.parent() {
             let filename = path.file_name().unwrap().to_str().unwrap();
