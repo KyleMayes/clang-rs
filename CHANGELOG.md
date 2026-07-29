@@ -1,3 +1,14 @@
+## [2.1.0] - 2026-06-29
+
+### Changed
+- Allowed panics to properly propagate through FFI boundaries.
+- Bump MSRV to 1.71.
+
+### Fixed
+- Removed an allocation from `Entity::visit_children`.
+- Fixed passing null pointer to `from_raw_parts` in `SourceRange::tokenize`.
+- Lossily convert strings (to avoid panics on invalid UTF-8).
+
 ## [2.0.0] - 2022-05-18
 
 ### Changed
