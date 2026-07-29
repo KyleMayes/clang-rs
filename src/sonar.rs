@@ -14,9 +14,9 @@
 
 //! Finding C declarations.
 
+use std::collections::HashSet;
+use std::str::FromStr;
 use std::vec;
-use std::collections::{HashSet};
-use std::str::{FromStr};
 
 use super::{Entity, EntityKind, Type, TypeKind};
 
@@ -87,7 +87,11 @@ impl<'tu> Declaration<'tu> {
     //- Constructors -----------------------------
 
     fn new(name: String, entity: Entity<'tu>, source: Option<Entity<'tu>>) -> Declaration<'tu> {
-        Declaration { name, entity, source }
+        Declaration {
+            name,
+            entity,
+            source,
+        }
     }
 }
 
@@ -108,7 +112,11 @@ impl<'tu> Definition<'tu> {
     //- Constructors -----------------------------
 
     fn new(name: String, value: DefinitionValue, entity: Entity<'tu>) -> Definition<'tu> {
-        Definition { name, value, entity }
+        Definition {
+            name,
+            value,
+            entity,
+        }
     }
 }
 
@@ -125,7 +133,10 @@ impl<'tu> Definitions<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Definitions<'tu> {
-        Definitions { entities, seen: HashSet::new() }
+        Definitions {
+            entities,
+            seen: HashSet::new(),
+        }
     }
 }
 
@@ -161,7 +172,10 @@ impl<'tu> Enums<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Enums<'tu> {
-        Enums { entities, seen: HashSet::new() }
+        Enums {
+            entities,
+            seen: HashSet::new(),
+        }
     }
 }
 
@@ -169,7 +183,12 @@ impl<'tu> Iterator for Enums<'tu> {
     type Item = Declaration<'tu>;
 
     fn next(&mut self) -> Option<Declaration<'tu>> {
-        next(&mut self.entities, &mut self.seen, EntityKind::EnumDecl, "enum ")
+        next(
+            &mut self.entities,
+            &mut self.seen,
+            EntityKind::EnumDecl,
+            "enum ",
+        )
     }
 }
 
@@ -186,7 +205,10 @@ impl<'tu> Functions<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Functions<'tu> {
-        Functions { entities, seen: HashSet::new() }
+        Functions {
+            entities,
+            seen: HashSet::new(),
+        }
     }
 }
 
@@ -220,7 +242,10 @@ impl<'tu> Structs<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Structs<'tu> {
-        Structs { entities, seen: HashSet::new() }
+        Structs {
+            entities,
+            seen: HashSet::new(),
+        }
     }
 }
 
@@ -228,7 +253,12 @@ impl<'tu> Iterator for Structs<'tu> {
     type Item = Declaration<'tu>;
 
     fn next(&mut self) -> Option<Declaration<'tu>> {
-        next(&mut self.entities, &mut self.seen, EntityKind::StructDecl, "struct ")
+        next(
+            &mut self.entities,
+            &mut self.seen,
+            EntityKind::StructDecl,
+            "struct ",
+        )
     }
 }
 
@@ -245,7 +275,10 @@ impl<'tu> Typedefs<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Typedefs<'tu> {
-        Typedefs { entities, seen: HashSet::new() }
+        Typedefs {
+            entities,
+            seen: HashSet::new(),
+        }
     }
 }
 
@@ -260,9 +293,9 @@ impl<'tu> Iterator for Typedefs<'tu> {
                     let underlying = entity.get_typedef_underlying_type().unwrap();
                     let display = entity.get_type().unwrap().get_display_name();
 
-                    let typedef = !is_elaborated(underlying) ||
-                        underlying.get_result_type().is_some() ||
-                        is_alias(underlying, &display);
+                    let typedef = !is_elaborated(underlying)
+                        || underlying.get_result_type().is_some()
+                        || is_alias(underlying, &display);
 
                     if typedef {
                         self.seen.insert(name.clone());
@@ -288,7 +321,10 @@ impl<'tu> Unions<'tu> {
     //- Constructors -----------------------------
 
     fn new(entities: vec::IntoIter<Entity<'tu>>) -> Unions<'tu> {
-        Unions { entities, seen: HashSet::new() }
+        Unions {
+            entities,
+            seen: HashSet::new(),
+        }
     }
 }
 
@@ -296,7 +332,12 @@ impl<'tu> Iterator for Unions<'tu> {
     type Item = Declaration<'tu>;
 
     fn next(&mut self) -> Option<Declaration<'tu>> {
-        next(&mut self.entities, &mut self.seen, EntityKind::UnionDecl, "union ")
+        next(
+            &mut self.entities,
+            &mut self.seen,
+            EntityKind::UnionDecl,
+            "union ",
+        )
     }
 }
 
@@ -321,7 +362,9 @@ fn is_alias(type_: Type, name: &str) -> bool {
 }
 
 fn is_elaborated(type_: Type) -> bool {
-    type_.is_elaborated().unwrap_or(type_.get_kind() == TypeKind::Unexposed)
+    type_
+        .is_elaborated()
+        .unwrap_or(type_.get_kind() == TypeKind::Unexposed)
 }
 
 fn next<'tu>(
@@ -347,7 +390,9 @@ fn next<'tu>(
             if is(underlying, prefix) && !seen.contains(&name) {
                 let declaration = underlying.get_declaration().unwrap();
 
-                let complete = declaration.get_type().map_or(false, |t| t.get_sizeof().is_ok());
+                let complete = declaration
+                    .get_type()
+                    .map_or(false, |t| t.get_sizeof().is_ok());
                 let anonymous = declaration.get_display_name().is_none();
                 let same = entity.get_display_name() == declaration.get_display_name();
 

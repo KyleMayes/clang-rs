@@ -14,15 +14,15 @@
 
 //! Issues with source files.
 
+use std::cmp::{self, Ordering};
 use std::fmt;
 use std::mem;
-use std::cmp::{self, Ordering};
 
 use clang_sys::*;
 
-use utility;
-use super::{TranslationUnit};
 use super::source::{SourceLocation, SourceRange};
+use super::TranslationUnit;
+use utility;
 
 //================================================
 // Enums
@@ -104,25 +104,29 @@ impl<'tu> Diagnostic<'tu> {
         iter!(
             clang_getDiagnosticNumRanges(self.ptr),
             clang_getDiagnosticRange(self.ptr),
-        ).map(|r| SourceRange::from_raw(r, self.tu)).collect()
+        )
+        .map(|r| SourceRange::from_raw(r, self.tu))
+        .collect()
     }
 
     /// Returns the fix-its for this diagnostic.
     pub fn get_fix_its(&self) -> Vec<FixIt<'tu>> {
         unsafe {
-            (0..clang_getDiagnosticNumFixIts(self.ptr)).map(|i| {
-                let mut range = mem::MaybeUninit::uninit();
-                let fixit = clang_getDiagnosticFixIt(self.ptr, i, range.as_mut_ptr());
-                let string = utility::to_string(fixit);
-                let range = SourceRange::from_raw(range.assume_init(), self.tu);
-                if string.is_empty() {
-                    FixIt::Deletion(range)
-                } else if range.get_start() == range.get_end() {
-                    FixIt::Insertion(range.get_start(), string)
-                } else {
-                    FixIt::Replacement(range, string)
-                }
-            }).collect()
+            (0..clang_getDiagnosticNumFixIts(self.ptr))
+                .map(|i| {
+                    let mut range = mem::MaybeUninit::uninit();
+                    let fixit = clang_getDiagnosticFixIt(self.ptr, i, range.as_mut_ptr());
+                    let string = utility::to_string(fixit);
+                    let range = SourceRange::from_raw(range.assume_init(), self.tu);
+                    if string.is_empty() {
+                        FixIt::Deletion(range)
+                    } else if range.get_start() == range.get_end() {
+                        FixIt::Insertion(range.get_start(), string)
+                    } else {
+                        FixIt::Replacement(range, string)
+                    }
+                })
+                .collect()
         }
     }
 
@@ -132,7 +136,9 @@ impl<'tu> Diagnostic<'tu> {
         iter!(
             clang_getNumDiagnosticsInSet(ptr),
             clang_getDiagnosticInSet(ptr),
-        ).map(|d| Diagnostic::from_ptr(d, self.tu)).collect()
+        )
+        .map(|d| Diagnostic::from_ptr(d, self.tu))
+        .collect()
     }
 
     /// Returns a diagnostic formatter that builds a formatted string from this diagnostic.
@@ -157,7 +163,8 @@ impl<'tu> cmp::PartialOrd for Diagnostic<'tu> {
 
 impl<'tu> fmt::Debug for Diagnostic<'tu> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct("Diagnostic")
+        formatter
+            .debug_struct("Diagnostic")
             .field("location", &self.get_location())
             .field("severity", &self.get_severity())
             .field("text", &self.get_text())
