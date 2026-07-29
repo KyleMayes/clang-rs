@@ -30,10 +30,17 @@ pub fn test(clang: &Clang) {
         let index = Index::new(&clang, false, false);
         let tu = index.parser(f).detailed_preprocessing_record(true).parse().unwrap();
 
-        let definitions = sonar::find_definitions(tu.get_entity().get_children()).filter(|d| {
+        let mut definitions = sonar::find_definitions(tu.get_entity().get_children()).filter(|d| {
             !d.entity.is_in_system_header()
         }).collect::<Vec<_>>();
-        assert_eq!(definitions.len(), 4);
+
+        // Workaround for Clang 14 (and maybe other versions) inserting this
+        // constant.
+        if definitions[0].name == "__GCC_HAVE_DWARF2_CFI_ASM" {
+            definitions.remove(0);
+        }
+
+        assert_eq!(definitions.len(), 4, "{definitions:?}");
 
         macro_rules! assert_definition_eq {
             ($definition:expr, $name:expr, $value:expr) => ({
