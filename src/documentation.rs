@@ -22,8 +22,8 @@ use std::mem;
 
 use clang_sys::*;
 
+use super::utility;
 use super::TranslationUnit;
-use utility;
 
 //================================================
 // Enums

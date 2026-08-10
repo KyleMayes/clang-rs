@@ -28,8 +28,8 @@ use clang_sys::*;
 use libc::{c_uint, time_t};
 
 use super::token::Token;
+use super::utility::{self, Nullable};
 use super::{Entity, TranslationUnit};
-use utility::{self, Nullable};
 
 //================================================
 // Structs

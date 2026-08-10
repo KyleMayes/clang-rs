@@ -9,6 +9,7 @@ clang-sys = { path = "./clang-sys" }
 name = "clang"
 authors = ["Kyle Mayes <kyle@mayeses.com>"]
 version = "2.1.0"
+edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
 description = "A somewhat idiomatic Rust wrapper for libclang."

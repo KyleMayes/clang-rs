@@ -27,8 +27,8 @@ use clang_sys::*;
 use libc::c_uint;
 
 use super::diagnostic::Diagnostic;
+use super::utility;
 use super::{Availability, EntityKind, TranslationUnit, Unsaved, Usr};
-use utility;
 
 //================================================
 // Enums

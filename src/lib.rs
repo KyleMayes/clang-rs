@@ -54,12 +54,12 @@ use clang_sys::*;
 
 use libc::{c_int, c_uint, c_ulong};
 
-use completion::{Completer, CompletionString};
-use diagnostic::Diagnostic;
-use documentation::Comment;
-use source::{File, Module, SourceLocation, SourceRange};
-use token::Token;
-use utility::{FromError, Nullable};
+use self::completion::{Completer, CompletionString};
+use self::diagnostic::Diagnostic;
+use self::documentation::Comment;
+use self::source::{File, Module, SourceLocation, SourceRange};
+use self::token::Token;
+use self::utility::{FromError, Nullable};
 
 mod error;
 pub use self::error::*;

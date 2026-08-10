@@ -20,8 +20,8 @@ use std::mem;
 use clang_sys::*;
 
 use super::source::{SourceLocation, SourceRange};
+use super::utility;
 use super::TranslationUnit;
-use utility;
 
 //================================================
 // Enums
