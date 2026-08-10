@@ -131,7 +131,7 @@ impl<'tu> Diagnostic<'tu> {
     }
 
     /// Returns the child diagnostics of this diagnostic.
-    pub fn get_children(&self) -> Vec<Diagnostic> {
+    pub fn get_children(&self) -> Vec<Diagnostic<'_>> {
         let ptr = unsafe { clang_getChildDiagnostics(self.ptr) };
         iter!(
             clang_getNumDiagnosticsInSet(ptr),

@@ -1102,7 +1102,7 @@ pub enum PrintingPolicyFlag {
 // RefQualifier __________________________________
 
 /// Indicates the ref qualifier of a C++ function or method type.
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::enum_variant_names))]
+#[allow(clippy::enum_variant_names)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum RefQualifier {
@@ -1746,7 +1746,7 @@ impl CompileCommands {
     }
 
     /// Returns all commands for this search
-    pub fn get_commands(&self) -> Vec<CompileCommand> {
+    pub fn get_commands(&self) -> Vec<CompileCommand<'_>> {
         iter!(
             clang_CompileCommands_getSize(self.ptr),
             clang_CompileCommands_getCommand(self.ptr),
@@ -1958,7 +1958,7 @@ impl<'tu> Entity<'tu> {
     }
 
     /// Returns a completion string for this declaration or macro definition, if applicable.
-    pub fn get_completion_string(&self) -> Option<CompletionString> {
+    pub fn get_completion_string(&self) -> Option<CompletionString<'_>> {
         unsafe { clang_getCursorCompletionString(self.raw).map(CompletionString::from_ptr) }
     }
 
@@ -3171,7 +3171,7 @@ impl<'i> TranslationUnit<'i> {
     }
 
     /// Returns a completer which runs code completion.
-    pub fn completer<F: Into<PathBuf>>(&self, file: F, line: u32, column: u32) -> Completer {
+    pub fn completer<F: Into<PathBuf>>(&self, file: F, line: u32, column: u32) -> Completer<'_> {
         Completer::new(self, file, line, column)
     }
 

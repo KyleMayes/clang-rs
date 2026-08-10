@@ -15,8 +15,6 @@
 
 #![allow(unused_attributes)]
 
-use std::path::Path;
-
 #[macro_use]
 #[path = "build/macros.rs"]
 pub mod macros;
@@ -47,7 +45,7 @@ fn main() {
     }
 
     if let Some(output) = common::run_llvm_config(&["--includedir"]) {
-        let directory = Path::new(output.trim_end());
+        let directory = std::path::Path::new(output.trim_end());
         println!("cargo:include={}", directory.display());
     }
 }

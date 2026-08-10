@@ -20,7 +20,7 @@
 //! minimum `libclang` version required to use the item.
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::unreadable_literal))]
+#![allow(clippy::unreadable_literal)]
 
 pub mod support;
 

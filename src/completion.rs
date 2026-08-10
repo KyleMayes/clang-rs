@@ -347,7 +347,7 @@ impl CompletionResults {
     }
 
     /// Returns the code completion results in this set of code completion results.
-    pub fn get_results(&self) -> Vec<CompletionResult> {
+    pub fn get_results(&self) -> Vec<CompletionResult<'_>> {
         unsafe {
             let raws = slice::from_raw_parts((*self.ptr).Results, (*self.ptr).NumResults as usize);
             raws.iter()
@@ -442,7 +442,7 @@ impl<'r> CompletionString<'r> {
     }
 
     /// Returns the chunks of this completion string.
-    pub fn get_chunks(&self) -> Vec<CompletionChunk> {
+    pub fn get_chunks(&self) -> Vec<CompletionChunk<'_>> {
         iter!(
             clang_getNumCompletionChunks(self.ptr),
             clang_getCompletionChunkKind(self.ptr),

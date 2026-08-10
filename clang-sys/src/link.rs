@@ -93,7 +93,7 @@ macro_rules! link {
         pub struct Functions {
             $(
                 $(#[doc=$doc] #[cfg($cfg)])*
-                pub $name: Option<unsafe extern fn($($pname: $pty), *) $(-> $ret)*>,
+                pub $name: Option<unsafe extern "C" fn($($pname: $pty), *) $(-> $ret)*>,
             )+
         }
 
@@ -125,7 +125,7 @@ macro_rules! link {
             pub fn version(&self) -> Option<Version> {
                 macro_rules! check {
                     ($fn:expr, $version:ident) => {
-                        if self.library.get::<unsafe extern fn()>($fn).is_ok() {
+                        if self.library.get::<unsafe extern "C" fn()>($fn).is_ok() {
                             return Some(Version::$version);
                         }
                     };
@@ -170,8 +170,8 @@ macro_rules! link {
         }
 
         $(
-            #[cfg_attr(feature="cargo-clippy", allow(clippy::missing_safety_doc))]
-            #[cfg_attr(feature="cargo-clippy", allow(clippy::too_many_arguments))]
+            #[allow(clippy::missing_safety_doc)]
+            #[allow(clippy::too_many_arguments)]
             $(#[doc=$doc] #[cfg($cfg)])*
             pub unsafe fn $name($($pname: $pty), *) $(-> $ret)* {
                 let f = with_library(|library| {
@@ -305,7 +305,7 @@ macro_rules! link {
             pub fn $name:ident($($pname:ident: $pty:ty),* $(,)?) $(-> $ret:ty)*;
         )+
     ) => (
-        extern {
+        extern "C" {
             $(
                 $(#[doc=$doc] #[cfg($cfg)])*
                 pub fn $name($($pname: $pty), *) $(-> $ret)*;

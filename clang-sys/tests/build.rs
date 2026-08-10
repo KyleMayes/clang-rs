@@ -233,6 +233,7 @@ fn test_all() {
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! assert_error {
     ($result:expr, $contents:expr $(,)?) => {
         if let Err(error) = $result {
