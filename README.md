@@ -33,5 +33,5 @@ default.
 
 ## Dependencies
 
-See [here](https://github.com/KyleMayes/clang-sys#dependencies) for information on this crate's
-dependencies.
+See [`clang-sys`](https://github.com/KyleMayes/clang-rs/blob/HEAD/clang-sys/README.md#dependencies)
+for information on this crate's dependencies.

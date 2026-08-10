@@ -2,7 +2,7 @@
 
 [![Crate](https://img.shields.io/crates/v/clang-sys.svg)](https://crates.io/crates/clang-sys)
 [![Documentation](https://docs.rs/clang-sys/badge.svg)](https://docs.rs/clang-sys)
-[![CI](https://img.shields.io/github/actions/workflow/status/KyleMayes/clang-sys/ci.yml?branch=master)](https://github.com/KyleMayes/clang-sys/actions?query=workflow%3ACI)
+[![CI](https://img.shields.io/github/actions/workflow/status/KyleMayes/clang-rs/ci.yml?branch=master)](https://github.com/KyleMayes/clang-rs/actions?query=workflow%3ACI)
 ![MSRV](https://img.shields.io/badge/MSRV-1.71.0-blue)
 
 Rust bindings for `libclang`.
@@ -102,8 +102,8 @@ cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS=clang -DLIBCLANG_BUILD_ST
 ninja -C build
 
 cd ..
-git clone git@github.com:KyleMayes/clang-sys.git
-cd clang-sys
+git clone git@github.com:KyleMayes/clang-rs.git
+cd clang-rs
 
 LLVM_CONFIG_PATH=../llvm-project/build/bin/llvm-config cargo test --features static
 ```

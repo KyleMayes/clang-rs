@@ -7,7 +7,7 @@ readme = "README.md"
 license = "Apache-2.0"
 description = "Rust bindings for libclang."
 documentation = "https://docs.rs/clang-sys"
-repository = "https://github.com/KyleMayes/clang-sys"
+repository = "https://github.com/KyleMayes/clang-rs"
 rust-version = "1.71"
 
 links = "clang"
