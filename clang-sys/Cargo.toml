@@ -1,27 +1,19 @@
 [package]
-
-edition = "2021"
-
 name = "clang-sys"
 authors = ["Kyle Mayes <kyle@mayeses.com>"]
-
 version = "1.9.1"
-
+edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
-
 description = "Rust bindings for libclang."
-
 documentation = "https://docs.rs/clang-sys"
 repository = "https://github.com/KyleMayes/clang-sys"
+rust-version = "1.71"
 
 links = "clang"
 build = "build.rs"
 
-rust-version = "1.71"
-
 [features]
-
 clang_3_5 = []
 clang_3_6 = ["clang_3_5"]
 clang_3_7 = ["clang_3_6"]
@@ -51,21 +43,17 @@ static = []
 libcpp = []
 
 [dependencies]
-
 glob = "0.3"
 libc = { version = "0.2.39", default-features = false }
 libloading = { version = "0.8", optional = true }
 
 [build-dependencies]
-
 glob = "0.3"
 
 [dev-dependencies]
-
 glob = "0.3"
 lazy_static = "1"
 tempfile = "3.6.0"
 
 [package.metadata.docs.rs]
-
 features = ["clang_20_0", "runtime"]

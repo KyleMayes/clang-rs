@@ -52,18 +52,24 @@ jobs:
           toolchain: ${{ matrix.rust }}
 
       # Cargo
-      - name: Generate lockfile
-        run: cargo generate-lockfile
+      - name: Generate lockfile and pin dependencies for MSRV
+        run: cargo generate-lockfile && cargo update -p getrandom --precise 0.3.4 && cargo update -p rustc-hash --precise 2.1.0
 
       # Test
       - name: Cargo Test (Dynamic)
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/lib
           LLVM_CONFIG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/bin/llvm-config
-        run: cargo test --verbose --features ${{ matrix.clang[1] }} -- --nocapture
+        run: cargo test --workspace --verbose --features ${{ matrix.clang[1] }} -- --nocapture
 
       - name: Cargo Test (Runtime)
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/lib
           LLVM_CONFIG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/bin/llvm-config
-        run: cargo test --verbose --features "${{ matrix.clang[1] }} runtime" -- --nocapture
+        run: cargo test --workspace --verbose --features "${{ matrix.clang[1] }} runtime clang-sys/runtime bindgen-test/runtime" -- --nocapture
+
+      - name: Run bindgen-test
+        env:
+          LIBCLANG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/lib
+          LLVM_CONFIG_PATH: ${{ runner.temp }}/llvm-${{ matrix.clang[0] }}/bin/llvm-config
+        run: cargo run -pbindgen-test --bin bindgen-test

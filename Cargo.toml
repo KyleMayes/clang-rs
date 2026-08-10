@@ -1,24 +1,24 @@
-[package]
+[workspace]
+members = ["clang-sys", "bindgen-test"]
 
+# For bindgen-test
+[patch.crates-io]
+clang-sys = { path = "./clang-sys" }
+
+[package]
 name = "clang"
 authors = ["Kyle Mayes <kyle@mayeses.com>"]
-
 version = "2.1.0"
-
 readme = "README.md"
 license = "Apache-2.0"
-
 description = "A somewhat idiomatic Rust wrapper for libclang."
-
 documentation = "https://docs.rs/clang"
 repository = "https://github.com/KyleMayes/clang-rs"
-
 rust-version = "1.71"
 
 autotests = false
 
 [features]
-
 clang_3_5 = ["clang-sys/clang_3_5"]
 clang_3_6 = ["clang-sys/clang_3_6", "clang_3_5"]
 clang_3_7 = ["clang-sys/clang_3_7", "clang_3_6"]
@@ -36,15 +36,12 @@ runtime = ["clang-sys/runtime"]
 static = ["clang-sys/static"]
 
 [dependencies]
-
-clang-sys = "1"
+clang-sys = { path = "./clang-sys", version = "1.9.1" }
 libc = "0.2.39"
 
 [[test]]
-
 name = "tests"
 harness = true
 
 [package.metadata.docs.rs]
-
 features = ["clang_10_0"]
