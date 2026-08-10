@@ -1027,7 +1027,17 @@ pub enum Nullability {
     /// Values of this type can be null.
     Nullable = 1,
     /// Whether values of this type can be null is (explicitly) unspecified.
+    ///
+    /// This captures a (fairly rare) case where we can't conclude anything
+    /// about the nullability of the type even though it has been considered.
     Unspecified = 2,
+    /// Generally behaves like Nullable, except when used in a block parameter
+    /// that was imported into a swift async method.
+    ///
+    /// There, swift will assume that the parameter can get null even if no
+    /// error occurred. _Nullable parameters are assumed to only get null on
+    /// error.
+    NullableResult = 4,
 }
 
 #[cfg(feature = "clang_8_0")]
@@ -1035,6 +1045,7 @@ impl Nullability {
     fn from_raw(raw: c_int) -> Option<Self> {
         match raw {
             0..=2 => Some(unsafe { mem::transmute(raw) }),
+            4 => Some(Self::NullableResult),
             _ => None,
         }
     }
